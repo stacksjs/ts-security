@@ -69,7 +69,7 @@ declare global {
  * is encrypted to produce random bytes. The key is regularly updated
  * using entropy from the system.
  */
-const prng_aes: PRNGAes = {
+export const prng_aes: PRNGAes = {
   formatKey(key: string | number[] | ByteStringBuffer): number[] {
     // convert the key into 32-bit integers
     const tmp = createBuffer(key as string)
@@ -126,8 +126,8 @@ const prng_aes: PRNGAes = {
  */
 export function spawnPrng(): PRNG {
   // Internal state
-  let key = Array.from({ length: 4 }).fill(0)
-  let seed = Array.from({ length: 4 }).fill(0)
+  let key: number[] = Array.from({ length: 4 }).fill(0) as number[]
+  let seed: number[] = Array.from({ length: 4 }).fill(0) as number[]
   let time = 0
   let collected = 0
   const entropyPool = createBuffer()
@@ -198,11 +198,8 @@ export function spawnPrng(): PRNG {
   return ctx
 }
 
-// Create the default PRNG context
-const _ctx = spawnPrng()
-
 // Get crypto implementation
-function getRandomValues(arr: Uint32Array): Uint32Array {
+export function getRandomValues(arr: Uint32Array): Uint32Array {
   const _window = typeof globalThis !== 'undefined' ? globalThis : {} as any
 
   if (_window.crypto?.getRandomValues)
@@ -214,46 +211,8 @@ function getRandomValues(arr: Uint32Array): Uint32Array {
   throw new Error('No cryptographic random number generator available.')
 }
 
-/**
- * Initialize entropy collection for non-native crypto environments.
- * This is only done if we're in a browser without native crypto support.
- * We collect entropy from various sources including:
- * - System time and performance metrics
- * - Navigator and browser state
- * - User input events (handled separately)
- */
-if (!isServer && !getRandomValues) {
-  // Skip entropy collection in web workers as they should receive
-  // entropy from the main thread
-  const _window = typeof globalThis !== 'undefined' ? globalThis : {} as any
-  if (!_window.document) {
-    // FIXME: Implement web worker entropy handling
-  }
-
-  // Add load time entropy
-  _ctx.collectInt(+new Date(), 32)
-
-  // Collect entropy from navigator object properties
-  if (typeof navigator !== 'undefined') {
-    let _navBytes = ''
-    const nav = navigator as ExtendedNavigator
-    for (const key in nav) {
-      try {
-        if (typeof nav[key] === 'string') {
-          _navBytes += nav[key]
-        }
-      }
-      catch (e) {
-        /* Some navigator properties may be inaccessible */
-      }
-    }
-    _ctx.collect(_navBytes)
-    _navBytes = '' // Clear the string instead of setting to null
-  }
-}
-
 // Expose PRNG spawning capability
 export const createInstance: () => PRNG = spawnPrng
 
 // Export the random API
-export const random: PRNG = _ctx
+export const random: PRNG = createInstance()

@@ -1,367 +1,330 @@
 /**
  * Secure Hash Algorithm with 256-bit digest (SHA-256) implementation.
  *
- * See FIPS 180-2 for details.
+ * This implementation follows FIPS 180-2 specification for SHA-256.
+ * It provides a secure hash function that produces a 256-bit (32-byte) hash value
+ * for any given input data.
+ *
+ * Key features:
+ * 1. Implements the standard SHA-256 algorithm as specified in FIPS 180-2
+ * 2. Processes input in 512-bit blocks
+ * 3. Produces a 256-bit message digest
+ * 4. Supports both synchronous and streaming operations
+ * 5. Handles UTF-8 encoded input
  *
  * @author Dave Longley
- *
  * Copyright (c) 2010-2015 Digital Bazaar, Inc.
  */
 
-import { createBuffer, fillString } from './utils'
+import { ByteStringBuffer, createBuffer, fillString } from './utils'
 
-export const sha256 = {}
+// SHA-256 state interface
+interface SHA256State {
+  h0: number
+  h1: number
+  h2: number
+  h3: number
+  h4: number
+  h5: number
+  h6: number
+  h7: number
+}
+
+// Message digest interface
+interface MessageDigest {
+  algorithm: string
+  blockLength: number
+  digestLength: number
+  messageLength: number
+  fullMessageLength: number[]
+  messageLength64?: number[]
+  messageLengthSize: number
+  start: () => MessageDigest
+  update: (msg: string, encoding?: string) => MessageDigest
+  digest: () => ByteStringBuffer
+}
+
+// Internal state
+let _initialized = false
+let _padding: string | null = null
+let _k: number[] | null = null
 
 /**
  * Creates a SHA-256 message digest object.
  *
- * @return a message digest object.
+ * @returns a message digest object.
  */
-sha256.create = function () {
-  // do initialization as necessary
+export function create(): MessageDigest {
+  // Initialize constants if necessary
   if (!_initialized) {
     _init()
   }
 
   // SHA-256 state contains eight 32-bit integers
-  let _state = null
+  let _state: SHA256State | null = null
 
-  // input buffer
+  // Input buffer
   let _input = createBuffer()
 
-  // used for word storage
-  const _w = Array.from({ length: 64 })
+  // Used for word storage
+  const _w = Array.from({ length: 64 }) as number[]
 
-  // message digest object
-  const md = {
+  // Message digest object
+  const md: MessageDigest = {
     algorithm: 'sha256',
     blockLength: 64,
     digestLength: 32,
-    // 56-bit length of message so far (does not including padding)
     messageLength: 0,
-    // true message length
-    fullMessageLength: null,
-    // size of message length in bytes
+    fullMessageLength: [],
     messageLengthSize: 8,
+
+    /**
+     * Starts the digest.
+     *
+     * @returns this digest object.
+     */
+    start() {
+      // Reset message length
+      md.messageLength = 0
+      md.fullMessageLength = []
+      const int32s = md.messageLengthSize / 4
+      for (let i = 0; i < int32s; ++i) {
+        md.fullMessageLength.push(0)
+      }
+
+      // Reset input buffer
+      _input = createBuffer()
+
+      // Reset state
+      _state = {
+        h0: 0x6A09E667,
+        h1: 0xBB67AE85,
+        h2: 0x3C6EF372,
+        h3: 0xA54FF53A,
+        h4: 0x510E527F,
+        h5: 0x9B05688C,
+        h6: 0x1F83D9AB,
+        h7: 0x5BE0CD19,
+      }
+
+      return md
+    },
+
+    /**
+     * Updates the digest with the given message input.
+     *
+     * @param msg - The message input to update with.
+     * @param encoding - The encoding to use (default: 'raw', other: 'utf8').
+     * @returns this digest object.
+     */
+    update(msg: string, encoding?: string) {
+      if (!msg) {
+        return md
+      }
+
+      // Handle UTF-8 encoding
+      if (encoding === 'utf8') {
+        msg = encodeURIComponent(msg)
+      }
+
+      // Update message length
+      const len = msg.length
+      md.messageLength += len
+      const lenArr = [(len / 0x100000000) >>> 0, len >>> 0]
+
+      for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
+        md.fullMessageLength[i] += lenArr[1]
+        lenArr[1] = lenArr[0] + ((md.fullMessageLength[i] / 0x100000000) >>> 0)
+        md.fullMessageLength[i] = md.fullMessageLength[i] >>> 0
+        lenArr[0] = ((lenArr[1] / 0x100000000) >>> 0)
+      }
+
+      // Add bytes to input buffer
+      _input.putBytes(msg)
+
+      // Process bytes
+      _update(_state!, _w, _input)
+
+      // Compact input buffer every 2K bytes
+      if (_input.length() > 2048) {
+        _input = createBuffer(_input.bytes())
+      }
+
+      return md
+    },
+
+    /**
+     * Produces the digest.
+     *
+     * @returns a byte buffer containing the digest value.
+     */
+    digest() {
+      const finalBlock = createBuffer()
+      finalBlock.putBytes(_input.bytes())
+
+      // Compute remaining size to be digested (include message length size)
+      const remaining = (
+        md.fullMessageLength[md.fullMessageLength.length - 1]
+        + md.messageLengthSize
+      )
+
+      // Add padding
+      const overflow = remaining & (md.blockLength - 1)
+      finalBlock.putBytes(_padding!.substr(0, md.blockLength - overflow))
+
+      // Serialize message length in bits in big-endian order
+      let bits = md.fullMessageLength[0] * 8
+      const finalState = {
+        h0: _state!.h0,
+        h1: _state!.h1,
+        h2: _state!.h2,
+        h3: _state!.h3,
+        h4: _state!.h4,
+        h5: _state!.h5,
+        h6: _state!.h6,
+        h7: _state!.h7,
+      }
+
+      for (let i = 0; i < md.fullMessageLength.length - 1; ++i) {
+        const next = md.fullMessageLength[i + 1] * 8
+        const carry = (next / 0x100000000) >>> 0
+        bits += carry
+        finalBlock.putInt32(bits >>> 0)
+        bits = next >>> 0
+      }
+      finalBlock.putInt32(bits)
+
+      // Final update
+      _update(finalState, _w, finalBlock)
+
+      // Build final hash value
+      const rval = createBuffer()
+      rval.putInt32(finalState.h0)
+      rval.putInt32(finalState.h1)
+      rval.putInt32(finalState.h2)
+      rval.putInt32(finalState.h3)
+      rval.putInt32(finalState.h4)
+      rval.putInt32(finalState.h5)
+      rval.putInt32(finalState.h6)
+      rval.putInt32(finalState.h7)
+
+      return rval
+    },
   }
 
-  /**
-   * Starts the digest.
-   *
-   * @return this digest object.
-   */
-  md.start = function () {
-    // up to 56-bit message length for convenience
-    md.messageLength = 0
-
-    // full message length (set md.messageLength64 for backwards-compatibility)
-    md.fullMessageLength = md.messageLength64 = []
-    const int32s = md.messageLengthSize / 4
-    for (let i = 0; i < int32s; ++i) {
-      md.fullMessageLength.push(0)
-    }
-    _input = createBuffer()
-    _state = {
-      h0: 0x6A09E667,
-      h1: 0xBB67AE85,
-      h2: 0x3C6EF372,
-      h3: 0xA54FF53A,
-      h4: 0x510E527F,
-      h5: 0x9B05688C,
-      h6: 0x1F83D9AB,
-      h7: 0x5BE0CD19,
-    }
-    return md
-  }
-  // start digest automatically for first time
-  md.start()
-
-  /**
-   * Updates the digest with the given message input. The given input can
-   * treated as raw input (no encoding will be applied) or an encoding of
-   * 'utf8' maybe given to encode the input using UTF-8.
-   *
-   * @param msg the message input to update with.
-   * @param encoding the encoding to use (default: 'raw', other: 'utf8').
-   *
-   * @return this digest object.
-   */
-  md.update = function (msg, encoding) {
-    if (encoding === 'utf8') {
-      msg = forge.util.encodeUtf8(msg)
-    }
-
-    // update message length
-    let len = msg.length
-    md.messageLength += len
-    len = [(len / 0x100000000) >>> 0, len >>> 0]
-    for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
-      md.fullMessageLength[i] += len[1]
-      len[1] = len[0] + ((md.fullMessageLength[i] / 0x100000000) >>> 0)
-      md.fullMessageLength[i] = md.fullMessageLength[i] >>> 0
-      len[0] = ((len[1] / 0x100000000) >>> 0)
-    }
-
-    // add bytes to input buffer
-    _input.putBytes(msg)
-
-    // process bytes
-    _update(_state, _w, _input)
-
-    // compact input buffer every 2K or if empty
-    if (_input.read > 2048 || _input.length() === 0) {
-      _input.compact()
-    }
-
-    return md
-  }
-
-  /**
-   * Produces the digest.
-   *
-   * @return a byte buffer containing the digest value.
-   */
-  md.digest = function () {
-    /* Note: Here we copy the remaining bytes in the input buffer and
-    add the appropriate SHA-256 padding. Then we do the final update
-    on a copy of the state so that if the user wants to get
-    intermediate digests they can do so. */
-
-    /* Determine the number of bytes that must be added to the message
-    to ensure its length is congruent to 448 mod 512. In other words,
-    the data to be digested must be a multiple of 512 bits (or 128 bytes).
-    This data includes the message, some padding, and the length of the
-    message. Since the length of the message will be encoded as 8 bytes (64
-    bits), that means that the last segment of the data must have 56 bytes
-    (448 bits) of message and padding. Therefore, the length of the message
-    plus the padding must be congruent to 448 mod 512 because
-    512 - 128 = 448.
-
-    In order to fill up the message length it must be filled with
-    padding that begins with 1 bit followed by all 0 bits. Padding
-    must *always* be present, so if the message length is already
-    congruent to 448 mod 512, then 512 padding bits must be added. */
-
-    const finalBlock = createBuffer()
-    finalBlock.putBytes(_input.bytes())
-
-    // compute remaining size to be digested (include message length size)
-    const remaining = (
-      md.fullMessageLength[md.fullMessageLength.length - 1]
-      + md.messageLengthSize)
-
-    // add padding for overflow blockSize - overflow
-    // _padding starts with 1 byte with first bit is set (byte value 128), then
-    // there may be up to (blockSize - 1) other pad bytes
-    const overflow = remaining & (md.blockLength - 1)
-    finalBlock.putBytes(_padding.substr(0, md.blockLength - overflow))
-
-    // serialize message length in bits in big-endian order; since length
-    // is stored in bytes we multiply by 8 and add carry from next int
-    let next, carry
-    let bits = md.fullMessageLength[0] * 8
-    for (let i = 0; i < md.fullMessageLength.length - 1; ++i) {
-      next = md.fullMessageLength[i + 1] * 8
-      carry = (next / 0x100000000) >>> 0
-      bits += carry
-      finalBlock.putInt32(bits >>> 0)
-      bits = next >>> 0
-    }
-    finalBlock.putInt32(bits)
-
-    const s2 = {
-      h0: _state.h0,
-      h1: _state.h1,
-      h2: _state.h2,
-      h3: _state.h3,
-      h4: _state.h4,
-      h5: _state.h5,
-      h6: _state.h6,
-      h7: _state.h7,
-    }
-    _update(s2, _w, finalBlock)
-    const rval = createBuffer()
-    rval.putInt32(s2.h0)
-    rval.putInt32(s2.h1)
-    rval.putInt32(s2.h2)
-    rval.putInt32(s2.h3)
-    rval.putInt32(s2.h4)
-    rval.putInt32(s2.h5)
-    rval.putInt32(s2.h6)
-    rval.putInt32(s2.h7)
-    return rval
-  }
-
-  return md
+  // Start digest automatically for first time
+  return md.start()
 }
-
-// sha-256 padding bytes not initialized yet
-var _padding = null
-var _initialized = false
-
-// table of constants
-let _k = null
 
 /**
  * Initializes the constant tables.
  */
-function _init() {
-  // create padding
+function _init(): void {
+  // Create padding
   _padding = String.fromCharCode(128)
   _padding += fillString(String.fromCharCode(0x00), 64)
 
-  // create K table for SHA-256
+  // Create K table for SHA-256
   _k = [
-    0x428A2F98,
-    0x71374491,
-    0xB5C0FBCF,
-    0xE9B5DBA5,
-    0x3956C25B,
-    0x59F111F1,
-    0x923F82A4,
-    0xAB1C5ED5,
-    0xD807AA98,
-    0x12835B01,
-    0x243185BE,
-    0x550C7DC3,
-    0x72BE5D74,
-    0x80DEB1FE,
-    0x9BDC06A7,
-    0xC19BF174,
-    0xE49B69C1,
-    0xEFBE4786,
-    0x0FC19DC6,
-    0x240CA1CC,
-    0x2DE92C6F,
-    0x4A7484AA,
-    0x5CB0A9DC,
-    0x76F988DA,
-    0x983E5152,
-    0xA831C66D,
-    0xB00327C8,
-    0xBF597FC7,
-    0xC6E00BF3,
-    0xD5A79147,
-    0x06CA6351,
-    0x14292967,
-    0x27B70A85,
-    0x2E1B2138,
-    0x4D2C6DFC,
-    0x53380D13,
-    0x650A7354,
-    0x766A0ABB,
-    0x81C2C92E,
-    0x92722C85,
-    0xA2BFE8A1,
-    0xA81A664B,
-    0xC24B8B70,
-    0xC76C51A3,
-    0xD192E819,
-    0xD6990624,
-    0xF40E3585,
-    0x106AA070,
-    0x19A4C116,
-    0x1E376C08,
-    0x2748774C,
-    0x34B0BCB5,
-    0x391C0CB3,
-    0x4ED8AA4A,
-    0x5B9CCA4F,
-    0x682E6FF3,
-    0x748F82EE,
-    0x78A5636F,
-    0x84C87814,
-    0x8CC70208,
-    0x90BEFFFA,
-    0xA4506CEB,
-    0xBEF9A3F7,
-    0xC67178F2,
+    0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5,
+    0x3956C25B, 0x59F111F1, 0x923F82A4, 0xAB1C5ED5,
+    0xD807AA98, 0x12835B01, 0x243185BE, 0x550C7DC3,
+    0x72BE5D74, 0x80DEB1FE, 0x9BDC06A7, 0xC19BF174,
+    0xE49B69C1, 0xEFBE4786, 0x0FC19DC6, 0x240CA1CC,
+    0x2DE92C6F, 0x4A7484AA, 0x5CB0A9DC, 0x76F988DA,
+    0x983E5152, 0xA831C66D, 0xB00327C8, 0xBF597FC7,
+    0xC6E00BF3, 0xD5A79147, 0x06CA6351, 0x14292967,
+    0x27B70A85, 0x2E1B2138, 0x4D2C6DFC, 0x53380D13,
+    0x650A7354, 0x766A0ABB, 0x81C2C92E, 0x92722C85,
+    0xA2BFE8A1, 0xA81A664B, 0xC24B8B70, 0xC76C51A3,
+    0xD192E819, 0xD6990624, 0xF40E3585, 0x106AA070,
+    0x19A4C116, 0x1E376C08, 0x2748774C, 0x34B0BCB5,
+    0x391C0CB3, 0x4ED8AA4A, 0x5B9CCA4F, 0x682E6FF3,
+    0x748F82EE, 0x78A5636F, 0x84C87814, 0x8CC70208,
+    0x90BEFFFA, 0xA4506CEB, 0xBEF9A3F7, 0xC67178F2,
   ]
 
-  // now initialized
   _initialized = true
 }
 
 /**
  * Updates a SHA-256 state with the given byte buffer.
  *
- * @param s the SHA-256 state to update.
- * @param w the array to use to store words.
- * @param bytes the byte buffer to update with.
+ * @param s - The SHA-256 state to update.
+ * @param w - The array to use to store words.
+ * @param bytes - The byte buffer to update with.
  */
-export function _update(s: any, w: any, bytes: any): void {
-  // consume 512 bit (64 byte) chunks
-  let t1, t2, s0, s1, ch, maj, i, a, b, c, d, e, f, g, h
+export function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
+  // Consume 512 bit (64 byte) chunks
   let len = bytes.length()
 
   while (len >= 64) {
-    // the w array will be populated with sixteen 32-bit big-endian words
-    // and then extended into 64 32-bit words according to SHA-256
-    for (i = 0; i < 16; ++i)
+    // Populate sixteen 32-bit big-endian words
+    for (let i = 0; i < 16; ++i) {
       w[i] = bytes.getInt32()
-
-    for (; i < 64; ++i) {
-      // XOR word 2 words ago rot right 17, rot right 19, shft right 10
-      t1 = w[i - 2]
-      t1
-        = ((t1 >>> 17) | (t1 << 15))
-          ^ ((t1 >>> 19) | (t1 << 13))
-          ^ (t1 >>> 10)
-      // XOR word 15 words ago rot right 7, rot right 18, shift right 3
-      t2 = w[i - 15]
-      t2
-        = ((t2 >>> 7) | (t2 << 25))
-          ^ ((t2 >>> 18) | (t2 << 14))
-          ^ (t2 >>> 3)
-      // sum(t1, word 7 ago, t2, word 16 ago) modulo 2^32
-      w[i] = (t1 + w[i - 7] + t2 + w[i - 16]) | 0
     }
 
-    // initialize hash value for this chunk
-    a = s.h0
-    b = s.h1
-    c = s.h2
-    d = s.h3
-    e = s.h4
-    f = s.h5
-    g = s.h6
-    h = s.h7
+    // Extend into 64 32-bit words
+    for (let i = 16; i < 64; ++i) {
+      // XOR word 2 words ago rot right 17, rot right 19, shft right 10
+      const t1 = w[i - 2]
+      const s1 = ((t1 >>> 17) | (t1 << 15))
+        ^ ((t1 >>> 19) | (t1 << 13))
+        ^ (t1 >>> 10)
 
-    // round function
-    for (i = 0; i < 64; ++i) {
+      // XOR word 15 words ago rot right 7, rot right 18, shift right 3
+      const t2 = w[i - 15]
+      const s0 = ((t2 >>> 7) | (t2 << 25))
+        ^ ((t2 >>> 18) | (t2 << 14))
+        ^ (t2 >>> 3)
+
+      // Sum(t1, word 7 ago, t2, word 16 ago) modulo 2^32
+      w[i] = (s1 + w[i - 7] + s0 + w[i - 16]) | 0
+    }
+
+    // Initialize working variables
+    let a = s.h0
+    let b = s.h1
+    let c = s.h2
+    let d = s.h3
+    let e = s.h4
+    let f = s.h5
+    let g = s.h6
+    let h = s.h7
+
+    // Compression function main loop
+    for (let i = 0; i < 64; ++i) {
       // Sum1(e)
-      s1
-        = ((e >>> 6) | (e << 26))
-          ^ ((e >>> 11) | (e << 21))
-          ^ ((e >>> 25) | (e << 7))
-      // Ch(e, f, g) (optimized the same way as SHA-1)
-      ch = g ^ (e & (f ^ g))
-      // Sum0(a)
-      s0
-        = ((a >>> 2) | (a << 30))
-          ^ ((a >>> 13) | (a << 19))
-          ^ ((a >>> 22) | (a << 10))
-      // Maj(a, b, c) (optimized the same way as SHA-1)
-      maj = (a & b) | (c & (a ^ b))
+      const s1 = ((e >>> 6) | (e << 26))
+        ^ ((e >>> 11) | (e << 21))
+        ^ ((e >>> 25) | (e << 7))
 
-      // main algorithm
-      t1 = h + s1 + ch + _k[i] + w[i]
-      t2 = s0 + maj
+      // Ch(e, f, g)
+      const ch = g ^ (e & (f ^ g))
+
+      // Sum0(a)
+      const s0 = ((a >>> 2) | (a << 30))
+        ^ ((a >>> 13) | (a << 19))
+        ^ ((a >>> 22) | (a << 10))
+
+      // Maj(a, b, c)
+      const maj = (a & b) | (c & (a ^ b))
+
+      // Main algorithm
+      const t1 = h + s1 + ch + _k![i] + w[i]
+      const t2 = s0 + maj
+
       h = g
       g = f
       f = e
-      // `>>> 0` necessary to avoid iOS/Safari 10 optimization bug
-      // can't truncate with `| 0`
       e = (d + t1) >>> 0
       d = c
       c = b
       b = a
-      // `>>> 0` necessary to avoid iOS/Safari 10 optimization bug
-      // can't truncate with `| 0`
       a = (t1 + t2) >>> 0
     }
 
-    // update hash state
+    // Update hash state
     s.h0 = (s.h0 + a) | 0
     s.h1 = (s.h1 + b) | 0
     s.h2 = (s.h2 + c) | 0
@@ -370,6 +333,14 @@ export function _update(s: any, w: any, bytes: any): void {
     s.h5 = (s.h5 + f) | 0
     s.h6 = (s.h6 + g) | 0
     s.h7 = (s.h7 + h) | 0
+
     len -= 64
   }
 }
+
+// Export the SHA-256 implementation
+interface SHA256API {
+  create: () => MessageDigest
+}
+
+export const sha256: SHA256API = { create }
