@@ -143,7 +143,7 @@ export class BigInteger {
     }
     else if (randomizer) {
       // New BigInteger(int, RNG)
-      const x: number[] = new Array((value >> 3) + 1)
+      const x: number[] = Array.from({ length: (value >> 3) + 1 })
       const t = value & 7
       x.length = (value >> 3) + 1
       randomizer.nextBytes(x)
@@ -714,26 +714,26 @@ export class BigInteger {
   }
 
   public multiplyLowerTo(a: BigInteger, n: number, r: BigInteger): void {
-    let i = Math.min(this.t + a.t, n);
-    r.s = 0; // assumes a,this >= 0
-    r.t = i;
-    while (i > 0) r.data[--i] = 0;
-    let j;
-    for (j = r.t - this.t; i < j; ++i) r.data[i + this.t] = this.am(0, a.data[i], r, i, 0, this.t);
-    for (j = Math.min(a.t, n); i < j; ++i) this.am(0, a.data[i], r, i, 0, n - i);
-    r.clamp();
+    let i = Math.min(this.t + a.t, n)
+    r.s = 0 // assumes a,this >= 0
+    r.t = i
+    while (i > 0) r.data[--i] = 0
+    let j
+    for (j = r.t - this.t; i < j; ++i) r.data[i + this.t] = this.am(0, a.data[i], r, i, 0, this.t)
+    for (j = Math.min(a.t, n); i < j; ++i) this.am(0, a.data[i], r, i, 0, n - i)
+    r.clamp()
   }
 
   public multiplyUpperTo(a: BigInteger, n: number, r: BigInteger): void {
-    --n;
-    let i = r.t = this.t + a.t - n;
-    r.s = 0; // assumes a,this >= 0
-    while (--i >= 0) r.data[i] = 0;
+    --n
+    let i = r.t = this.t + a.t - n
+    r.s = 0 // assumes a,this >= 0
+    while (--i >= 0) r.data[i] = 0
     for (i = Math.max(n - this.t, 0); i < a.t; ++i) {
-      r.data[this.t + i - n] = this.am(n - i, a.data[i], r, 0, 0, this.t + i - n);
+      r.data[this.t + i - n] = this.am(n - i, a.data[i], r, 0, 0, this.t + i - n)
     }
-    r.clamp();
-    r.drShiftTo(1, r);
+    r.clamp()
+    r.drShiftTo(1, r)
   }
 
   // Shifting operations
@@ -985,60 +985,66 @@ export class BigInteger {
   }
 
   public dAddOffset(n: number, w: number): void {
-    if (n === 0) return;
-    while (this.t <= w) this.data[this.t++] = 0;
-    this.data[w] += n;
+    if (n === 0)
+      return
+    while (this.t <= w) this.data[this.t++] = 0
+    this.data[w] += n
     while (this.data[w] >= BigInteger.DV) {
-      this.data[w] -= BigInteger.DV;
-      if (++w >= this.t) this.data[this.t++] = 0;
-      ++this.data[w];
+      this.data[w] -= BigInteger.DV
+      if (++w >= this.t)
+        this.data[this.t++] = 0
+      ++this.data[w]
     }
   }
 
   private fromRadix(s: string, b: number): void {
-    this.fromInt(0);
-    const cs = this.chunkSize(b);
-    const d = Math.pow(b, cs);
-    let mi = false;
-    let j = 0;
-    let w = 0;
+    this.fromInt(0)
+    const cs = this.chunkSize(b)
+    const d = b ** cs
+    let mi = false
+    let j = 0
+    let w = 0
 
     for (let i = 0; i < s.length; ++i) {
-      const x = this.intAt(s, i);
+      const x = this.intAt(s, i)
       if (x < 0) {
-        if (s.charAt(i) === "-" && this.signum() === 0) mi = true;
-        continue;
+        if (s.charAt(i) === '-' && this.signum() === 0)
+          mi = true
+        continue
       }
-      w = b * w + x;
+      w = b * w + x
       if (++j >= cs) {
-        this.dMultiply(d);
-        this.dAddOffset(w, 0);
-        j = 0;
-        w = 0;
+        this.dMultiply(d)
+        this.dAddOffset(w, 0)
+        j = 0
+        w = 0
       }
     }
 
     if (j > 0) {
-      this.dMultiply(Math.pow(b, j));
-      this.dAddOffset(w, 0);
+      this.dMultiply(b ** j)
+      this.dAddOffset(w, 0)
     }
-    if (mi) BigInteger.ZERO.subTo(this, this);
+    if (mi)
+      BigInteger.ZERO.subTo(this, this)
   }
 
   public signum(): number {
-    if (this.s < 0) return -1;
-    if (this.t <= 0 || (this.t === 1 && this.data[0] <= 0)) return 0;
-    return 1;
+    if (this.s < 0)
+      return -1
+    if (this.t <= 0 || (this.t === 1 && this.data[0] <= 0))
+      return 0
+    return 1
   }
 
   private chunkSize(r: number): number {
-    return Math.floor(Math.LN2 * BigInteger.DB / Math.log(r));
+    return Math.floor(Math.LN2 * BigInteger.DB / Math.log(r))
   }
 
   private dMultiply(n: number): void {
-    this.data[this.t] = this.am(0, n - 1, this, 0, 0, this.t);
-    ++this.t;
-    this.clamp();
+    this.data[this.t] = this.am(0, n - 1, this, 0, 0, this.t)
+    ++this.t
+    this.clamp()
   }
 }
 

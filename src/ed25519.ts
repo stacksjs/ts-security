@@ -9,9 +9,9 @@
  * https://github.com/dchest/tweetnacl-js
  */
 
+import { getBytesSync } from './random'
 import { ByteBuffer } from './utils'
 
-require('./jsbn')
 require('./random')
 require('./sha512')
 const asn1Validator = require('./asn1-validator')
@@ -19,18 +19,12 @@ const asn1Validator = require('./asn1-validator')
 const publicKeyValidator = asn1Validator.publicKeyValidator
 const privateKeyValidator = asn1Validator.privateKeyValidator
 
-if (typeof BigInteger === 'undefined') {
-  var BigInteger = forge.jsbn.BigInteger
-}
-
 const NativeBuffer = typeof Buffer === 'undefined' ? Uint8Array : Buffer
 
 /*
  * Ed25519 algorithms, see RFC 8032:
  * https://tools.ietf.org/html/rfc8032
  */
-forge.pki = forge.pki || {}
-module.exports = forge.pki.ed25519 = forge.ed25519 = forge.ed25519 || {}
 const ed25519 = forge.ed25519
 
 ed25519.constants = {}
@@ -45,7 +39,7 @@ ed25519.generateKeyPair = function (options) {
   let seed = options.seed
   if (seed === undefined) {
     // generate seed
-    seed = forge.random.getBytesSync(ed25519.constants.SEED_BYTE_LENGTH)
+    seed = getBytesSync(ed25519.constants.SEED_BYTE_LENGTH)
   }
   else if (typeof seed === 'string') {
     if (seed.length !== ed25519.constants.SEED_BYTE_LENGTH) {

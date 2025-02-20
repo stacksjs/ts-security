@@ -556,7 +556,7 @@ export const ByteBuffer: typeof ByteStringBuffer = ByteStringBuffer
  * @param [input] a string with encoded bytes to store in the buffer.
  * @param [encoding] (default: 'raw', other: 'utf8').
  */
-export function createBuffer(input: string, encoding?: string): ByteStringBuffer {
+export function createBuffer(input?: string, encoding?: string): ByteStringBuffer {
   encoding = encoding || 'raw'
 
   if (input !== undefined && encoding === 'utf8') {
