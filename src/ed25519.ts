@@ -12,7 +12,6 @@
 import { getBytesSync } from './random'
 import { ByteBuffer } from './utils'
 
-require('./random')
 require('./sha512')
 const asn1Validator = require('./asn1-validator')
 

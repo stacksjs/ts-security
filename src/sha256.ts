@@ -7,12 +7,10 @@
  *
  * Copyright (c) 2010-2015 Digital Bazaar, Inc.
  */
-const forge = require('./forge')
-require('./md')
-require('./util')
 
-const sha256 = module.exports = forge.sha256 = forge.sha256 || {}
-forge.md.sha256 = forge.md.algorithms.sha256 = sha256
+import { createBuffer, fillString } from './utils'
+
+export const sha256 = {}
 
 /**
  * Creates a SHA-256 message digest object.
@@ -29,7 +27,7 @@ sha256.create = function () {
   let _state = null
 
   // input buffer
-  let _input = forge.util.createBuffer()
+  let _input = createBuffer()
 
   // used for word storage
   const _w = Array.from({ length: 64 })
@@ -62,7 +60,7 @@ sha256.create = function () {
     for (let i = 0; i < int32s; ++i) {
       md.fullMessageLength.push(0)
     }
-    _input = forge.util.createBuffer()
+    _input = createBuffer()
     _state = {
       h0: 0x6A09E667,
       h1: 0xBB67AE85,
@@ -144,7 +142,7 @@ sha256.create = function () {
     must *always* be present, so if the message length is already
     congruent to 448 mod 512, then 512 padding bits must be added. */
 
-    const finalBlock = forge.util.createBuffer()
+    const finalBlock = createBuffer()
     finalBlock.putBytes(_input.bytes())
 
     // compute remaining size to be digested (include message length size)
@@ -182,7 +180,7 @@ sha256.create = function () {
       h7: _state.h7,
     }
     _update(s2, _w, finalBlock)
-    const rval = forge.util.createBuffer()
+    const rval = createBuffer()
     rval.putInt32(s2.h0)
     rval.putInt32(s2.h1)
     rval.putInt32(s2.h2)
@@ -210,7 +208,7 @@ let _k = null
 function _init() {
   // create padding
   _padding = String.fromCharCode(128)
-  _padding += forge.util.fillString(String.fromCharCode(0x00), 64)
+  _padding += fillString(String.fromCharCode(0x00), 64)
 
   // create K table for SHA-256
   _k = [

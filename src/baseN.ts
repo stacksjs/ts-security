@@ -23,12 +23,12 @@ export const ALPHABETS = {
 export type KnownAlphabet = typeof ALPHABETS[keyof typeof ALPHABETS]
 export type Alphabet = KnownAlphabet | string
 
-interface BaseConverter {
+export interface BaseConverter {
   encode: (input: Uint8Array | string, maxline?: number) => string
   decode: (input: string, maxline?: number) => Uint8Array
 }
 
-function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
+export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
   if (ALPHABET.length >= 255)
     throw new TypeError('Alphabet too long')
 

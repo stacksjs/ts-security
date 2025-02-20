@@ -616,7 +616,7 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
  * @param output an array of block-size 32-bit words.
  * @param decrypt true to decrypt, false to encrypt.
  */
-function _updateBlock(w: number[], input: number[], output: number[], decrypt: boolean) {
+export function _updateBlock(w: number[], input: number[], output: number[], decrypt: boolean): void {
   /* Mixing columns is done using matrix multiplication. The columns
    * that are to be mixed are each a single word in the current state.
    * The state has Nb columns (4 columns). Therefore each column is a

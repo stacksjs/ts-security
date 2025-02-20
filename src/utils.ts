@@ -618,11 +618,22 @@ export function decodeUtf8(bytes: string): string {
  * design only allow for byte operations of a limited size.
  *
  * @param n number of bits.
- *
- * Throw Error if n invalid.
+ * @throws Error if n invalid.
  */
-function _checkBitsParam(n: number): void {
+export function _checkBitsParam(n: number): void {
   if (!(n === 8 || n === 16 || n === 24 || n === 32)) {
     throw new Error(`Only 8, 16, 24, or 32 bits supported: ${n}`)
   }
 }
+
+export const isServer: boolean = !!(typeof process !== 'undefined' && process.versions && (process.versions.node || process.versions.bun))
+
+// 'self' will also work in Web Workers (instance of WorkerGlobalScope) while
+// it will point to `window` in the main thread. To remain compatible with
+// older browsers, we fall back to 'window' if 'self' is not available.
+export const globalScope: typeof globalThis = (function () {
+  if (isServer)
+    return global
+
+  return typeof self === 'undefined' ? window : self
+})()

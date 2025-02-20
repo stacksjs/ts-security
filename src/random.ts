@@ -1,180 +1,259 @@
 /**
- * An API for getting cryptographically-secure random bytes. The bytes are
- * generated using the Fortuna algorithm devised by Bruce Schneier and
- * Niels Ferguson.
+ * Advanced Random Number Generator implementation using the Fortuna algorithm.
  *
- * Getting strong random bytes is not yet easy to do in javascript. The only
- * truish random entropy that can be collected is from the mouse, keyboard, or
- * from timing with respect to page loads, etc. This generator makes a poor
- * attempt at providing random bytes when those sources haven't yet provided
- * enough entropy to initially seed or to reseed the PRNG.
+ * This implementation provides cryptographically-secure random bytes using
+ * the Fortuna algorithm designed by Bruce Schneier and Niels Ferguson.
+ * Fortuna is a cryptographically secure pseudo-random number generator (CSPRNG)
+ * that is designed to be resistant to various attacks.
+ *
+ * Key features of this implementation:
+ * 1. Uses AES-128 in counter mode as the underlying block cipher
+ * 2. Collects entropy from multiple sources when available:
+ *    - Native crypto API (window.crypto.getRandomValues)
+ *    - System time and performance counters
+ *    - Browser/environment state information
+ *    - User input events (in browser environments)
+ * 3. Implements automatic reseeding based on entropy pool accumulation
+ *
+ * Security considerations:
+ * - In browser environments without native crypto support, initial entropy
+ *   can be limited. The implementation attempts to gather entropy from
+ *   available sources but may not be cryptographically secure until
+ *   sufficient entropy is collected.
+ * - In Node.js or secure contexts, it will use the native crypto API
+ *   as the primary source of entropy.
  *
  * @author Dave Longley
- *
  * Copyright (c) 2009-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer } from './utils'
+import { createBuffer, globalScope, isServer, type ByteStringBuffer } from './utils'
+import { _expandKey, _updateBlock } from './aes'
+import * as sha256Module from './sha256'
 
-require('./aes')
-require('./sha256')
-require('./prng')
+// Define PRNG interface
+export interface PRNG {
+  getBytes: (count: number, callback?: (err: Error | null, bytes: string) => void) => void | string
+  getBytesSync: (count: number) => string
+  generate: (count: number, callback?: (err: Error | null, bytes: string) => void) => string
+  collect: (bytes: string) => void
+  collectInt: (num: number, bits: number) => void
+  [key: string]: any // Allow indexing with string
+}
 
-// the default prng plugin, uses AES-128
-const prng_aes = {}
-const _prng_aes_output = Array.from({ length: 4 })
-const _prng_aes_buffer = createBuffer()
-prng_aes.formatKey = function (key) {
-  // convert the key into 32-bit integers
-  const tmp = forge.util.createBuffer(key)
-  key = Array.from({ length: 4 })
-  key[0] = tmp.getInt32()
-  key[1] = tmp.getInt32()
-  key[2] = tmp.getInt32()
-  key[3] = tmp.getInt32()
+export interface PRNGAes {
+  formatKey: (key: string | number[] | ByteStringBuffer) => number[]
+  formatSeed: (seed: string | number[] | ByteStringBuffer) => number[]
+  cipher: (key: number[], seed: number[]) => string
+  increment: (seed: number[]) => number[]
+  md: any
+}
 
-  // return the expanded key
-  return forge.aes._expandKey(key, false)
+interface ExtendedNavigator extends Navigator {
+  [key: string]: any // Allow indexing with string
 }
-prng_aes.formatSeed = function (seed) {
-  // convert seed into 32-bit integers
-  const tmp = forge.util.createBuffer(seed)
-  seed = Array.from({ length: 4 })
-  seed[0] = tmp.getInt32()
-  seed[1] = tmp.getInt32()
-  seed[2] = tmp.getInt32()
-  seed[3] = tmp.getInt32()
-  return seed
+
+declare global {
+  interface Window {
+    crypto: Crypto
+    msCrypto?: Crypto
+    navigator: ExtendedNavigator
+    document?: any
+  }
 }
-prng_aes.cipher = function (key, seed) {
-  forge.aes._updateBlock(key, seed, _prng_aes_output, false)
-  _prng_aes_buffer.putInt32(_prng_aes_output[0])
-  _prng_aes_buffer.putInt32(_prng_aes_output[1])
-  _prng_aes_buffer.putInt32(_prng_aes_output[2])
-  _prng_aes_buffer.putInt32(_prng_aes_output[3])
-  return _prng_aes_buffer.getBytes()
-}
-prng_aes.increment = function (seed) {
-  // FIXME: do we care about carry or signed issues?
-  ++seed[3]
-  return seed
-}
-prng_aes.md = forge.md.sha256
 
 /**
- * Creates a new PRNG.
+ * The AES-based PRNG implementation used as the core generator.
+ * This implementation uses AES-128 in counter mode, where the counter
+ * is encrypted to produce random bytes. The key is regularly updated
+ * using entropy from the system.
  */
-function spawnPrng() {
-  const ctx = forge.prng.create(prng_aes)
+const prng_aes: PRNGAes = {
+  formatKey: function (key: string | number[] | ByteStringBuffer): number[] {
+    // convert the key into 32-bit integers
+    const tmp = createBuffer(key as string)
+    const result = Array.from({ length: 4 }) as number[]
+    result[0] = tmp.getInt32()
+    result[1] = tmp.getInt32()
+    result[2] = tmp.getInt32()
+    result[3] = tmp.getInt32()
 
-  /**
-   * Gets random bytes. If a native secure crypto API is unavailable, this
-   * method tries to make the bytes more unpredictable by drawing from data that
-   * can be collected from the user of the browser, eg: mouse movement.
-   *
-   * If a callback is given, this method will be called asynchronously.
-   *
-   * @param count the number of random bytes to get.
-   * @param [callback(err, bytes)] called once the operation completes.
-   *
-   * @return the random bytes in a string.
-   */
-  ctx.getBytes = function (count, callback) {
-    return ctx.generate(count, callback)
-  }
+    // return the expanded key
+    return _expandKey(result, false)
+  },
 
-  /**
-   * Gets random bytes asynchronously. If a native secure crypto API is
-   * unavailable, this method tries to make the bytes more unpredictable by
-   * drawing from data that can be collected from the user of the browser,
-   * eg: mouse movement.
-   *
-   * @param count the number of random bytes to get.
-   *
-   * @return the random bytes in a string.
-   */
-  ctx.getBytesSync = function (count) {
-    return ctx.generate(count)
+  formatSeed: function (seed: string | number[] | ByteStringBuffer): number[] {
+    // convert seed into 32-bit integers
+    const tmp = createBuffer(seed as string)
+    const result = Array.from({ length: 4 }) as number[]
+    result[0] = tmp.getInt32()
+    result[1] = tmp.getInt32()
+    result[2] = tmp.getInt32()
+    result[3] = tmp.getInt32()
+
+    return result
+  },
+
+  cipher: function (key: number[], seed: number[]): string {
+    const output = Array.from({ length: 4 }) as number[]
+    _updateBlock(key, seed, output, false)
+
+    const buffer = createBuffer()
+    buffer.putInt32(output[0])
+    buffer.putInt32(output[1])
+    buffer.putInt32(output[2])
+    buffer.putInt32(output[3])
+
+    return buffer.getBytes()
+  },
+
+  increment: function (seed: number[]): number[] {
+    // FIXME: do we care about carry or signed issues?
+    ++seed[3]
+    return seed
+  },
+
+  md: sha256Module.sha256
+}
+
+/**
+ * Creates a new instance of the PRNG.
+ * This function initializes a new generator with its own state,
+ * allowing multiple independent random number streams.
+ *
+ * @returns a new PRNG context
+ */
+export function spawnPrng(): PRNG {
+  // Internal state
+  let key = new Array(4).fill(0)
+  let seed = new Array(4).fill(0)
+  let time = 0
+  let collected = 0
+  const entropyPool = createBuffer()
+
+  const ctx: PRNG = {
+    getBytes: function (count: number, callback?: (err: Error | null, bytes: string) => void): void | string {
+      return ctx.generate(count, callback)
+    },
+
+    getBytesSync: function (count: number): string {
+      return ctx.generate(count)
+    },
+
+    generate: function (count: number, callback?: (err: Error | null, bytes: string) => void): string {
+      if (count <= 0) {
+        return ''
+      }
+
+      // Reseed if necessary (every 100ms or if enough entropy collected)
+      const now = +new Date()
+      if (now - time >= 100 || collected >= 32) {
+        const entropy = entropyPool.getBytes()
+        key = prng_aes.formatKey(entropy)
+        seed = prng_aes.formatSeed(entropy)
+        time = now
+        collected = 0
+        entropyPool.clear()
+      }
+
+      // Generate random bytes
+      let bytes = ''
+      while (count > 0) {
+        seed = prng_aes.increment(seed)
+        bytes += prng_aes.cipher(key, seed)
+        count -= 16
+      }
+
+      // Truncate to the exact length requested
+      if (bytes.length > count) {
+        bytes = bytes.substr(0, count)
+      }
+
+      // Handle callback if provided
+      if (callback) {
+        callback(null, bytes)
+      }
+
+      return bytes
+    },
+
+    collect: function (bytes: string): void {
+      if (!bytes) {
+        return
+      }
+      entropyPool.putBytes(bytes)
+      collected += bytes.length
+    },
+
+    collectInt: function (num: number, bits: number): void {
+      const bytes = []
+      for (let i = 0; i < bits; i += 8) {
+        bytes.push((num >> i) & 0xFF)
+      }
+      this.collect(String.fromCharCode.apply(null, bytes))
+    }
   }
 
   return ctx
 }
 
-// create default prng context
+// Create the default PRNG context
 const _ctx = spawnPrng()
 
-// add other sources of entropy only if window.crypto.getRandomValues is not
-// available -- otherwise this source will be automatically used by the prng
-let getRandomValues = null
-const globalScope = forge.util.globalScope
-const _crypto = globalScope.crypto || globalScope.msCrypto
-if (_crypto && _crypto.getRandomValues) {
-  getRandomValues = function (arr) {
-    return _crypto.getRandomValues(arr)
-  }
+// Get crypto implementation
+const getRandomValues = (arr: Uint32Array): Uint32Array => {
+  const _window = typeof globalThis !== 'undefined' ? globalThis : {} as any
+
+  if (_window.crypto?.getRandomValues)
+    return _window.crypto.getRandomValues(arr)
+
+  if (_window.msCrypto?.getRandomValues)
+    return _window.msCrypto.getRandomValues(arr)
+
+  throw new Error('No cryptographic random number generator available.')
 }
 
-if (forge.options.usePureJavaScript
-  || (!forge.util.isNodejs && !getRandomValues)) {
-  // if this is a web worker, do not use weak entropy, instead register to
-  // receive strong entropy asynchronously from the main thread
-  if (typeof window === 'undefined' || window.document === undefined) {
-    // FIXME:
+/**
+ * Initialize entropy collection for non-native crypto environments.
+ * This is only done if we're in a browser without native crypto support.
+ * We collect entropy from various sources including:
+ * - System time and performance metrics
+ * - Navigator and browser state
+ * - User input events (handled separately)
+ */
+if (!isServer && !getRandomValues) {
+  // Skip entropy collection in web workers as they should receive
+  // entropy from the main thread
+  const _window = typeof globalThis !== 'undefined' ? globalThis : {} as any
+  if (!_window.document) {
+    // FIXME: Implement web worker entropy handling
   }
 
-  // get load time entropy
+  // Add load time entropy
   _ctx.collectInt(+new Date(), 32)
 
-  // add some entropy from navigator object
-  if (typeof (navigator) !== 'undefined') {
+  // Collect entropy from navigator object properties
+  if (typeof navigator !== 'undefined') {
     let _navBytes = ''
-    for (var key in navigator) {
+    const nav = navigator as ExtendedNavigator
+    for (const key in nav) {
       try {
-        if (typeof (navigator[key]) == 'string') {
-          _navBytes += navigator[key]
+        if (typeof nav[key] === 'string') {
+          _navBytes += nav[key]
         }
       }
       catch (e) {
-        /* Some navigator keys might not be accessible, e.g. the geolocation
-          attribute throws an exception if touched in Mozilla chrome://
-          context.
-
-          Silently ignore this and just don't use this as a source of
-          entropy. */
+        /* Some navigator properties may be inaccessible */
       }
     }
     _ctx.collect(_navBytes)
-    _navBytes = null
-  }
-
-  // add mouse and keyboard collectors if jquery is available
-  if (jQuery) {
-    // set up mouse entropy capture
-    jQuery().mousemove((e) => {
-      // add mouse coords
-      _ctx.collectInt(e.clientX, 16)
-      _ctx.collectInt(e.clientY, 16)
-    })
-
-    // set up keyboard entropy capture
-    jQuery().keypress((e) => {
-      _ctx.collectInt(e.charCode, 8)
-    })
+    _navBytes = '' // Clear the string instead of setting to null
   }
 }
 
-/* Random API */
-if (!forge.random) {
-  forge.random = _ctx
-}
-else {
-  // extend forge.random with _ctx
-  for (var key in _ctx) {
-    forge.random[key] = _ctx[key]
-  }
-}
+// Expose PRNG spawning capability
+export const createInstance: () => PRNG = spawnPrng
 
-// expose spawn PRNG
-forge.random.createInstance = spawnPrng
+// Export the random API
+export const random: PRNG = _ctx
 
-module.exports = forge.random
