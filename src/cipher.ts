@@ -6,9 +6,9 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer } from './utils'
+import { createBuffer, type ByteStringBuffer } from './utils'
 
-interface AlgorithmMode {
+export interface AlgorithmMode {
   name?: string
   blockSize: number
   decrypt: (input: any, output: any, finish: boolean) => boolean
@@ -19,7 +19,7 @@ interface AlgorithmMode {
   afterFinish?: (output: any, options: CipherOptions) => boolean
 }
 
-interface Algorithm {
+export interface Algorithm {
   mode: AlgorithmMode
   initialize: (options: CipherOptions) => void
 }
@@ -120,11 +120,11 @@ export function getAlgorithm(name: string): AlgorithmFactory | null {
   return null
 }
 
-interface CipherOptions {
+export interface CipherOptions {
   algorithm: Algorithm
   key: any
   decrypt: boolean
-  iv?: string | Buffer | number[]
+  iv?: string | number[] | ByteStringBuffer | null
   additionalData?: string
   tagLength?: number
   tag?: string

@@ -16,103 +16,136 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer } from './utils'
+import { createBuffer, ByteStringBuffer } from './utils'
+import { registerAlgorithm as registerCipherAlgorithm, type CipherOptions } from './cipher'
+import { modes, type CipherMode, type CipherModeOptions } from './cipher-modes'
 
-require('./cipher')
-require('./cipher-modes')
+// AES implementation types
+type SubstitutionBox = number[]
+type MixTable = number[][][]
+type XTimeTable = number[]
 
-/**
- * Creates a new AES cipher algorithm object.
- *
- * @param name the name of the algorithm.
- * @param mode the mode factory function.
- *
- * @return the AES algorithm object.
- */
-forge.aes.Algorithm = function (name, mode) {
-  if (!init) {
-    initialize()
-  }
-  const self = this
-  self.name = name
-  self.mode = new mode({
-    blockSize: 16,
-    cipher: {
-      encrypt(inBlock, outBlock) {
-        return _updateBlock(self._w, inBlock, outBlock, false)
-      },
-      decrypt(inBlock, outBlock) {
-        return _updateBlock(self._w, inBlock, outBlock, true)
-      },
-    },
-  })
-  self._init = false
+interface AlgorithmOptions {
+  key?: string | number[] | ByteStringBuffer
+  decrypt?: boolean
 }
 
-/**
- * Initializes this AES algorithm by expanding its key.
- *
- * @param options the options to use.
- *          key the key to use with this algorithm.
- *          decrypt true if the algorithm should be initialized for decryption,
- *            false for encryption.
- */
-forge.aes.Algorithm.prototype.initialize = function (options) {
-  if (this._init) {
-    return
-  }
-
-  let key = options.key
-  let tmp
-
-  /* Note: The key may be a string of bytes, an array of bytes, a byte
-    buffer, or an array of 32-bit integers. If the key is in bytes, then
-    it must be 16, 24, or 32 bytes in length. If it is in 32-bit
-    integers, it must be 4, 6, or 8 integers long. */
-
-  if (typeof key === 'string'
-    && (key.length === 16 || key.length === 24 || key.length === 32)) {
-    // convert key string into byte buffer
-    key = createBuffer(key)
-  }
-  else if (Array.isArray(key)
-    && (key.length === 16 || key.length === 24 || key.length === 32)) {
-    // convert key integer array into byte buffer
-    tmp = key
-    key = createBuffer()
-    for (var i = 0; i < tmp.length; ++i) {
-      key.putByte(tmp[i])
+interface AlgorithmFactory {
+  (): {
+    mode: {
+      start: (options: Partial<CipherModeOptions>) => void
+      encrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
+      decrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
     }
   }
+}
 
-  // convert key byte buffer into 32-bit integer array
-  if (!forge.util.isArray(key)) {
-    tmp = key
-    key = []
+/** AES implementation */
+let init = false // not yet initialized
+const Nb = 4 // number of words comprising the state (AES = 4)
+let sbox: SubstitutionBox = [] // non-linear substitution table used in key expansion
+let isbox: SubstitutionBox = [] // inversion of sbox
+let rcon: number[] = [] // round constant word array
+let mix: MixTable = [] // mix-columns table
+let imix: MixTable = [] // inverse mix-columns table
+let xtime: XTimeTable = [] // xtime table for GF(2^8) multiplication
 
-    // key lengths of 16, 24, 32 bytes allowed
-    let len = tmp.length()
-    if (len === 16 || len === 24 || len === 32) {
-      len = len >>> 2
-      for (var i = 0; i < len; ++i) {
-        key.push(tmp.getInt32())
+export class Algorithm {
+  name: string
+  mode!: CipherMode // definite assignment assertion
+  _init: boolean
+  _w: number[]
+
+  constructor(name: string, mode: (options?: any) => CipherMode) {
+    this.name = name
+    this._init = false
+    this._w = []
+
+    if (!init) {
+      initialize()
+    }
+
+    this.name = name
+    this.mode = mode({
+      blockSize: 16,
+      cipher: {
+        encrypt: (inBlock: number[], outBlock: number[]) => {
+          return _updateBlock(this._w, inBlock, outBlock, false)
+        },
+        decrypt: (inBlock: number[], outBlock: number[]) => {
+          return _updateBlock(this._w, inBlock, outBlock, true)
+        },
+      },
+    })
+  }
+
+  /**
+   * Initializes this AES algorithm by expanding its key.
+   *
+   * @param options the options to use.
+   * @param options.key the key to use with this algorithm.
+   * @param options.decrypt `true` if the algorithm should be initialized for decryption, `false` for encryption.
+   *
+   * Note: The key may be a string of bytes, an array of bytes, a byte
+   * buffer, or an array of 32-bit integers. If the key is in bytes, then
+   * it must be 16, 24, or 32 bytes in length. If it is in 32-bit
+   * integers, it must be 4, 6, or 8 integers long.
+   */
+  initialize(options: AlgorithmOptions = {}): void {
+    if (this._init) {
+      return
+    }
+
+    let key = options.key
+    let tmp: ByteStringBuffer | undefined
+
+    /* Note: The key may be a string of bytes, an array of bytes, a byte
+      buffer, or an array of 32-bit integers. If the key is in bytes, then
+      it must be 16, 24, or 32 bytes in length. If it is in 32-bit
+      integers, it must be 4, 6, or 8 integers long. */
+
+    if (typeof key === 'string' && key.length && (key.length === 16 || key.length === 24 || key.length === 32)) {
+      // convert key string into byte buffer
+      tmp = createBuffer(key)
+      key = tmp
+    }
+    else if (Array.isArray(key) && (key.length === 16 || key.length === 24 || key.length === 32)) {
+      // convert key integer array into byte buffer
+      tmp = createBuffer()
+      for (let i = 0; i < key.length; ++i) {
+        tmp.putByte(key[i])
       }
+      key = tmp
     }
+
+    // convert key byte buffer into 32-bit integer array
+    let keyInts: number[] = []
+    if (key && key instanceof ByteStringBuffer) {
+      // key lengths of 16, 24, 32 bytes allowed
+      const len = key.length()
+      if (len === 16 || len === 24 || len === 32) {
+        const numInts = len >>> 2
+        for (let i = 0; i < numInts; ++i) {
+          keyInts.push(key.getInt32())
+        }
+      }
+    } else if (Array.isArray(key)) {
+      keyInts = key
+    }
+
+    // key must be an array of 32-bit integers by now
+    if (!Array.isArray(keyInts) || !(keyInts.length === 4 || keyInts.length === 6 || keyInts.length === 8)) {
+      throw new Error('Invalid key parameter.')
+    }
+
+    // encryption operation is always used for these modes
+    const mode = this.mode.name
+    const encryptOp = (['CFB', 'OFB', 'CTR', 'GCM'].includes(mode))
+
+    // do key expansion
+    this._w = _expandKey(keyInts, options.decrypt === true && !encryptOp)
+    this._init = true
   }
-
-  // key must be an array of 32-bit integers by now
-  if (!forge.util.isArray(key)
-    || !(key.length === 4 || key.length === 6 || key.length === 8)) {
-    throw new Error('Invalid key parameter.')
-  }
-
-  // encryption operation is always used for these modes
-  const mode = this.mode.name
-  const encryptOp = (['CFB', 'OFB', 'CTR', 'GCM'].includes(mode))
-
-  // do key expansion
-  this._w = _expandKey(key, options.decrypt && !encryptOp)
-  this._init = true
 }
 
 /**
@@ -123,48 +156,28 @@ forge.aes.Algorithm.prototype.initialize = function (options) {
  *
  * @return the expanded key.
  */
-forge.aes._expandKey = function (key, decrypt) {
+function expandKey(key: number[], decrypt: boolean) {
   if (!init) {
     initialize()
   }
   return _expandKey(key, decrypt)
 }
 
-/**
- * Updates a single block. Typically only used for testing.
- *
- * @param w the expanded key to use.
- * @param input an array of block-size 32-bit words.
- * @param output an array of block-size 32-bit words.
- * @param decrypt true to decrypt, false to encrypt.
- */
-forge.aes._updateBlock = _updateBlock
-
 /** Register AES algorithms */
 
-registerAlgorithm('AES-ECB', forge.cipher.modes.ecb)
-registerAlgorithm('AES-CBC', forge.cipher.modes.cbc)
-registerAlgorithm('AES-CFB', forge.cipher.modes.cfb)
-registerAlgorithm('AES-OFB', forge.cipher.modes.ofb)
-registerAlgorithm('AES-CTR', forge.cipher.modes.ctr)
-registerAlgorithm('AES-GCM', forge.cipher.modes.gcm)
-
-function registerAlgorithm(name: string, mode: any) {
+function registerAESAlgorithm(name: string, mode: any) {
   const factory = function () {
-    return new forge.aes.Algorithm(name, mode)
+    return new Algorithm(name, mode)
   }
-  forge.cipher.registerAlgorithm(name, factory)
+  registerCipherAlgorithm(name, factory)
 }
 
-/** AES implementation */
-
-var init = false // not yet initialized
-const Nb = 4 // number of words comprising the state (AES = 4)
-let sbox // non-linear substitution table used in key expansion
-let isbox // inversion of sbox
-let rcon // round constant word array
-let mix // mix-columns table
-let imix // inverse mix-columns table
+registerAESAlgorithm('AES-ECB', modes.ecb)
+registerAESAlgorithm('AES-CBC', modes.cbc)
+registerAESAlgorithm('AES-CFB', modes.cfb)
+registerAESAlgorithm('AES-OFB', modes.ofb)
+registerAESAlgorithm('AES-CTR', modes.ctr)
+registerAESAlgorithm('AES-GCM', modes.gcm)
 
 /**
  * Performs initialization, ie: precomputes tables to optimize for speed.
@@ -348,83 +361,33 @@ function initialize() {
   rcon = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36]
 
   // compute xtime table which maps i onto GF(i, 0x02)
-  const xtime = Array.from({ length: 256 })
-  for (var i = 0; i < 128; ++i) {
+  xtime = new Array(256)
+  for (let i = 0; i < 128; ++i) {
     xtime[i] = i << 1
     xtime[i + 128] = (i + 128) << 1 ^ 0x11B
   }
 
   // compute all other tables
-  sbox = Array.from({ length: 256 })
-  isbox = Array.from({ length: 256 })
-  mix = Array.from({ length: 4 })
-  imix = Array.from({ length: 4 })
-  for (var i = 0; i < 4; ++i) {
-    mix[i] = Array.from({ length: 256 })
-    imix[i] = Array.from({ length: 256 })
+  sbox = new Array(256)
+  isbox = new Array(256)
+  mix = new Array(4)
+  imix = new Array(4)
+  for (let i = 0; i < 4; ++i) {
+    mix[i] = new Array(256).fill([]).map(() => new Array(4))
+    imix[i] = new Array(256).fill([]).map(() => new Array(4))
   }
-  let e = 0; let ei = 0; let e2; let e4; let e8; let sx; let sx2; let me; let ime
-  for (var i = 0; i < 256; ++i) {
-    /* We need to generate the SubBytes() sbox and isbox tables so that
-      we can perform byte substitutions. This requires us to traverse
-      all of the elements in GF, find their multiplicative inverses,
-      and apply to each the following affine transformation:
 
-      bi' = bi ^ b(i + 4) mod 8 ^ b(i + 5) mod 8 ^ b(i + 6) mod 8 ^
-            b(i + 7) mod 8 ^ ci
-      for 0 <= i < 8, where bi is the ith bit of the byte, and ci is the
-      ith bit of a byte c with the value {63} or {01100011}.
+  let e = 0
+  let ei = 0
+  let e2: number
+  let e4: number
+  let e8: number
+  let sx: number
+  let sx2: number
+  let me: number
+  let ime: number
 
-      It is possible to traverse every possible value in a Galois field
-      using what is referred to as a 'generator'. There are many
-      generators (128 out of 256): 3,5,6,9,11,82 to name a few. To fully
-      traverse GF we iterate 255 times, multiplying by our generator
-      each time.
-
-      On each iteration we can determine the multiplicative inverse for
-      the current element.
-
-      Suppose there is an element in GF 'e'. For a given generator 'g',
-      e = g^x. The multiplicative inverse of e is g^(255 - x). It turns
-      out that if use the inverse of a generator as another generator
-      it will produce all of the corresponding multiplicative inverses
-      at the same time. For this reason, we choose 5 as our inverse
-      generator because it only requires 2 multiplies and 1 add and its
-      inverse, 82, requires relatively few operations as well.
-
-      In order to apply the affine transformation, the multiplicative
-      inverse 'ei' of 'e' can be repeatedly XOR'd (4 times) with a
-      bit-cycling of 'ei'. To do this 'ei' is first stored in 's' and
-      'x'. Then 's' is left shifted and the high bit of 's' is made the
-      low bit. The resulting value is stored in 's'. Then 'x' is XOR'd
-      with 's' and stored in 'x'. On each subsequent iteration the same
-      operation is performed. When 4 iterations are complete, 'x' is
-      XOR'd with 'c' (0x63) and the transformed value is stored in 'x'.
-      For example:
-
-      s = 01000001
-      x = 01000001
-
-      iteration 1: s = 10000010, x ^= s
-      iteration 2: s = 00000101, x ^= s
-      iteration 3: s = 00001010, x ^= s
-      iteration 4: s = 00010100, x ^= s
-      x ^= 0x63
-
-      This can be done with a loop where s = (s << 1) | (s >> 7). However,
-      it can also be done by using a single 16-bit (in this case 32-bit)
-      number 'sx'. Since XOR is an associative operation, we can set 'sx'
-      to 'ei' and then XOR it with 'sx' left-shifted 1,2,3, and 4 times.
-      The most significant bits will flow into the high 8 bit positions
-      and be correctly XOR'd with one another. All that remains will be
-      to cycle the high 8 bits by XOR'ing them all with the lower 8 bits
-      afterwards.
-
-      At the same time we're populating sbox and isbox we can precompute
-      the multiplication we'll need to do to do MixColumns() later.
-    */
-
-    // apply affine transformation
+  for (let i = 0; i < 256; ++i) {
     sx = ei ^ (ei << 1) ^ (ei << 2) ^ (ei << 3) ^ (ei << 4)
     sx = (sx >> 8) ^ (sx & 255) ^ 0x63
 
@@ -432,90 +395,42 @@ function initialize() {
     sbox[e] = sx
     isbox[sx] = e
 
-    /* Mixing columns is done using matrix multiplication. The columns
-      that are to be mixed are each a single word in the current state.
-      The state has Nb columns (4 columns). Therefore each column is a
-      4 byte word. So to mix the columns in a single column 'c' where
-      its rows are r0, r1, r2, and r3, we use the following matrix
-      multiplication:
-
-      [2 3 1 1]*[r0,c]=[r'0,c]
-      [1 2 3 1] [r1,c] [r'1,c]
-      [1 1 2 3] [r2,c] [r'2,c]
-      [3 1 1 2] [r3,c] [r'3,c]
-
-      r0, r1, r2, and r3 are each 1 byte of one of the words in the
-      state (a column). To do matrix multiplication for each mixed
-      column c' we multiply the corresponding row from the left matrix
-      with the corresponding column from the right matrix. In total, we
-      get 4 equations:
-
-      r0,c' = 2*r0,c + 3*r1,c + 1*r2,c + 1*r3,c
-      r1,c' = 1*r0,c + 2*r1,c + 3*r2,c + 1*r3,c
-      r2,c' = 1*r0,c + 1*r1,c + 2*r2,c + 3*r3,c
-      r3,c' = 3*r0,c + 1*r1,c + 1*r2,c + 2*r3,c
-
-      As usual, the multiplication is as previously defined and the
-      addition is XOR. In order to optimize mixing columns we can store
-      the multiplication results in tables. If you think of the whole
-      column as a word (it might help to visualize by mentally rotating
-      the equations above by counterclockwise 90 degrees) then you can
-      see that it would be useful to map the multiplications performed on
-      each byte (r0, r1, r2, r3) onto a word as well. For instance, we
-      could map 2*r0,1*r0,1*r0,3*r0 onto a word by storing 2*r0 in the
-      highest 8 bits and 3*r0 in the lowest 8 bits (with the other two
-      respectively in the middle). This means that a table can be
-      constructed that uses r0 as an index to the word. We can do the
-      same with r1, r2, and r3, creating a total of 4 tables.
-
-      To construct a full c', we can just look up each byte of c in
-      their respective tables and XOR the results together.
-
-      Also, to build each table we only have to calculate the word
-      for 2,1,1,3 for every byte ... which we can do on each iteration
-      of this loop since we will iterate over every byte. After we have
-      calculated 2,1,1,3 we can get the results for the other tables
-      by cycling the byte at the end to the beginning. For instance
-      we can take the result of table 2,1,1,3 and produce table 3,2,1,1
-      by moving the right most byte to the left most position just like
-      how you can imagine the 3 moved out of 2,1,1,3 and to the front
-      to produce 3,2,1,1.
-
-      There is another optimization in that the same multiples of
-      the current element we need in order to advance our generator
-      to the next iteration can be reused in performing the 2,1,1,3
-      calculation. We also calculate the inverse mix column tables,
-      with e,9,d,b being the inverse of 2,1,1,3.
-
-      When we're done, and we need to actually mix columns, the first
-      byte of each state word should be put through mix[0] (2,1,1,3),
-      the second through mix[1] (3,2,1,1) and so forth. Then they should
-      be XOR'd together to produce the fully mixed column.
-    */
-
-    // calculate mix and imix table values
+    // calculate mix table values
     sx2 = xtime[sx]
     e2 = xtime[e]
     e4 = xtime[e2]
     e8 = xtime[e4]
-    me
-      = (sx2 << 24) // 2
-        ^ (sx << 16) // 1
-        ^ (sx << 8) // 1
-        ^ (sx ^ sx2) // 3
-    ime
-      = (e2 ^ e4 ^ e8) << 24 // E (14)
-        ^ (e ^ e8) << 16 // 9
-        ^ (e ^ e4 ^ e8) << 8 // D (13)
-        ^ (e ^ e2 ^ e8) // B (11)
+
+    // Calculate mix and inverse mix values using numeric operations
+    const sx2Byte = Number(sx2 & 0xFF)
+    const sxByte = Number(sx & 0xFF)
+    const sx2sxByte = Number(sx ^ sx2 & 0xFF)
+
+    const e2e4e8Byte = Number(e2 ^ e4 ^ e8 & 0xFF)
+    const ee8Byte = Number(e ^ e8 & 0xFF)
+    const ee4e8Byte = Number(e ^ e4 ^ e8 & 0xFF)
+    const ee2e8Byte = Number(e ^ e2 ^ e8 & 0xFF)
+
+    me = sx2Byte * 0x1000000 + sxByte * 0x10000 + sxByte * 0x100 + sx2sxByte
+    ime = e2e4e8Byte * 0x1000000 + ee8Byte * 0x10000 + ee4e8Byte * 0x100 + ee2e8Byte
+
     // produce each of the mix tables by rotating the 2,1,1,3 value
     for (let n = 0; n < 4; ++n) {
-      mix[n][e] = me
-      imix[n][sx] = ime
-      // cycle the right most byte to the left most position
-      // ie: 2,1,1,3 becomes 3,2,1,1
-      me = me << 24 | me >>> 8
-      ime = ime << 24 | ime >>> 8
+      mix[n][e] = [
+        Number((me / 0x1000000) & 0xFF),
+        Number((me / 0x10000) & 0xFF),
+        Number((me / 0x100) & 0xFF),
+        Number(me & 0xFF)
+      ]
+      imix[n][sx] = [
+        Number((ime / 0x1000000) & 0xFF),
+        Number((ime / 0x10000) & 0xFF),
+        Number((ime / 0x100) & 0xFF),
+        Number(ime & 0xFF)
+      ]
+      // cycle the right most byte to the left most position using numeric operations
+      me = Number((me % 0x1000000) * 0x100 + Math.floor(me / 0x1000000))
+      ime = Number((ime % 0x1000000) * 0x100 + Math.floor(ime / 0x1000000))
     }
 
     // get next element and inverse
@@ -669,11 +584,21 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
         // decryption mode) and swap indexes 3 and 1
         for (let n = 0; n < Nb; ++n) {
           tmp = w[wi + n]
-          wnew[i + (3 & -n)]
-            = m0[sbox[tmp >>> 24]]
-              ^ m1[sbox[tmp >>> 16 & 255]]
-              ^ m2[sbox[tmp >>> 8 & 255]]
-              ^ m3[sbox[tmp & 255]]
+          // First, apply sbox substitution to each byte of the word
+          // This is done to prepare for the inverse mix operation
+          const sboxed = [
+            sbox[tmp >>> 24],               // Most significant byte
+            sbox[(tmp >>> 16) & 255],      // Second byte
+            sbox[(tmp >>> 8) & 255],       // Third byte
+            sbox[tmp & 255]                // Least significant byte
+          ]
+          // Then apply the inverse mix operation using the mix tables
+          // The Number() conversions ensure proper numeric operations
+          // The bitwise OR (|) combines the bytes back into a word
+          wnew[i + (3 & -n)] = Number(m0[sboxed[0]]) |
+            Number(m1[sboxed[1]]) |
+            Number(m2[sboxed[2]]) |
+            Number(m3[sboxed[3]])
         }
       }
     }
@@ -684,50 +609,90 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
 }
 
 /**
- * Updates a single block (16 bytes) using AES. The update will either
- * encrypt or decrypt the block.
+ * Updates a single block. Typically only used for testing.
  *
- * @param w the key schedule.
- * @param input the input block (an array of 32-bit words).
- * @param output the updated output block.
- * @param decrypt true to decrypt the block, false to encrypt it.
+ * @param w the expanded key to use.
+ * @param input an array of block-size 32-bit words.
+ * @param output an array of block-size 32-bit words.
+ * @param decrypt true to decrypt, false to encrypt.
  */
 function _updateBlock(w: number[], input: number[], output: number[], decrypt: boolean) {
-  /*
-  Cipher(byte in[4*Nb], byte out[4*Nb], word w[Nb*(Nr+1)])
-  begin
-    byte state[4,Nb]
-    state = in
-    AddRoundKey(state, w[0, Nb-1])
-    for round = 1 step 1 to Nr-1
-      SubBytes(state)
-      ShiftRows(state)
-      MixColumns(state)
-      AddRoundKey(state, w[round*Nb, (round+1)*Nb-1])
-    end for
-    SubBytes(state)
-    ShiftRows(state)
-    AddRoundKey(state, w[Nr*Nb, (Nr+1)*Nb-1])
-    out = state
-  end
-
-  InvCipher(byte in[4*Nb], byte out[4*Nb], word w[Nb*(Nr+1)])
-  begin
-    byte state[4,Nb]
-    state = in
-    AddRoundKey(state, w[Nr*Nb, (Nr+1)*Nb-1])
-    for round = Nr-1 step -1 downto 1
-      InvShiftRows(state)
-      InvSubBytes(state)
-      AddRoundKey(state, w[round*Nb, (round+1)*Nb-1])
-      InvMixColumns(state)
-    end for
-    InvShiftRows(state)
-    InvSubBytes(state)
-    AddRoundKey(state, w[0, Nb-1])
-    out = state
-  end
-  */
+  /* Mixing columns is done using matrix multiplication. The columns
+   * that are to be mixed are each a single word in the current state.
+   * The state has Nb columns (4 columns). Therefore each column is a
+   * 4 byte word. So to mix the columns in a single column 'c' where
+   * its rows are r0, r1, r2, and r3, we use the following matrix
+   * multiplication:
+   *
+   * [2 3 1 1]*[r0,c]=[r'0,c]
+   * [1 2 3 1] [r1,c] [r'1,c]
+   * [1 1 2 3] [r2,c] [r'2,c]
+   * [3 1 1 2] [r3,c] [r'3,c]
+   *
+   * r0, r1, r2, and r3 are each 1 byte of one of the words in the
+   * state (a column). To do matrix multiplication for each mixed
+   * column c' we multiply the corresponding row from the left matrix
+   * with the corresponding column from the right matrix. In total, we
+   * get 4 equations:
+   *
+   * r0,c' = 2*r0,c + 3*r1,c + 1*r2,c + 1*r3,c
+   * r1,c' = 1*r0,c + 2*r1,c + 3*r2,c + 1*r3,c
+   * r2,c' = 1*r0,c + 1*r1,c + 2*r2,c + 3*r3,c
+   * r3,c' = 3*r0,c + 1*r1,c + 1*r2,c + 2*r3,c
+   *
+   * Therefore to mix the columns in each word in the state we
+   * do the following (& 255 omitted for brevity):
+   * c'0,r0 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
+   * c'0,r1 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
+   * c'0,r2 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
+   * c'0,r3 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
+   *
+   * However, before mixing, the algorithm requires us to perform
+   * ShiftRows(). The ShiftRows() transformation cyclically shifts the
+   * last 3 rows of the state over different offsets. The first row
+   * (r = 0) is not shifted.
+   *
+   * s'_r,c = s_r,(c + shift(r, Nb) mod Nb
+   * for 0 < r < 4 and 0 <= c < Nb and
+   * shift(1, 4) = 1
+   * shift(2, 4) = 2
+   * shift(3, 4) = 3.
+   *
+   * This causes the first byte in r = 1 to be moved to the end of
+   * the row, the first 2 bytes in r = 2 to be moved to the end of
+   * the row, the first 3 bytes in r = 3 to be moved to the end of
+   * the row:
+   *
+   * r1: [c0 c1 c2 c3] => [c1 c2 c3 c0]
+   * r2: [c0 c1 c2 c3]    [c2 c3 c0 c1]
+   * r3: [c0 c1 c2 c3]    [c3 c0 c1 c2]
+   *
+   * We can make these substitutions inline with our column mixing to
+   * generate an updated set of equations to produce each word in the
+   * state (note the columns have changed positions):
+   *
+   * c0 c1 c2 c3 => c0 c1 c2 c3
+   * c0 c1 c2 c3    c1 c2 c3 c0  (cycled 1 byte)
+   * c0 c1 c2 c3    c2 c3 c0 c1  (cycled 2 bytes)
+   * c0 c1 c2 c3    c3 c0 c1 c2  (cycled 3 bytes)
+   *
+   * Therefore:
+   *
+   * c'0 = 2*r0,c0 + 3*r1,c1 + 1*r2,c2 + 1*r3,c3
+   * c'0 = 1*r0,c0 + 2*r1,c1 + 3*r2,c2 + 1*r3,c3
+   * c'0 = 1*r0,c0 + 1*r1,c1 + 2*r2,c2 + 3*r3,c3
+   * c'0 = 3*r0,c0 + 1*r1,c1 + 1*r2,c2 + 2*r3,c3
+   *
+   * c'1 = 2*r0,c1 + 3*r1,c2 + 1*r2,c3 + 1*r3,c0
+   * c'1 = 1*r0,c1 + 2*r1,c2 + 3*r2,c3 + 1*r3,c0
+   * c'1 = 1*r0,c1 + 1*r1,c2 + 2*r2,c3 + 3*r3,c0
+   * c'1 = 3*r0,c1 + 1*r1,c2 + 1*r2,c3 + 2*r3,c0
+   *
+   * ... and so forth for c'2 and c'3. The important distinction is
+   * that the columns are cycling, with c0 being used with the m0
+   * map when calculating c0, but c1 being used with the m0 map when
+   * calculating c1 ... and so forth.
+   */
 
   // Encrypt: AddRoundKey(state, w[0, Nb-1])
   // Decrypt: AddRoundKey(state, w[Nr*Nb, (Nr+1)*Nb-1])
@@ -754,163 +719,110 @@ function _updateBlock(w: number[], input: number[], output: number[], decrypt: b
   d = input[decrypt ? 1 : 3] ^ w[3]
   let i = 3
 
-  /* In order to share code we follow the encryption algorithm when both
-    encrypting and decrypting. To account for the changes required in the
-    decryption algorithm, we use different lookup tables when decrypting
-    and use a modified key schedule to account for the difference in the
-    order of transformations applied when performing rounds. We also get
-    key rounds in reverse order (relative to encryption). */
+  /* When performing the inverse we transform the mirror image and
+   * skip the bottom row, instead of the top one, and move upwards:
+   *
+   * c3 c2 c1 c0 => c0 c3 c2 c1  (cycled 3 bytes) *same as encryption
+   * c3 c2 c1 c0    c1 c0 c3 c2  (cycled 2 bytes)
+   * c3 c2 c1 c0    c2 c1 c0 c3  (cycled 1 byte)  *same as encryption
+   * c3 c2 c1 c0    c3 c2 c1 c0
+   *
+   * If you compare the resulting matrices for ShiftRows()+MixColumns()
+   * and for InvShiftRows()+InvMixColumns() the 2nd and 4th columns are
+   * different (in encrypt mode vs. decrypt mode). So in order to use
+   * the same code to handle both encryption and decryption, we will
+   * need to do some mapping.
+   *
+   * If in encryption mode we let a=c0, b=c1, c=c2, d=c3, and r<N> be
+   * a row number in the state, then the resulting matrix in encryption
+   * mode for applying the above transformations would be:
+   *
+   * r1: a b c d
+   * r2: b c d a
+   * r3: c d a b
+   * r4: d a b c
+   *
+   * If we did the same in decryption mode we would get:
+   *
+   * r1: a d c b
+   * r2: b a d c
+   * r3: c b a d
+   * r4: d c b a
+   *
+   * If instead we swap d and b (set b=c3 and d=c1), then we get:
+   *
+   * r1: a b c d
+   * r2: d a b c
+   * r3: c d a b
+   * r4: b c d a
+   *
+   * Now the 1st and 3rd rows are the same as the encryption matrix. All
+   * we need to do then to make the mapping exactly the same is to swap
+   * the 2nd and 4th rows when in decryption mode. We also have to do the swap above
+   * when we first pull in the input and when we set the final output.
+   */
+
   for (let round = 1; round < Nr; ++round) {
     /* As described above, we'll be using table lookups to perform the
-      column mixing. Each column is stored as a word in the state (the
-      array 'input' has one column as a word at each index). In order to
-      mix a column, we perform these transformations on each row in c,
-      which is 1 byte in each word. The new column for c0 is c'0:
+     * column mixing. Each column is stored as a word in the state (the
+     * array 'input' has one column as a word at each index). In order to
+     * mix a column, we perform these transformations on each row in c,
+     * which is 1 byte in each word. The new column for c0 is c'0:
+     *
+     *        m0      m1      m2      m3
+     * r0,c'0 = 2*r0,c0 + 3*r1,c0 + 1*r2,c0 + 1*r3,c0
+     * r1,c'0 = 1*r0,c0 + 2*r1,c0 + 3*r2,c0 + 1*r3,c0
+     * r2,c'0 = 1*r0,c0 + 1*r1,c0 + 2*r2,c0 + 3*r3,c0
+     * r3,c'0 = 3*r0,c0 + 1*r1,c0 + 1*r2,c0 + 2*r3,c0
+     *
+     * So using mix tables where c0 is a word with r0 being its upper
+     * 8 bits and r3 being its lower 8 bits:
+     *
+     * m0[c0 >> 24] will yield this word: [2*r0,1*r0,1*r0,3*r0]
+     * ...
+     * m3[c0 & 255] will yield this word: [1*r3,1*r3,3*r3,2*r3]
+     */
 
-               m0      m1      m2      m3
-      r0,c'0 = 2*r0,c0 + 3*r1,c0 + 1*r2,c0 + 1*r3,c0
-      r1,c'0 = 1*r0,c0 + 2*r1,c0 + 3*r2,c0 + 1*r3,c0
-      r2,c'0 = 1*r0,c0 + 1*r1,c0 + 2*r2,c0 + 3*r3,c0
-      r3,c'0 = 3*r0,c0 + 1*r1,c0 + 1*r2,c0 + 2*r3,c0
+    // Transform state using the mix tables and key schedule
+    a2 = Number(m0[a >>> 24]) |           // Transform byte 3 using table 0
+      Number(m1[b >>> 16 & 255]) |       // Transform byte 2 using table 1
+      Number(m2[c >>> 8 & 255]) |        // Transform byte 1 using table 2
+      Number(m3[d & 255]) ^ w[++i]       // Transform byte 0 using table 3
 
-      So using mix tables where c0 is a word with r0 being its upper
-      8 bits and r3 being its lower 8 bits:
+    b2 = Number(m0[b >>> 24]) |
+      Number(m1[c >>> 16 & 255]) |
+      Number(m2[d >>> 8 & 255]) |
+      Number(m3[a & 255]) ^ w[++i]
 
-      m0[c0 >> 24] will yield this word: [2*r0,1*r0,1*r0,3*r0]
-      ...
-      m3[c0 & 255] will yield this word: [1*r3,1*r3,3*r3,2*r3]
+    c2 = Number(m0[c >>> 24]) |
+      Number(m1[d >>> 16 & 255]) |
+      Number(m2[a >>> 8 & 255]) |
+      Number(m3[b & 255]) ^ w[++i]
 
-      Therefore to mix the columns in each word in the state we
-      do the following (& 255 omitted for brevity):
-      c'0,r0 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
-      c'0,r1 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
-      c'0,r2 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
-      c'0,r3 = m0[c0 >> 24] ^ m1[c1 >> 16] ^ m2[c2 >> 8] ^ m3[c3]
+    d = Number(m0[d >>> 24]) |
+      Number(m1[a >>> 16 & 255]) |
+      Number(m2[b >>> 8 & 255]) |
+      Number(m3[c & 255]) ^ w[++i]
 
-      However, before mixing, the algorithm requires us to perform
-      ShiftRows(). The ShiftRows() transformation cyclically shifts the
-      last 3 rows of the state over different offsets. The first row
-      (r = 0) is not shifted.
-
-      s'_r,c = s_r,(c + shift(r, Nb) mod Nb
-      for 0 < r < 4 and 0 <= c < Nb and
-      shift(1, 4) = 1
-      shift(2, 4) = 2
-      shift(3, 4) = 3.
-
-      This causes the first byte in r = 1 to be moved to the end of
-      the row, the first 2 bytes in r = 2 to be moved to the end of
-      the row, the first 3 bytes in r = 3 to be moved to the end of
-      the row:
-
-      r1: [c0 c1 c2 c3] => [c1 c2 c3 c0]
-      r2: [c0 c1 c2 c3]    [c2 c3 c0 c1]
-      r3: [c0 c1 c2 c3]    [c3 c0 c1 c2]
-
-      We can make these substitutions inline with our column mixing to
-      generate an updated set of equations to produce each word in the
-      state (note the columns have changed positions):
-
-      c0 c1 c2 c3 => c0 c1 c2 c3
-      c0 c1 c2 c3    c1 c2 c3 c0  (cycled 1 byte)
-      c0 c1 c2 c3    c2 c3 c0 c1  (cycled 2 bytes)
-      c0 c1 c2 c3    c3 c0 c1 c2  (cycled 3 bytes)
-
-      Therefore:
-
-      c'0 = 2*r0,c0 + 3*r1,c1 + 1*r2,c2 + 1*r3,c3
-      c'0 = 1*r0,c0 + 2*r1,c1 + 3*r2,c2 + 1*r3,c3
-      c'0 = 1*r0,c0 + 1*r1,c1 + 2*r2,c2 + 3*r3,c3
-      c'0 = 3*r0,c0 + 1*r1,c1 + 1*r2,c2 + 2*r3,c3
-
-      c'1 = 2*r0,c1 + 3*r1,c2 + 1*r2,c3 + 1*r3,c0
-      c'1 = 1*r0,c1 + 2*r1,c2 + 3*r2,c3 + 1*r3,c0
-      c'1 = 1*r0,c1 + 1*r1,c2 + 2*r2,c3 + 3*r3,c0
-      c'1 = 3*r0,c1 + 1*r1,c2 + 1*r2,c3 + 2*r3,c0
-
-      ... and so forth for c'2 and c'3. The important distinction is
-      that the columns are cycling, with c0 being used with the m0
-      map when calculating c0, but c1 being used with the m0 map when
-      calculating c1 ... and so forth.
-
-      When performing the inverse we transform the mirror image and
-      skip the bottom row, instead of the top one, and move upwards:
-
-      c3 c2 c1 c0 => c0 c3 c2 c1  (cycled 3 bytes) *same as encryption
-      c3 c2 c1 c0    c1 c0 c3 c2  (cycled 2 bytes)
-      c3 c2 c1 c0    c2 c1 c0 c3  (cycled 1 byte)  *same as encryption
-      c3 c2 c1 c0    c3 c2 c1 c0
-
-      If you compare the resulting matrices for ShiftRows()+MixColumns()
-      and for InvShiftRows()+InvMixColumns() the 2nd and 4th columns are
-      different (in encrypt mode vs. decrypt mode). So in order to use
-      the same code to handle both encryption and decryption, we will
-      need to do some mapping.
-
-      If in encryption mode we let a=c0, b=c1, c=c2, d=c3, and r<N> be
-      a row number in the state, then the resulting matrix in encryption
-      mode for applying the above transformations would be:
-
-      r1: a b c d
-      r2: b c d a
-      r3: c d a b
-      r4: d a b c
-
-      If we did the same in decryption mode we would get:
-
-      r1: a d c b
-      r2: b a d c
-      r3: c b a d
-      r4: d c b a
-
-      If instead we swap d and b (set b=c3 and d=c1), then we get:
-
-      r1: a b c d
-      r2: d a b c
-      r3: c d a b
-      r4: b c d a
-
-      Now the 1st and 3rd rows are the same as the encryption matrix. All
-      we need to do then to make the mapping exactly the same is to swap
-      the 2nd and 4th rows when in decryption mode. To do this without
-      having to do it on each iteration, we swapped the 2nd and 4th rows
-      in the decryption key schedule. We also have to do the swap above
-      when we first pull in the input and when we set the final output. */
-    a2
-      = m0[a >>> 24]
-        ^ m1[b >>> 16 & 255]
-        ^ m2[c >>> 8 & 255]
-        ^ m3[d & 255] ^ w[++i]
-    b2
-      = m0[b >>> 24]
-        ^ m1[c >>> 16 & 255]
-        ^ m2[d >>> 8 & 255]
-        ^ m3[a & 255] ^ w[++i]
-    c2
-      = m0[c >>> 24]
-        ^ m1[d >>> 16 & 255]
-        ^ m2[a >>> 8 & 255]
-        ^ m3[b & 255] ^ w[++i]
-    d
-      = m0[d >>> 24]
-        ^ m1[a >>> 16 & 255]
-        ^ m2[b >>> 8 & 255]
-        ^ m3[c & 255] ^ w[++i]
+    // Update state variables for next round
     a = a2
     b = b2
     c = c2
+
+    // cycle the right most byte to the left most position
+    // ie: 2,1,1,3 becomes 3,2,1,1
   }
 
   /*
-    Encrypt:
-    SubBytes(state)
-    ShiftRows(state)
-    AddRoundKey(state, w[Nr*Nb, (Nr+1)*Nb-1])
-
-    Decrypt:
-    InvShiftRows(state)
-    InvSubBytes(state)
-    AddRoundKey(state, w[0, Nb-1])
+   * Encrypt:
+   * SubBytes(state)
+   * ShiftRows(state)
+   * AddRoundKey(state, w[Nr*Nb, (Nr+1)*Nb-1])
+   *
+   * Decrypt:
+   * InvShiftRows(state)
+   * InvSubBytes(state)
+   * AddRoundKey(state, w[0, Nb-1])
    */
   // Note: rows are shifted inline
   output[0]
