@@ -894,13 +894,14 @@ modes.gcm.prototype.tableMultiply = function (x) {
  *
  * @return the hashed value (Ym).
  */
-modes.gcm.prototype.ghash = function (h, y, x) {
+modes.gcm.prototype.ghash = function (h: number[], y: number[], x: number[]) {
   y[0] ^= x[0]
   y[1] ^= x[1]
   y[2] ^= x[2]
   y[3] ^= x[3]
-  return this.tableMultiply(y)
+
   // return this.multiply(y, h);
+  return this.tableMultiply(y)
 }
 
 /**
