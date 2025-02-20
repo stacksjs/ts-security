@@ -407,7 +407,6 @@ export class ByteStringBuffer {
   copy(): ByteStringBuffer {
     const c = new ByteStringBuffer(this.data)
     c.read = this.read
-
     return c
   }
 
@@ -421,7 +420,6 @@ export class ByteStringBuffer {
       this.data = this.data.slice(this.read)
       this.read = 0
     }
-
     return this
   }
 
@@ -433,7 +431,6 @@ export class ByteStringBuffer {
   clear(): this {
     this.data = ''
     this.read = 0
-
     return this
   }
 
@@ -448,7 +445,6 @@ export class ByteStringBuffer {
     const len = Math.max(0, this.length() - count)
     this.data = this.data.substr(this.read, len)
     this.read = 0
-
     return this
   }
 
@@ -459,7 +455,6 @@ export class ByteStringBuffer {
    */
   toHex(): string {
     let rval = ''
-
     for (let i = this.read; i < this.data.length; ++i) {
       const b = this.data.charCodeAt(i)
       if (b < 16) {
@@ -467,7 +462,6 @@ export class ByteStringBuffer {
       }
       rval += b.toString(16)
     }
-
     return rval
   }
 
@@ -481,7 +475,7 @@ export class ByteStringBuffer {
   }
 
   // Helper method for string construction optimization
-  _optimizeConstructedString(x: number): void {
+  private _optimizeConstructedString(x: number): void {
     const _MAX_CONSTRUCTED_STRING_LENGTH = 4096
     this._constructedStringLength += x
     if (this._constructedStringLength > _MAX_CONSTRUCTED_STRING_LENGTH) {
@@ -618,7 +612,16 @@ export function decodeUtf8(bytes: string): string {
   return decodeURIComponent(escape(bytes))
 }
 
-function _checkBitsParam(n: number) {
+/**
+ * Ensure a bits param is 8, 16, 24, or 32. Used to validate input for
+ * algorithms where bit manipulation, JavaScript limitations, and/or algorithm
+ * design only allow for byte operations of a limited size.
+ *
+ * @param n number of bits.
+ *
+ * Throw Error if n invalid.
+ */
+function _checkBitsParam(n: number): void {
   if (!(n === 8 || n === 16 || n === 24 || n === 32)) {
     throw new Error(`Only 8, 16, 24, or 32 bits supported: ${n}`)
   }
