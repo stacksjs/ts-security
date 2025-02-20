@@ -1,3 +1,4 @@
+const forge = require('./forge')
 /**
  * JavaScript implementation of Ed25519.
  *
@@ -8,11 +9,10 @@
  *
  * https://github.com/dchest/tweetnacl-js
  */
-const forge = require('./forge')
+import { ByteStringBuffer } from './utils'
 require('./jsbn')
 require('./random')
 require('./sha512')
-require('./util')
 const asn1Validator = require('./asn1-validator')
 
 const publicKeyValidator = asn1Validator.publicKeyValidator

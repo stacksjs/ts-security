@@ -1,9 +1,7 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, it } from 'bun:test'
 import ASSERT from 'node:assert'
 import { ED25519 } from '../../src/ed25519'
 import { SHA256 } from '../../src/sha256'
-import { base64 } from '../../src/baseN'
-import { ByteBuffer } from '../../src/utils'
 
 const b64PrivateKey
   = 'XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtjE20/RjGhpDRDhAKkH'

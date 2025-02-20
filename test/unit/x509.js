@@ -1475,9 +1475,9 @@ const UTIL = require('../../lib/util');
           + '71oPI0bgRkpde2rJT7E41fxxajIGbGgVnvIT2yo2QZNRTJjrnzIoVAfOsgWSp8jf\r\n'
           + 'L6HjyZwK5L6ziBfPYnCAzRC4mwjgR2EkEhbA/HDZCko5CfRR8WIKVmtGweIL/5I+\r\n'
           + '9aUG7lUKbf3aGLnBMG6YzThNnMW1a4EZt7EZUlz4mZ3C7KH1lqdmeaZT+BdnZFL2\r\n'
-        + 'Mjf0zXRaL1k1BpBrzPfmfWfE+gx7EAWF6E/iDu+g1PhX678vFEJiAQkINVwkjA1d\r\n'
-        + '/fpSWNjJEEVPrhWwmoK5+xfM5qC9una9BfFwaUOdYDH59BN6jHE=\r\n'
-        + '-----END CERTIFICATE-----\r\n'
+          + 'Mjf0zXRaL1k1BpBrzPfmfWfE+gx7EAWF6E/iDu+g1PhX678vFEJiAQkINVwkjA1d\r\n'
+          + '/fpSWNjJEEVPrhWwmoK5+xfM5qC9una9BfFwaUOdYDH59BN6jHE=\r\n'
+          + '-----END CERTIFICATE-----\r\n'
       // round trip pem -> cert -> asn1 -> der -> asn1 -> cert -> pem
       const inCert = PKI.certificateFromPem(certPem)
       const inAsn1 = PKI.certificateToAsn1(inCert)

@@ -5,43 +5,48 @@
  */
 export class ByteStringBuffer {
   // Class properties
-  private data: string;
-  private read: number;
-  private _constructedStringLength: number;
+  private data: string
+  private read: number
+  private _constructedStringLength: number
 
   constructor(b?: string | ArrayBuffer | ArrayBufferView) {
     // Initialize properties
-    this.data = '';
-    this.read = 0;
-    this._constructedStringLength = 0;
+    this.data = ''
+    this.read = 0
+    this._constructedStringLength = 0
 
     if (b !== undefined) {
       if (typeof b === 'string') {
-        this.data = b;
-      } else if (isArrayBuffer(b) || isArrayBufferView(b)) {
+        this.data = b
+      }
+      else if (isArrayBuffer(b) || isArrayBufferView(b)) {
         if (typeof Buffer !== 'undefined' && b instanceof Buffer) {
-          this.data = b.toString('binary');
-        } else {
+          this.data = b.toString('binary')
+        }
+        else {
           // convert native buffer to forge buffer
-          const arr = new Uint8Array(b as ArrayBuffer);
+          const arr = new Uint8Array(b as ArrayBuffer)
           try {
-            this.data = String.fromCharCode(...Array.from(arr));
-          } catch (e) {
+            this.data = String.fromCharCode(...Array.from(arr))
+          }
+          catch (e) {
             for (let i = 0; i < arr.length; ++i) {
-              this.putByte(arr[i]);
+              this.putByte(arr[i])
             }
           }
         }
-      } else if (b instanceof ByteStringBuffer) {
+      }
+      else if (b instanceof ByteStringBuffer) {
         // copy existing buffer
-        this.data = b.data;
-        this.read = b.read;
-      } else if (typeof b === 'object' &&
-        'data' in b && typeof b.data === 'string' &&
-        'read' in b && typeof b.read === 'number') {
+        this.data = b.data
+        this.read = b.read
+      }
+      else if (typeof b === 'object'
+        && 'data' in b && typeof b.data === 'string'
+        && 'read' in b && typeof b.read === 'number') {
         // copy from object with compatible interface
-        this.data = b.data;
-        this.read = b.read;
+        this.data = b.data
+        this.read = b.read
       }
     }
   }
@@ -52,7 +57,7 @@ export class ByteStringBuffer {
    * @return the number of bytes in this buffer.
    */
   length(): number {
-    return this.data.length - this.read;
+    return this.data.length - this.read
   }
 
   /**
@@ -61,7 +66,7 @@ export class ByteStringBuffer {
    * @return true if this buffer is empty, false if not.
    */
   isEmpty(): boolean {
-    return this.length() <= 0;
+    return this.length() <= 0
   }
 
   /**
@@ -72,7 +77,7 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   putByte(b: number): this {
-    return this.putBytes(String.fromCharCode(b));
+    return this.putBytes(String.fromCharCode(b))
   }
 
   /**
@@ -84,20 +89,20 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   fillWithByte(b: number, n: number): this {
-    let str = String.fromCharCode(b);
-    let d = this.data;
+    let str = String.fromCharCode(b)
+    let d = this.data
     while (n > 0) {
       if (n & 1) {
-        d += str;
+        d += str
       }
-      n >>>= 1;
+      n >>>= 1
       if (n > 0) {
-        str += str;
+        str += str
       }
     }
-    this.data = d;
-    this._optimizeConstructedString(n);
-    return this;
+    this.data = d
+    this._optimizeConstructedString(n)
+    return this
   }
 
   /**
@@ -108,9 +113,9 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   putBytes(bytes: string): this {
-    this.data += bytes;
-    this._optimizeConstructedString(bytes.length);
-    return this;
+    this.data += bytes
+    this._optimizeConstructedString(bytes.length)
+    return this
   }
 
   /**
@@ -121,7 +126,7 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   putString(str: string): this {
-    return this.putBytes(encodeUtf8(str));
+    return this.putBytes(encodeUtf8(str))
   }
 
   /**
@@ -133,8 +138,9 @@ export class ByteStringBuffer {
    */
   putInt16(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF));
+      String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   /**
@@ -146,9 +152,10 @@ export class ByteStringBuffer {
    */
   putInt24(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF));
+      String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   /**
@@ -160,10 +167,11 @@ export class ByteStringBuffer {
    */
   putInt32(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i >> 24 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF));
+      String.fromCharCode(i >> 24 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   /**
@@ -175,8 +183,9 @@ export class ByteStringBuffer {
    */
   putInt16Le(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF));
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF),
+    )
   }
 
   /**
@@ -188,9 +197,10 @@ export class ByteStringBuffer {
    */
   putInt24Le(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF));
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF),
+    )
   }
 
   /**
@@ -202,10 +212,11 @@ export class ByteStringBuffer {
    */
   putInt32Le(i: number): this {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 24 & 0xFF));
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 24 & 0xFF),
+    )
   }
 
   /**
@@ -217,13 +228,13 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   putInt(i: number, n: number): this {
-    _checkBitsParam(n);
-    let bytes = '';
+    _checkBitsParam(n)
+    let bytes = ''
     do {
-      n -= 8;
-      bytes += String.fromCharCode((i >> n) & 0xFF);
-    } while (n > 0);
-    return this.putBytes(bytes);
+      n -= 8
+      bytes += String.fromCharCode((i >> n) & 0xFF)
+    } while (n > 0)
+    return this.putBytes(bytes)
   }
 
   /**
@@ -232,7 +243,7 @@ export class ByteStringBuffer {
    * @return the byte.
    */
   getByte(): number {
-    return this.data.charCodeAt(this.read++);
+    return this.data.charCodeAt(this.read++)
   }
 
   /**
@@ -243,10 +254,10 @@ export class ByteStringBuffer {
    */
   getInt16(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 8 ^
-      this.data.charCodeAt(this.read + 1));
-    this.read += 2;
-    return rval;
+      this.data.charCodeAt(this.read) << 8
+      ^ this.data.charCodeAt(this.read + 1))
+    this.read += 2
+    return rval
   }
 
   /**
@@ -257,11 +268,11 @@ export class ByteStringBuffer {
    */
   getInt24(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 16 ^
-      this.data.charCodeAt(this.read + 1) << 8 ^
-      this.data.charCodeAt(this.read + 2));
-    this.read += 3;
-    return rval;
+      this.data.charCodeAt(this.read) << 16
+      ^ this.data.charCodeAt(this.read + 1) << 8
+      ^ this.data.charCodeAt(this.read + 2))
+    this.read += 3
+    return rval
   }
 
   /**
@@ -272,12 +283,12 @@ export class ByteStringBuffer {
    */
   getInt32(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 24 ^
-      this.data.charCodeAt(this.read + 1) << 16 ^
-      this.data.charCodeAt(this.read + 2) << 8 ^
-      this.data.charCodeAt(this.read + 3));
-    this.read += 4;
-    return rval;
+      this.data.charCodeAt(this.read) << 24
+      ^ this.data.charCodeAt(this.read + 1) << 16
+      ^ this.data.charCodeAt(this.read + 2) << 8
+      ^ this.data.charCodeAt(this.read + 3))
+    this.read += 4
+    return rval
   }
 
   /**
@@ -288,10 +299,10 @@ export class ByteStringBuffer {
    */
   getInt16Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) ^
-      this.data.charCodeAt(this.read + 1) << 8);
-    this.read += 2;
-    return rval;
+      this.data.charCodeAt(this.read)
+      ^ this.data.charCodeAt(this.read + 1) << 8)
+    this.read += 2
+    return rval
   }
 
   /**
@@ -302,11 +313,11 @@ export class ByteStringBuffer {
    */
   getInt24Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) ^
-      this.data.charCodeAt(this.read + 1) << 8 ^
-      this.data.charCodeAt(this.read + 2) << 16);
-    this.read += 3;
-    return rval;
+      this.data.charCodeAt(this.read)
+      ^ this.data.charCodeAt(this.read + 1) << 8
+      ^ this.data.charCodeAt(this.read + 2) << 16)
+    this.read += 3
+    return rval
   }
 
   /**
@@ -317,12 +328,12 @@ export class ByteStringBuffer {
    */
   getInt32Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) ^
-      this.data.charCodeAt(this.read + 1) << 8 ^
-      this.data.charCodeAt(this.read + 2) << 16 ^
-      this.data.charCodeAt(this.read + 3) << 24);
-    this.read += 4;
-    return rval;
+      this.data.charCodeAt(this.read)
+      ^ this.data.charCodeAt(this.read + 1) << 8
+      ^ this.data.charCodeAt(this.read + 2) << 16
+      ^ this.data.charCodeAt(this.read + 3) << 24)
+    this.read += 4
+    return rval
   }
 
   /**
@@ -334,13 +345,13 @@ export class ByteStringBuffer {
    * @return the integer.
    */
   getInt(n: number): number {
-    _checkBitsParam(n);
-    let rval = 0;
+    _checkBitsParam(n)
+    let rval = 0
     do {
-      rval = (rval << 8) + this.data.charCodeAt(this.read++);
-      n -= 8;
-    } while (n > 0);
-    return rval;
+      rval = (rval << 8) + this.data.charCodeAt(this.read++)
+      n -= 8
+    } while (n > 0)
+    return rval
   }
 
   /**
@@ -353,12 +364,12 @@ export class ByteStringBuffer {
    */
   getSignedInt(n: number): number {
     // getInt checks n
-    let x = this.getInt(n);
-    const max = 2 << (n - 2);
+    let x = this.getInt(n)
+    const max = 2 << (n - 2)
     if (x >= max) {
-      x -= max << 1;
+      x -= max << 1
     }
-    return x;
+    return x
   }
 
   /**
@@ -370,20 +381,22 @@ export class ByteStringBuffer {
    * @return a binary encoded string of bytes.
    */
   getBytes(count?: number): string {
-    let rval;
+    let rval
     if (count) {
       // read count bytes
-      count = Math.min(this.length(), count);
-      rval = this.data.slice(this.read, this.read + count);
-      this.read += count;
-    } else if (count === 0) {
-      rval = '';
-    } else {
-      // read all bytes, optimize to only copy when needed
-      rval = (this.read === 0) ? this.data : this.data.slice(this.read);
-      this.clear();
+      count = Math.min(this.length(), count)
+      rval = this.data.slice(this.read, this.read + count)
+      this.read += count
     }
-    return rval;
+    else if (count === 0) {
+      rval = ''
+    }
+    else {
+      // read all bytes, optimize to only copy when needed
+      rval = (this.read === 0) ? this.data : this.data.slice(this.read)
+      this.clear()
+    }
+    return rval
   }
 
   /**
@@ -392,10 +405,10 @@ export class ByteStringBuffer {
    * @return the copy.
    */
   copy(): ByteStringBuffer {
-    const c = new ByteStringBuffer(this.data);
-    c.read = this.read;
+    const c = new ByteStringBuffer(this.data)
+    c.read = this.read
 
-    return c;
+    return c
   }
 
   /**
@@ -405,11 +418,11 @@ export class ByteStringBuffer {
    */
   compact(): this {
     if (this.read > 0) {
-      this.data = this.data.slice(this.read);
-      this.read = 0;
+      this.data = this.data.slice(this.read)
+      this.read = 0
     }
 
-    return this;
+    return this
   }
 
   /**
@@ -418,10 +431,10 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   clear(): this {
-    this.data = '';
-    this.read = 0;
+    this.data = ''
+    this.read = 0
 
-    return this;
+    return this
   }
 
   /**
@@ -432,11 +445,11 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   truncate(count: number): this {
-    const len = Math.max(0, this.length() - count);
-    this.data = this.data.substr(this.read, len);
-    this.read = 0;
+    const len = Math.max(0, this.length() - count)
+    this.data = this.data.substr(this.read, len)
+    this.read = 0
 
-    return this;
+    return this
   }
 
   /**
@@ -445,17 +458,17 @@ export class ByteStringBuffer {
    * @return a hexadecimal string.
    */
   toHex(): string {
-    let rval = '';
+    let rval = ''
 
     for (let i = this.read; i < this.data.length; ++i) {
-      const b = this.data.charCodeAt(i);
+      const b = this.data.charCodeAt(i)
       if (b < 16) {
-        rval += '0';
+        rval += '0'
       }
-      rval += b.toString(16);
+      rval += b.toString(16)
     }
 
-    return rval;
+    return rval
   }
 
   /**
@@ -464,17 +477,17 @@ export class ByteStringBuffer {
    * @return a UTF-16 string.
    */
   toString(): string {
-    return decodeUtf8(this.bytes());
+    return decodeUtf8(this.bytes())
   }
 
   // Helper method for string construction optimization
   _optimizeConstructedString(x: number): void {
-    const _MAX_CONSTRUCTED_STRING_LENGTH = 4096;
-    this._constructedStringLength += x;
+    const _MAX_CONSTRUCTED_STRING_LENGTH = 4096
+    this._constructedStringLength += x
     if (this._constructedStringLength > _MAX_CONSTRUCTED_STRING_LENGTH) {
       // this substr() should cause the constructed string to join
-      this.data.substr(0, 1);
-      this._constructedStringLength = 0;
+      this.data.substr(0, 1)
+      this._constructedStringLength = 0
     }
   }
 
@@ -487,9 +500,9 @@ export class ByteStringBuffer {
    * @return a string full of binary encoded characters.
    */
   bytes(count?: number): string {
-    return (typeof (count) === 'undefined' ?
-      this.data.slice(this.read) :
-      this.data.slice(this.read, this.read + count));
+    return (typeof (count) === 'undefined'
+      ? this.data.slice(this.read)
+      : this.data.slice(this.read, this.read + count))
   }
 
   /**
@@ -500,7 +513,7 @@ export class ByteStringBuffer {
    * @return the byte.
    */
   at(i: number): number {
-    return this.data.charCodeAt(this.read + i);
+    return this.data.charCodeAt(this.read + i)
   }
 
   /**
@@ -512,10 +525,10 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   setAt(i: number, b: number): this {
-    this.data = this.data.substr(0, this.read + i) +
-      String.fromCharCode(b) +
-      this.data.substr(this.read + i + 1);
-    return this;
+    this.data = this.data.substr(0, this.read + i)
+      + String.fromCharCode(b)
+      + this.data.substr(this.read + i + 1)
+    return this
   }
 
   /**
@@ -524,7 +537,7 @@ export class ByteStringBuffer {
    * @return the last byte.
    */
   last(): number {
-    return this.data.charCodeAt(this.data.length - 1);
+    return this.data.charCodeAt(this.data.length - 1)
   }
 
   /**
@@ -535,9 +548,11 @@ export class ByteStringBuffer {
    * @return this buffer.
    */
   putBuffer(buffer: ByteStringBuffer): this {
-    return this.putBytes(buffer.getBytes());
+    return this.putBytes(buffer.getBytes())
   }
 }
+
+export const ByteBuffer: typeof ByteStringBuffer = ByteStringBuffer
 
 // Utility functions
 
@@ -548,13 +563,13 @@ export class ByteStringBuffer {
  * @param [encoding] (default: 'raw', other: 'utf8').
  */
 export function createBuffer(input: string, encoding?: string): ByteStringBuffer {
-  encoding = encoding || 'raw';
+  encoding = encoding || 'raw'
 
   if (input !== undefined && encoding === 'utf8') {
-    input = encodeUtf8(input);
+    input = encodeUtf8(input)
   }
 
-  return new ByteStringBuffer(input);
+  return new ByteStringBuffer(input)
 }
 
 /**
@@ -565,7 +580,7 @@ export function createBuffer(input: string, encoding?: string): ByteStringBuffer
  * @return true if the object is an ArrayBuffer, false if not.
  */
 export function isArrayBuffer(x: any): boolean {
-  return typeof ArrayBuffer !== 'undefined' && x instanceof ArrayBuffer;
+  return typeof ArrayBuffer !== 'undefined' && x instanceof ArrayBuffer
 }
 
 /**
@@ -576,7 +591,7 @@ export function isArrayBuffer(x: any): boolean {
  * @return true if the object is a ArrayBufferView, false if not.
  */
 export function isArrayBufferView(x: any): boolean {
-  return x && isArrayBuffer(x.buffer) && x.byteLength !== undefined;
+  return x && isArrayBuffer(x.buffer) && x.byteLength !== undefined
 }
 
 /**
@@ -587,9 +602,9 @@ export function isArrayBufferView(x: any): boolean {
  * @return the UTF-8 bytes.
  */
 export function encodeUtf8(str: string): string {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(str);
-  return Array.from(bytes).map(b => String.fromCharCode(b)).join('');
+  const encoder = new TextEncoder()
+  const bytes = encoder.encode(str)
+  return Array.from(bytes).map(b => String.fromCharCode(b)).join('')
 }
 
 /**
@@ -600,12 +615,11 @@ export function encodeUtf8(str: string): string {
  * @return the string of characters.
  */
 export function decodeUtf8(bytes: string): string {
-  return decodeURIComponent(escape(bytes));
+  return decodeURIComponent(escape(bytes))
 }
 
 function _checkBitsParam(n: number) {
   if (!(n === 8 || n === 16 || n === 24 || n === 32)) {
-    throw new Error('Only 8, 16, 24, or 32 bits supported: ' + n);
+    throw new Error(`Only 8, 16, 24, or 32 bits supported: ${n}`)
   }
 }
-
