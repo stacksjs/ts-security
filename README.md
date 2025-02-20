@@ -8,15 +8,46 @@
 
 # ts-security
 
-> A TLS library with automation. HTTPS by default through a light-weight library and/or CLI. Similar to mkcert.
+> A comprehensive TypeScript security library providing cryptographic primitives and utilities with a focus on type safety, security, performance, and modern best practices.
 
 ## Features
 
-- 🔒 SSL Support _(HTTPS by default)_
-- 0️⃣ Zero-Config & Zero-Setup HTTPS
-- 🛠️ Configurable Library & CLI
-- 🔀 Multi-domain Support
-- 🏗️ Cross-platform System Trust Store Integration
+- 🔒 **Cryptographic Primitives**
+  - AES encryption _(128/192/256-bit)_ with multiple modes _(ECB, CBC, CFB, OFB, CTR, GCM)_
+  - SHA-2 family hash functions _(SHA-256, SHA-384, SHA-512)_
+  - HMAC message authentication
+  - RSA encryption and signing
+  - Ed25519 digital signatures
+
+- 🛡️ **Secure Random Number Generation**
+  - Fortuna CSPRNG implementation
+  - Multiple entropy sources
+  - Automatic reseeding
+  - Browser and Node.js support
+
+- 📜 **Certificate Management**
+  - X.509 certificate handling
+  - PEM encoding/decoding
+  - Certificate signing request _(CSR)_ creation
+  - Certificate chain validation
+
+- 🔐 **TLS/SSL Support**
+  - TLS protocol implementation
+  - Secure socket connections
+  - Certificate-based authentication
+  - Modern cipher suite support
+
+- 🎯 **Type Safety**
+  - Full TypeScript support
+  - Comprehensive type definitions
+  - Strict type checking
+  - Modern ES6+ features
+
+- 🧰 **Utilities**
+  - Base-N encoding _(Base64, Base58, etc.)_
+  - ASN.1 encoding/decoding
+  - BigInteger arithmetic
+  - Buffer manipulation
 
 ## Install
 
@@ -33,12 +64,56 @@ pnpm install ts-security
 
 ## Get Started
 
-Given the npm package is installed:
+After installing the package, you can import and use the various cryptographic functions:
 
 ```ts
-import type { ... } from 'ts-security'
-import { ... } from 'ts-security'
+import {
+  aes,
+  sha256,
+  sha512,
+  random,
+  hmac,
+  rsa,
+  ed25519,
+  pki,
+  tls
+} from 'ts-security'
+
+// AES Encryption
+const cipher = aes.createCipher('AES-GCM', key)
+cipher.start({ iv: iv })
+cipher.update(data)
+const encrypted = cipher.finish()
+
+// SHA-256 Hashing
+const md = sha256.create()
+md.update('Hello, World!')
+const hash = md.digest().toHex()
+
+// Secure Random Numbers
+const bytes = random.getBytesSync(32)
+
+// RSA Key Generation
+const keypair = rsa.generateKeyPair({ bits: 2048 })
+
+// Digital Signatures
+const signature = ed25519.sign(message, privateKey)
+const isValid = ed25519.verify(signature, message, publicKey)
+
+// Certificate Operations
+const cert = pki.createCertificate()
+cert.publicKey = keypair.publicKey
+cert.sign(keypair.privateKey)
+
+// TLS Connections
+const connection = tls.connect({
+  server: host,
+  port: 443,
+  caStore: [/* trusted certificates */]
+})
 ```
+
+For more detailed examples and API documentation, please visit our [documentation](https://ts-security.stacksjs.org).
 
 ## Testing
 
@@ -79,6 +154,7 @@ We would like to extend our thanks to the following sponsors for funding Stacks 
 
 ## Credits
 
+- [Dave Longley](https://github.com/dlongley)
 - [node-forge](https://github.com/digitalbazaar/forge)
 - [Chris Breuer](https://github.com/chrisbbreuer)
 - [All Contributors](../../contributors)
