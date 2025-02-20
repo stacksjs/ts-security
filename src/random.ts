@@ -30,7 +30,7 @@
 import type { ByteStringBuffer } from './utils'
 import { _expandKey, _updateBlock } from './aes'
 import * as sha256Module from './sha256'
-import { createBuffer, isServer } from './utils'
+import { createBuffer } from './utils'
 
 // Define PRNG interface
 export interface PRNG {

@@ -6,7 +6,7 @@ console.log('Building...')
 // await $`rm -rf ./dist`
 
 const result = await Bun.build({
-  entrypoints: ['./src/index.ts', './bin/cli.ts'],
+  entrypoints: ['./src/index.ts'],
   outdir: './dist',
   format: 'esm',
   target: 'node',
