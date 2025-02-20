@@ -1,4 +1,3 @@
-const forge = require('./forge')
 /**
  * JavaScript implementation of Ed25519.
  *
@@ -9,7 +8,9 @@ const forge = require('./forge')
  *
  * https://github.com/dchest/tweetnacl-js
  */
-import { ByteStringBuffer } from './utils'
+
+import { ByteBuffer } from './utils'
+
 require('./jsbn')
 require('./random')
 require('./sha512')
@@ -22,7 +23,6 @@ if (typeof BigInteger === 'undefined') {
   var BigInteger = forge.jsbn.BigInteger
 }
 
-const ByteBuffer = forge.util.ByteBuffer
 const NativeBuffer = typeof Buffer === 'undefined' ? Uint8Array : Buffer
 
 /*
