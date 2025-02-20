@@ -51,28 +51,28 @@ interface IPRNG {
 }
 
 export class BigInteger {
-  private static readonly DB = (() => {
+  public static readonly DB: number = (() => {
     const canary = 0xDEADBEEFCAFE
     const j_lm = ((canary & 0xFFFFFF) == 0xEFCAFE)
 
-    if (typeof navigator === 'undefined')
+    if (typeof navigator === 'undefined' || !navigator)
       return 28 // node.js
-    if (j_lm && navigator.appName === 'Microsoft Internet Explorer')
+    if (j_lm && 'appName' in navigator && navigator.appName === 'Microsoft Internet Explorer')
       return 30
-    if (j_lm && navigator.appName !== 'Netscape')
+    if (j_lm && 'appName' in navigator && navigator.appName !== 'Netscape')
       return 26
     return 28 // Mozilla/Netscape
   })()
 
-  private static readonly DM = ((1 << BigInteger.DB) - 1)
-  private static readonly DV = (1 << BigInteger.DB)
+  public static readonly DM: number = ((1 << BigInteger.DB) - 1)
+  public static readonly DV: number = (1 << BigInteger.DB)
   private static readonly FP = 52
   private static readonly FV = 2 ** BigInteger.FP
   private static readonly F1 = BigInteger.FP - BigInteger.DB
   private static readonly F2 = 2 * BigInteger.DB - BigInteger.FP
 
-  static readonly ZERO = new BigInteger(0)
-  static readonly ONE = new BigInteger(1)
+  static readonly ZERO: BigInteger = new BigInteger(0)
+  static readonly ONE: BigInteger = new BigInteger(1)
 
   public data: number[] = []
   public t: number = 0 // Array length
@@ -143,7 +143,7 @@ export class BigInteger {
     }
     else if (randomizer) {
       // New BigInteger(int, RNG)
-      const x = []
+      const x: number[] = new Array((value >> 3) + 1)
       const t = value & 7
       x.length = (value >> 3) + 1
       randomizer.nextBytes(x)
@@ -450,10 +450,9 @@ export class BigInteger {
     const r = n1.shiftRight(k)
 
     for (let i = 0; i < t; ++i) {
-      // Select witness 'a' at random between 1 and n1
       let a: BigInteger
       do {
-        a = new BigInteger(this.bitLength(), this.getPrng())
+        a = new BigInteger(this.bitLength(), new Number(this.getPrng()) as number)
       } while (a.compareTo(BigInteger.ONE) <= 0 || a.compareTo(n1) >= 0)
 
       let y = a.modPow(r, this)
@@ -929,8 +928,8 @@ export class BigInteger {
     while (--i >= 0) r.data[i] = 0
     for (i = 0; i < x.t - 1; ++i) {
       const c = x.am(i, x.data[i], r, 2 * i, 0, 1)
-      if ((r.data[i + x.t] += x.am(i + 1, 2 * x.data[i], r, 2 * i + 1, c, x.t - i - 1)) >= x.DV) {
-        r.data[i + x.t] -= x.DV
+      if ((r.data[i + x.t] += x.am(i + 1, 2 * x.data[i], r, 2 * i + 1, c, x.t - i - 1)) >= BigInteger.DV) {
+        r.data[i + x.t] -= BigInteger.DV
         r.data[i + x.t + 1] = 1
       }
     }
@@ -1088,7 +1087,7 @@ class Montgomery implements IReducer {
     this.mp = m.invDigit()
     this.mpl = this.mp & 0x7FFF
     this.mph = this.mp >> 15
-    this.um = (1 << (m.DB - 15)) - 1
+    this.um = (1 << (BigInteger.DB - 15)) - 1
     this.mt2 = 2 * m.t
   }
 
@@ -1115,11 +1114,11 @@ class Montgomery implements IReducer {
     }
     for (let i = 0; i < this.m.t; ++i) {
       let j = x.data[i] & 0x7FFF
-      const u0 = (j * this.mpl + (((j * this.mph + (x.data[i] >> 15) * this.mpl) & this.um) << 15)) & x.DM
+      const u0 = (j * this.mpl + (((j * this.mph + (x.data[i] >> 15) * this.mpl) & this.um) << 15)) & BigInteger.DM
       j = i + this.m.t
       x.data[j] += this.m.am(0, u0, x, i, 0, this.m.t)
-      while (x.data[j] >= x.DV) {
-        x.data[j] -= x.DV
+      while (x.data[j] >= BigInteger.DV) {
+        x.data[j] -= BigInteger.DV
         x.data[++j]++
       }
     }
