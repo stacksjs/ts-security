@@ -145,7 +145,7 @@ require('../../lib/ssh');
           + 'vQEnFkGcL1jLlLqp9PlvPIE4a///wy1y0XbnKMJs+dKxiesKVx1zZ1WDcK2Qgv4r\n'
           + 'G+RsZzHZuCjUyty1+SMVOYM6+3zW6bjXN58xI3XeSxgE/JaJKjLWBZWx5+eU7b6a\n'
           + '04mJDMhnpdLHG97m9p90L1yuudiJfq6ngha41xxv9xLmNatfrtStCrq/DR0KHm0K\n'
-        + '-----END RSA PRIVATE KEY-----\n'
+          + '-----END RSA PRIVATE KEY-----\n'
 
       // Unable to test -- uses a random IV that I can't control
       // ASSERT.equal(forge.ssh.rsaPrivateKeyAsOpenSSH(key, 'passphrase'), expect);
