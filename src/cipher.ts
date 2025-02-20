@@ -6,7 +6,8 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer, type ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from './utils'
+import { createBuffer } from './utils'
 
 export interface AlgorithmMode {
   name?: string

@@ -6,8 +6,8 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer } from './utils'
 import type { ByteStringBuffer } from './utils'
+import { createBuffer } from './utils'
 
 export interface CipherMode {
   name: string
@@ -1030,12 +1030,12 @@ export class GCM extends BaseCipherMode {
 
 // Update the modes export
 export const modes: Record<string, (options?: Partial<CipherModeOptions>) => CipherMode> = {
-  ecb: (options) => new ECB(options),
-  cbc: (options) => new CBC(options),
-  cfb: (options) => new CFB(options),
-  ofb: (options) => new OFB(options),
-  ctr: (options) => new CTR(options),
-  gcm: (options) => new GCM(options),
+  ecb: options => new ECB(options),
+  cbc: options => new CBC(options),
+  cfb: options => new CFB(options),
+  ofb: options => new OFB(options),
+  ctr: options => new CTR(options),
+  gcm: options => new GCM(options),
 }
 
 /** Utility functions */

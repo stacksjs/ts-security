@@ -27,9 +27,10 @@
  * Copyright (c) 2009-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer, globalScope, isServer, type ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from './utils'
 import { _expandKey, _updateBlock } from './aes'
 import * as sha256Module from './sha256'
+import { createBuffer, isServer } from './utils'
 
 // Define PRNG interface
 export interface PRNG {
@@ -69,7 +70,7 @@ declare global {
  * using entropy from the system.
  */
 const prng_aes: PRNGAes = {
-  formatKey: function (key: string | number[] | ByteStringBuffer): number[] {
+  formatKey(key: string | number[] | ByteStringBuffer): number[] {
     // convert the key into 32-bit integers
     const tmp = createBuffer(key as string)
     const result = Array.from({ length: 4 }) as number[]
@@ -82,7 +83,7 @@ const prng_aes: PRNGAes = {
     return _expandKey(result, false)
   },
 
-  formatSeed: function (seed: string | number[] | ByteStringBuffer): number[] {
+  formatSeed(seed: string | number[] | ByteStringBuffer): number[] {
     // convert seed into 32-bit integers
     const tmp = createBuffer(seed as string)
     const result = Array.from({ length: 4 }) as number[]
@@ -94,7 +95,7 @@ const prng_aes: PRNGAes = {
     return result
   },
 
-  cipher: function (key: number[], seed: number[]): string {
+  cipher(key: number[], seed: number[]): string {
     const output = Array.from({ length: 4 }) as number[]
     _updateBlock(key, seed, output, false)
 
@@ -107,13 +108,13 @@ const prng_aes: PRNGAes = {
     return buffer.getBytes()
   },
 
-  increment: function (seed: number[]): number[] {
+  increment(seed: number[]): number[] {
     // FIXME: do we care about carry or signed issues?
     ++seed[3]
     return seed
   },
 
-  md: sha256Module.sha256
+  md: sha256Module.sha256,
 }
 
 /**
@@ -125,22 +126,22 @@ const prng_aes: PRNGAes = {
  */
 export function spawnPrng(): PRNG {
   // Internal state
-  let key = new Array(4).fill(0)
-  let seed = new Array(4).fill(0)
+  let key = Array.from({ length: 4 }).fill(0)
+  let seed = Array.from({ length: 4 }).fill(0)
   let time = 0
   let collected = 0
   const entropyPool = createBuffer()
 
   const ctx: PRNG = {
-    getBytes: function (count: number, callback?: (err: Error | null, bytes: string) => void): void | string {
+    getBytes(count: number, callback?: (err: Error | null, bytes: string) => void): void | string {
       return ctx.generate(count, callback)
     },
 
-    getBytesSync: function (count: number): string {
+    getBytesSync(count: number): string {
       return ctx.generate(count)
     },
 
-    generate: function (count: number, callback?: (err: Error | null, bytes: string) => void): string {
+    generate(count: number, callback?: (err: Error | null, bytes: string) => void): string {
       if (count <= 0) {
         return ''
       }
@@ -177,7 +178,7 @@ export function spawnPrng(): PRNG {
       return bytes
     },
 
-    collect: function (bytes: string): void {
+    collect(bytes: string): void {
       if (!bytes) {
         return
       }
@@ -185,13 +186,13 @@ export function spawnPrng(): PRNG {
       collected += bytes.length
     },
 
-    collectInt: function (num: number, bits: number): void {
+    collectInt(num: number, bits: number): void {
       const bytes = []
       for (let i = 0; i < bits; i += 8) {
         bytes.push((num >> i) & 0xFF)
       }
       this.collect(String.fromCharCode.apply(null, bytes))
-    }
+    },
   }
 
   return ctx
@@ -201,7 +202,7 @@ export function spawnPrng(): PRNG {
 const _ctx = spawnPrng()
 
 // Get crypto implementation
-const getRandomValues = (arr: Uint32Array): Uint32Array => {
+function getRandomValues(arr: Uint32Array): Uint32Array {
   const _window = typeof globalThis !== 'undefined' ? globalThis : {} as any
 
   if (_window.crypto?.getRandomValues)
@@ -256,4 +257,3 @@ export const createInstance: () => PRNG = spawnPrng
 
 // Export the random API
 export const random: PRNG = _ctx
-

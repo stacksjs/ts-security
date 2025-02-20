@@ -289,16 +289,17 @@ function _init() {
  * @param w the array to use to store words.
  * @param bytes the byte buffer to update with.
  */
-function _update(s, w, bytes) {
+export function _update(s: any, w: any, bytes: any): void {
   // consume 512 bit (64 byte) chunks
   let t1, t2, s0, s1, ch, maj, i, a, b, c, d, e, f, g, h
   let len = bytes.length()
+
   while (len >= 64) {
     // the w array will be populated with sixteen 32-bit big-endian words
     // and then extended into 64 32-bit words according to SHA-256
-    for (i = 0; i < 16; ++i) {
+    for (i = 0; i < 16; ++i)
       w[i] = bytes.getInt32()
-    }
+
     for (; i < 64; ++i) {
       // XOR word 2 words ago rot right 17, rot right 19, shft right 10
       t1 = w[i - 2]
@@ -306,7 +307,7 @@ function _update(s, w, bytes) {
         = ((t1 >>> 17) | (t1 << 15))
           ^ ((t1 >>> 19) | (t1 << 13))
           ^ (t1 >>> 10)
-      // XOR word 15 words ago rot right 7, rot right 18, shft right 3
+      // XOR word 15 words ago rot right 7, rot right 18, shift right 3
       t2 = w[i - 15]
       t2
         = ((t2 >>> 7) | (t2 << 25))

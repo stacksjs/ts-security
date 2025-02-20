@@ -637,3 +637,28 @@ export const globalScope: typeof globalThis = (function () {
 
   return typeof self === 'undefined' ? window : self
 })()
+
+/**
+ * Fills a string with a particular value. If you want the string to be a byte
+ * string, pass in String.fromCharCode(theByte).
+ *
+ * @param c the character to fill the string with, use String.fromCharCode to fill the string with a byte value.
+ * @param n the number of characters of value c to fill with.
+ *
+ * @return the filled string.
+ */
+export function fillString(c: string, n: number): string {
+  let s = ''
+
+  while (n > 0) {
+    if (n & 1)
+      s += c
+
+    n >>>= 1
+
+    if (n > 0)
+      c += c
+  }
+
+  return s
+}

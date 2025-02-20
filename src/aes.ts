@@ -16,9 +16,10 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import { createBuffer, ByteStringBuffer } from './utils'
-import { registerAlgorithm as registerCipherAlgorithm, type CipherOptions } from './cipher'
-import { modes, type CipherMode, type CipherModeOptions } from './cipher-modes'
+import type { CipherMode, CipherModeOptions } from './cipher-modes'
+import { registerAlgorithm as registerCipherAlgorithm } from './cipher'
+import { modes } from './cipher-modes'
+import { ByteStringBuffer, createBuffer } from './utils'
 
 // AES implementation types
 type SubstitutionBox = number[]
@@ -129,7 +130,8 @@ export class Algorithm {
           keyInts.push(key.getInt32())
         }
       }
-    } else if (Array.isArray(key)) {
+    }
+    else if (Array.isArray(key)) {
       keyInts = key
     }
 
@@ -361,20 +363,20 @@ function initialize() {
   rcon = [0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36]
 
   // compute xtime table which maps i onto GF(i, 0x02)
-  xtime = new Array(256)
+  xtime = Array.from({ length: 256 })
   for (let i = 0; i < 128; ++i) {
     xtime[i] = i << 1
     xtime[i + 128] = (i + 128) << 1 ^ 0x11B
   }
 
   // compute all other tables
-  sbox = new Array(256)
-  isbox = new Array(256)
-  mix = new Array(4)
-  imix = new Array(4)
+  sbox = Array.from({ length: 256 })
+  isbox = Array.from({ length: 256 })
+  mix = Array.from({ length: 4 })
+  imix = Array.from({ length: 4 })
   for (let i = 0; i < 4; ++i) {
-    mix[i] = new Array(256).fill([]).map(() => new Array(4))
-    imix[i] = new Array(256).fill([]).map(() => new Array(4))
+    mix[i] = Array.from({ length: 256 }).fill([]).map(() => Array.from({ length: 4 }))
+    imix[i] = Array.from({ length: 256 }).fill([]).map(() => Array.from({ length: 4 }))
   }
 
   let e = 0
@@ -420,13 +422,13 @@ function initialize() {
         Number((me / 0x1000000) & 0xFF),
         Number((me / 0x10000) & 0xFF),
         Number((me / 0x100) & 0xFF),
-        Number(me & 0xFF)
+        Number(me & 0xFF),
       ]
       imix[n][sx] = [
         Number((ime / 0x1000000) & 0xFF),
         Number((ime / 0x10000) & 0xFF),
         Number((ime / 0x100) & 0xFF),
-        Number(ime & 0xFF)
+        Number(ime & 0xFF),
       ]
       // cycle the right most byte to the left most position using numeric operations
       me = Number((me % 0x1000000) * 0x100 + Math.floor(me / 0x1000000))
@@ -587,18 +589,18 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
           // First, apply sbox substitution to each byte of the word
           // This is done to prepare for the inverse mix operation
           const sboxed = [
-            sbox[tmp >>> 24],               // Most significant byte
-            sbox[(tmp >>> 16) & 255],      // Second byte
-            sbox[(tmp >>> 8) & 255],       // Third byte
-            sbox[tmp & 255]                // Least significant byte
+            sbox[tmp >>> 24], // Most significant byte
+            sbox[(tmp >>> 16) & 255], // Second byte
+            sbox[(tmp >>> 8) & 255], // Third byte
+            sbox[tmp & 255], // Least significant byte
           ]
           // Then apply the inverse mix operation using the mix tables
           // The Number() conversions ensure proper numeric operations
           // The bitwise OR (|) combines the bytes back into a word
-          wnew[i + (3 & -n)] = Number(m0[sboxed[0]]) |
-            Number(m1[sboxed[1]]) |
-            Number(m2[sboxed[2]]) |
-            Number(m3[sboxed[3]])
+          wnew[i + (3 & -n)] = Number(m0[sboxed[0]])
+            | Number(m1[sboxed[1]])
+            | Number(m2[sboxed[2]])
+            | Number(m3[sboxed[3]])
         }
       }
     }
@@ -784,25 +786,25 @@ export function _updateBlock(w: number[], input: number[], output: number[], dec
      */
 
     // Transform state using the mix tables and key schedule
-    a2 = Number(m0[a >>> 24]) |           // Transform byte 3 using table 0
-      Number(m1[b >>> 16 & 255]) |       // Transform byte 2 using table 1
-      Number(m2[c >>> 8 & 255]) |        // Transform byte 1 using table 2
-      Number(m3[d & 255]) ^ w[++i]       // Transform byte 0 using table 3
+    a2 = Number(m0[a >>> 24]) // Transform byte 3 using table 0
+      | Number(m1[b >>> 16 & 255]) // Transform byte 2 using table 1
+      | Number(m2[c >>> 8 & 255]) // Transform byte 1 using table 2
+      | Number(m3[d & 255]) ^ w[++i] // Transform byte 0 using table 3
 
-    b2 = Number(m0[b >>> 24]) |
-      Number(m1[c >>> 16 & 255]) |
-      Number(m2[d >>> 8 & 255]) |
-      Number(m3[a & 255]) ^ w[++i]
+    b2 = Number(m0[b >>> 24])
+      | Number(m1[c >>> 16 & 255])
+      | Number(m2[d >>> 8 & 255])
+      | Number(m3[a & 255]) ^ w[++i]
 
-    c2 = Number(m0[c >>> 24]) |
-      Number(m1[d >>> 16 & 255]) |
-      Number(m2[a >>> 8 & 255]) |
-      Number(m3[b & 255]) ^ w[++i]
+    c2 = Number(m0[c >>> 24])
+      | Number(m1[d >>> 16 & 255])
+      | Number(m2[a >>> 8 & 255])
+      | Number(m3[b & 255]) ^ w[++i]
 
-    d = Number(m0[d >>> 24]) |
-      Number(m1[a >>> 16 & 255]) |
-      Number(m2[b >>> 8 & 255]) |
-      Number(m3[c & 255]) ^ w[++i]
+    d = Number(m0[d >>> 24])
+      | Number(m1[a >>> 16 & 255])
+      | Number(m2[b >>> 8 & 255])
+      | Number(m3[c & 255]) ^ w[++i]
 
     // Update state variables for next round
     a = a2
