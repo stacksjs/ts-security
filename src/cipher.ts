@@ -9,24 +9,24 @@
 import { createBuffer } from './utils'
 
 interface AlgorithmMode {
-  name?: string;
-  blockSize: number;
-  decrypt: (input: any, output: any, finish: boolean) => boolean;
-  encrypt: (input: any, output: any, finish: boolean) => boolean;
-  start: (options: CipherOptions) => void;
-  pad?: (input: any, options: CipherOptions) => boolean;
-  unpad?: (output: any, options: CipherOptions) => boolean;
-  afterFinish?: (output: any, options: CipherOptions) => boolean;
+  name?: string
+  blockSize: number
+  decrypt: (input: any, output: any, finish: boolean) => boolean
+  encrypt: (input: any, output: any, finish: boolean) => boolean
+  start: (options: CipherOptions) => void
+  pad?: (input: any, options: CipherOptions) => boolean
+  unpad?: (output: any, options: CipherOptions) => boolean
+  afterFinish?: (output: any, options: CipherOptions) => boolean
 }
 
 interface Algorithm {
-  mode: AlgorithmMode;
-  initialize: (options: CipherOptions) => void;
+  mode: AlgorithmMode
+  initialize: (options: CipherOptions) => void
 }
 
-type AlgorithmFactory = () => Algorithm;
+type AlgorithmFactory = () => Algorithm
 
-const algorithms: Record<string, AlgorithmFactory> = {};
+const algorithms: Record<string, AlgorithmFactory> = {}
 
 /**
  * Creates a cipher object that can be used to encrypt data using the given
@@ -40,24 +40,24 @@ const algorithms: Record<string, AlgorithmFactory> = {};
  * @return the cipher.
  */
 export function createCipher(algorithm: string | Algorithm, key: string | Buffer): BlockCipher {
-  let api: Algorithm | null = typeof algorithm === 'string' ? null : algorithm;
+  let api: Algorithm | null = typeof algorithm === 'string' ? null : algorithm
 
   if (typeof algorithm === 'string') {
-    const factory = getAlgorithm(algorithm);
+    const factory = getAlgorithm(algorithm)
     if (factory) {
-      api = factory();
+      api = factory()
     }
   }
 
   if (!api) {
-    throw new Error(`Unsupported algorithm: ${algorithm}`);
+    throw new Error(`Unsupported algorithm: ${algorithm}`)
   }
 
   return new BlockCipher({
     algorithm: api,
     key,
     decrypt: false,
-  });
+  })
 }
 
 /**
@@ -72,24 +72,24 @@ export function createCipher(algorithm: string | Algorithm, key: string | Buffer
  * @return the cipher.
  */
 export function createDecipher(algorithm: string | Algorithm, key: string | Buffer): BlockCipher {
-  let api: Algorithm | null = typeof algorithm === 'string' ? null : algorithm;
+  let api: Algorithm | null = typeof algorithm === 'string' ? null : algorithm
 
   if (typeof algorithm === 'string') {
-    const factory = getAlgorithm(algorithm);
+    const factory = getAlgorithm(algorithm)
     if (factory) {
-      api = factory();
+      api = factory()
     }
   }
 
   if (!api) {
-    throw new Error(`Unsupported algorithm: ${algorithm}`);
+    throw new Error(`Unsupported algorithm: ${algorithm}`)
   }
 
   return new BlockCipher({
     algorithm: api,
     key,
     decrypt: true,
-  });
+  })
 }
 
 /**
@@ -100,8 +100,8 @@ export function createDecipher(algorithm: string | Algorithm, key: string | Buff
  * @param algorithm the algorithm API object.
  */
 export function registerAlgorithm(name: string, algorithm: AlgorithmFactory): void {
-  name = name.toUpperCase();
-  algorithms[name] = algorithm;
+  name = name.toUpperCase()
+  algorithms[name] = algorithm
 }
 
 /**
@@ -112,46 +112,46 @@ export function registerAlgorithm(name: string, algorithm: AlgorithmFactory): vo
  * @return the algorithm, if found, null if not.
  */
 export function getAlgorithm(name: string): AlgorithmFactory | null {
-  name = name.toUpperCase();
+  name = name.toUpperCase()
 
   if (name in algorithms)
-    return algorithms[name];
+    return algorithms[name]
 
-  return null;
+  return null
 }
 
 interface CipherOptions {
-  algorithm: Algorithm;
-  key: any;
-  decrypt: boolean;
-  iv?: string | Buffer | number[];
-  additionalData?: string;
-  tagLength?: number;
-  tag?: string;
-  output?: any;
-  overflow?: number;
+  algorithm: Algorithm
+  key: any
+  decrypt: boolean
+  iv?: string | Buffer | number[]
+  additionalData?: string
+  tagLength?: number
+  tag?: string
+  output?: any
+  overflow?: number
 }
 
 export class BlockCipher {
-  private algorithm: Algorithm;
-  private mode: AlgorithmMode;
-  private blockSize: number;
-  private _finish: boolean;
-  private _input: any;
-  private output: any;
-  private _op: (input: any, output: any, finish: boolean) => boolean;
-  private _decrypt: boolean;
+  private algorithm: Algorithm
+  private mode: AlgorithmMode
+  private blockSize: number
+  private _finish: boolean
+  private _input: any
+  private output: any
+  private _op: (input: any, output: any, finish: boolean) => boolean
+  private _decrypt: boolean
 
   constructor(options: CipherOptions) {
-    this.algorithm = options.algorithm;
-    this.mode = this.algorithm.mode;
-    this.blockSize = this.mode.blockSize;
-    this._finish = false;
-    this._input = null;
-    this.output = null;
-    this._op = options.decrypt ? this.mode.decrypt : this.mode.encrypt;
-    this._decrypt = options.decrypt;
-    this.algorithm.initialize(options);
+    this.algorithm = options.algorithm
+    this.mode = this.algorithm.mode
+    this.blockSize = this.mode.blockSize
+    this._finish = false
+    this._input = null
+    this.output = null
+    this._op = options.decrypt ? this.mode.decrypt : this.mode.encrypt
+    this._decrypt = options.decrypt
+    this.algorithm.initialize(options)
   }
 
   /**
@@ -185,12 +185,12 @@ export class BlockCipher {
     const opts: CipherOptions = {
       ...options,
       decrypt: this._decrypt,
-    } as CipherOptions;
+    } as CipherOptions
 
-    this._finish = false;
-    this._input = createBuffer();
-    this.output = options.output || createBuffer();
-    this.mode.start(opts);
+    this._finish = false
+    this._input = createBuffer()
+    this.output = options.output || createBuffer()
+    this.mode.start(opts)
   }
 
   /**
@@ -201,7 +201,7 @@ export class BlockCipher {
   update(input?: any): void {
     if (input) {
       // input given, so empty it into the input buffer
-      this._input.putBuffer(input);
+      this._input.putBuffer(input)
     }
 
     // do cipher operation until it needs more input and not finished
@@ -209,7 +209,7 @@ export class BlockCipher {
       && !this._finish) { }
 
     // free consumed memory from input buffer
-    this._input.compact();
+    this._input.compact()
   }
 
   /**
@@ -225,11 +225,11 @@ export class BlockCipher {
     // Note: will overwrite padding functions even after another start() call
     if (pad && (this.mode.name === 'ECB' || this.mode.name === 'CBC')) {
       this.mode.pad = (input: any): boolean => {
-        return pad(this.blockSize, input, false);
-      };
+        return pad(this.blockSize, input, false)
+      }
       this.mode.unpad = (output: any): boolean => {
-        return pad(this.blockSize, output, true);
-      };
+        return pad(this.blockSize, output, true)
+      }
     }
 
     // build options for padding and afterFinish functions
@@ -237,33 +237,33 @@ export class BlockCipher {
       decrypt: this._decrypt,
       algorithm: this.algorithm,
       key: null, // Not needed for finish operation
-    };
+    }
 
     // get # of bytes that won't fill a block
-    options.overflow = this._input.length() % this.blockSize;
+    options.overflow = this._input.length() % this.blockSize
 
     if (!this._decrypt && this.mode.pad) {
       if (!this.mode.pad(this._input, options)) {
-        return false;
+        return false
       }
     }
 
     // do final update
-    this._finish = true;
-    this.update();
+    this._finish = true
+    this.update()
 
     if (this._decrypt && this.mode.unpad) {
       if (!this.mode.unpad(this.output, options)) {
-        return false;
+        return false
       }
     }
 
     if (this.mode.afterFinish) {
       if (!this.mode.afterFinish(this.output, options)) {
-        return false;
+        return false
       }
     }
 
-    return true;
+    return true
   }
 }

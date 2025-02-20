@@ -5,109 +5,169 @@
  *
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
-const forge = require('./forge')
-require('./util')
 
-forge.cipher = forge.cipher || {}
+import { createBuffer } from './utils'
+import type { ByteStringBuffer } from './utils'
 
-// supported cipher modes
-const modes = module.exports = forge.cipher.modes = forge.cipher.modes || {}
-
-/** Electronic codebook (ECB) (Don't use this; it's not secure) */
-
-modes.ecb = function (options) {
-  options = options || {}
-  this.name = 'ECB'
-  this.cipher = options.cipher
-  this.blockSize = options.blockSize || 16
-  this._ints = this.blockSize / 4
-  this._inBlock = new Array(this._ints)
-  this._outBlock = new Array(this._ints)
+interface CipherMode {
+  name: string
+  cipher: any // TODO: Define proper cipher interface
+  blockSize: number
+  _ints: number
+  _inBlock: number[]
+  _outBlock: number[]
+  _prev?: number[]
+  _iv?: number[]
+  _partialBlock?: number[]
+  _partialOutput?: ByteStringBuffer
+  _partialBytes?: number
+  _R?: number
+  _hashSubkey?: number[]
+  _j0?: number[]
+  _aDataLength?: number[]
+  _cipherLength?: number
+  _hashBlock?: number[]
+  _s?: number[]
+  _m?: any[][]
+  _tag?: string
+  tag?: ByteStringBuffer
+  componentBits?: number
+  start: (options: Partial<CipherModeOptions>) => void
+  encrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
+  decrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
+  pad?: (input: ByteStringBuffer, options: Partial<CipherModeOptions>) => boolean
+  unpad?: (output: ByteStringBuffer, options: Partial<CipherModeOptions>) => boolean
+  afterFinish?: (output: ByteStringBuffer, options: Partial<CipherModeOptions>) => boolean
 }
 
-modes.ecb.prototype.start = function (options) { }
-
-modes.ecb.prototype.encrypt = function (input, output, finish) {
-  // not enough input to encrypt
-  if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
-    return true
-  }
-
-  // get next block
-  for (var i = 0; i < this._ints; ++i) {
-    this._inBlock[i] = input.getInt32()
-  }
-
-  // encrypt block
-  this.cipher.encrypt(this._inBlock, this._outBlock)
-
-  // write output
-  for (var i = 0; i < this._ints; ++i) {
-    output.putInt32(this._outBlock[i])
-  }
+interface CipherModeOptions {
+  cipher?: any
+  blockSize?: number
+  iv?: string | number[] | ByteStringBuffer | null
+  additionalData?: string | ByteStringBuffer
+  tagLength?: number
+  tag?: string
+  output?: ByteStringBuffer
+  decrypt?: boolean
+  overflow?: number
 }
 
-modes.ecb.prototype.decrypt = function (input, output, finish) {
-  // not enough input to decrypt
-  if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
-    return true
-  }
+type CipherModeConstructor = (options?: Partial<CipherModeOptions>) => CipherMode
 
-  // get next block
-  for (var i = 0; i < this._ints; ++i) {
-    this._inBlock[i] = input.getInt32()
-  }
-
-  // decrypt block
-  this.cipher.decrypt(this._inBlock, this._outBlock)
-
-  // write output
-  for (var i = 0; i < this._ints; ++i) {
-    output.putInt32(this._outBlock[i])
-  }
-}
-
-modes.ecb.prototype.pad = function (input, options) {
-  // add PKCS#7 padding to block (each pad byte is the
-  // value of the number of pad bytes)
-  const padding = (input.length() === this.blockSize
-    ? this.blockSize
-    : (this.blockSize - input.length()))
-  input.fillWithByte(padding, padding)
-  return true
-}
-
-modes.ecb.prototype.unpad = function (output, options) {
-  // check for error: input data not a multiple of blockSize
-  if (options.overflow > 0) {
-    return false
-  }
-
-  // ensure padding byte count is valid
-  const len = output.length()
-  const count = output.at(len - 1)
-  if (count > (this.blockSize << 2)) {
-    return false
-  }
-
-  // trim off padding bytes
-  output.truncate(count)
-  return true
-}
+const modes: Record<string, CipherModeConstructor> = {}
 
 /** Cipher-block Chaining (CBC) */
+modes.cbc = function (options: Partial<CipherModeOptions> = {}): CipherMode {
+  const mode: CipherMode = {
+    name: 'CBC',
+    cipher: options.cipher,
+    blockSize: options.blockSize || 16,
+    _ints: 0,
+    _inBlock: [],
+    _outBlock: [],
+    _prev: undefined,
+    _iv: undefined,
+    start: function (options: Partial<CipherModeOptions>): void {
+      // Note: legacy support for using IV residue (has security flaws)
+      // if IV is null, reuse block from previous processing
+      if (options.iv === null) {
+        // must have a previous block
+        if (!this._prev) {
+          throw new Error('Invalid IV parameter.')
+        }
+        this._iv = this._prev.slice(0)
+      }
+      else if (!('iv' in options)) {
+        throw new Error('Invalid IV parameter.')
+      }
+      else {
+        // save IV as "previous" block
+        this._iv = transformIV(options.iv || null, this.blockSize)
+        this._prev = this._iv.slice(0)
+      }
+    },
+    encrypt: function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
+      // not enough input to encrypt
+      if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
+        return true
+      }
 
-modes.cbc = function (options) {
-  options = options || {}
-  this.name = 'CBC'
-  this.cipher = options.cipher
-  this.blockSize = options.blockSize || 16
-  this._ints = this.blockSize / 4
-  this._inBlock = new Array(this._ints)
-  this._outBlock = new Array(this._ints)
+      // get next block
+      // CBC XOR's IV (or previous block) with plaintext
+      for (let i = 0; i < this._ints; ++i) {
+        this._inBlock[i] = (this._prev?.[i] || 0) ^ input.getInt32()
+      }
+
+      // encrypt block
+      this.cipher.encrypt(this._inBlock, this._outBlock)
+
+      // write output, save previous block
+      for (let i = 0; i < this._ints; ++i) {
+        output.putInt32(this._outBlock[i])
+      }
+      this._prev = this._outBlock.slice(0)
+
+      return false
+    },
+    decrypt: function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
+      // not enough input to decrypt
+      if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
+        return true
+      }
+
+      // get next block
+      for (let i = 0; i < this._ints; ++i) {
+        this._inBlock[i] = input.getInt32()
+      }
+
+      // decrypt block
+      this.cipher.decrypt(this._inBlock, this._outBlock)
+
+      // write output, save previous ciphered block
+      // CBC XOR's IV (or previous block) with ciphertext
+      for (let i = 0; i < this._ints; ++i) {
+        output.putInt32((this._prev?.[i] || 0) ^ this._outBlock[i])
+      }
+      this._prev = this._inBlock.slice(0)
+
+      return false
+    },
+    pad: function (input: ByteStringBuffer, options: Partial<CipherModeOptions>): boolean {
+      // add PKCS#7 padding to block (each pad byte is the
+      // value of the number of pad bytes)
+      const padding = (input.length() === this.blockSize
+        ? this.blockSize
+        : (this.blockSize - input.length()))
+      input.fillWithByte(padding, padding)
+      return true
+    },
+    unpad: function (output: ByteStringBuffer, options: Partial<CipherModeOptions>): boolean {
+      // check for error: input data not a multiple of blockSize
+      if (options.overflow) {
+        return false
+      }
+
+      // ensure padding byte count is valid
+      const len = output.length()
+      const count = output.at(len - 1)
+      if (count > (this.blockSize << 2)) {
+        return false
+      }
+
+      // trim off padding bytes
+      output.truncate(count)
+      return true
+    }
+  }
+
+  mode._ints = mode.blockSize / 4
+  mode._inBlock = new Array(mode._ints)
+  mode._outBlock = new Array(mode._ints)
+
+  return mode
 }
 
-modes.cbc.prototype.start = function (options) {
+modes.cbc.prototype.start = function (options: Partial<CipherModeOptions>): void {
   // Note: legacy support for using IV residue (has security flaws)
   // if IV is null, reuse block from previous processing
   if (options.iv === null) {
@@ -127,7 +187,7 @@ modes.cbc.prototype.start = function (options) {
   }
 }
 
-modes.cbc.prototype.encrypt = function (input, output, finish) {
+modes.cbc.prototype.encrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to encrypt
   if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
     return true
@@ -135,7 +195,7 @@ modes.cbc.prototype.encrypt = function (input, output, finish) {
 
   // get next block
   // CBC XOR's IV (or previous block) with plaintext
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     this._inBlock[i] = this._prev[i] ^ input.getInt32()
   }
 
@@ -143,20 +203,22 @@ modes.cbc.prototype.encrypt = function (input, output, finish) {
   this.cipher.encrypt(this._inBlock, this._outBlock)
 
   // write output, save previous block
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     output.putInt32(this._outBlock[i])
   }
-  this._prev = this._outBlock
+  this._prev = this._outBlock.slice(0)
+
+  return false
 }
 
-modes.cbc.prototype.decrypt = function (input, output, finish) {
+modes.cbc.prototype.decrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to decrypt
   if (input.length() < this.blockSize && !(finish && input.length() > 0)) {
     return true
   }
 
   // get next block
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     this._inBlock[i] = input.getInt32()
   }
 
@@ -165,13 +227,15 @@ modes.cbc.prototype.decrypt = function (input, output, finish) {
 
   // write output, save previous ciphered block
   // CBC XOR's IV (or previous block) with ciphertext
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     output.putInt32(this._prev[i] ^ this._outBlock[i])
   }
   this._prev = this._inBlock.slice(0)
+
+  return false
 }
 
-modes.cbc.prototype.pad = function (input, options) {
+modes.cbc.prototype.pad = function (input: ByteStringBuffer, options: Partial<CipherModeOptions>): boolean {
   // add PKCS#7 padding to block (each pad byte is the
   // value of the number of pad bytes)
   const padding = (input.length() === this.blockSize
@@ -181,9 +245,9 @@ modes.cbc.prototype.pad = function (input, options) {
   return true
 }
 
-modes.cbc.prototype.unpad = function (output, options) {
+modes.cbc.prototype.unpad = function (output: ByteStringBuffer, options: Partial<CipherModeOptions>): boolean {
   // check for error: input data not a multiple of blockSize
-  if (options.overflow > 0) {
+  if (options.overflow) {
     return false
   }
 
@@ -201,7 +265,7 @@ modes.cbc.prototype.unpad = function (output, options) {
 
 /** Cipher feedback (CFB) */
 
-modes.cfb = function (options) {
+modes.cfb = function (options: CipherModeOptions) {
   options = options || {}
   this.name = 'CFB'
   this.cipher = options.cipher
@@ -210,11 +274,11 @@ modes.cfb = function (options) {
   this._inBlock = null
   this._outBlock = new Array(this._ints)
   this._partialBlock = new Array(this._ints)
-  this._partialOutput = forge.util.createBuffer()
+  this._partialOutput = createBuffer()
   this._partialBytes = 0
 }
 
-modes.cfb.prototype.start = function (options) {
+modes.cfb.prototype.start = function (options: CipherModeOptions) {
   if (!('iv' in options)) {
     throw new Error('Invalid IV parameter.')
   }
@@ -224,7 +288,7 @@ modes.cfb.prototype.start = function (options) {
   this._partialBytes = 0
 }
 
-modes.cfb.prototype.encrypt = function (input, output, finish) {
+modes.cfb.prototype.encrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to encrypt
   const inputLength = input.length()
   if (inputLength === 0) {
@@ -237,11 +301,11 @@ modes.cfb.prototype.encrypt = function (input, output, finish) {
   // handle full block
   if (this._partialBytes === 0 && inputLength >= this.blockSize) {
     // XOR input with output, write input as output
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._inBlock[i] = input.getInt32() ^ this._outBlock[i]
       output.putInt32(this._inBlock[i])
     }
-    return
+    return false
   }
 
   // handle partial block
@@ -252,7 +316,7 @@ modes.cfb.prototype.encrypt = function (input, output, finish) {
 
   // XOR input with output, write input as partial output
   this._partialOutput.clear()
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     this._partialBlock[i] = input.getInt32() ^ this._outBlock[i]
     this._partialOutput.putInt32(this._partialBlock[i])
   }
@@ -263,7 +327,7 @@ modes.cfb.prototype.encrypt = function (input, output, finish) {
   }
   else {
     // block complete, update input block
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._inBlock[i] = this._partialBlock[i]
     }
   }
@@ -278,16 +342,18 @@ modes.cfb.prototype.encrypt = function (input, output, finish) {
       partialBytes - this._partialBytes,
     ))
     this._partialBytes = partialBytes
-    return true
+    return false
   }
 
   output.putBytes(this._partialOutput.getBytes(
     inputLength - this._partialBytes,
   ))
   this._partialBytes = 0
+
+  return false
 }
 
-modes.cfb.prototype.decrypt = function (input, output, finish) {
+modes.cfb.prototype.decrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to decrypt
   const inputLength = input.length()
   if (inputLength === 0) {
@@ -300,11 +366,11 @@ modes.cfb.prototype.decrypt = function (input, output, finish) {
   // handle full block
   if (this._partialBytes === 0 && inputLength >= this.blockSize) {
     // XOR input with output, write input as output
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._inBlock[i] = input.getInt32()
       output.putInt32(this._inBlock[i] ^ this._outBlock[i])
     }
-    return
+    return false
   }
 
   // handle partial block
@@ -315,7 +381,7 @@ modes.cfb.prototype.decrypt = function (input, output, finish) {
 
   // XOR input with output, write input as partial output
   this._partialOutput.clear()
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     this._partialBlock[i] = input.getInt32()
     this._partialOutput.putInt32(this._partialBlock[i] ^ this._outBlock[i])
   }
@@ -326,7 +392,7 @@ modes.cfb.prototype.decrypt = function (input, output, finish) {
   }
   else {
     // block complete, update input block
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._inBlock[i] = this._partialBlock[i]
     }
   }
@@ -341,18 +407,20 @@ modes.cfb.prototype.decrypt = function (input, output, finish) {
       partialBytes - this._partialBytes,
     ))
     this._partialBytes = partialBytes
-    return true
+    return false
   }
 
   output.putBytes(this._partialOutput.getBytes(
     inputLength - this._partialBytes,
   ))
   this._partialBytes = 0
+
+  return false
 }
 
 /** Output feedback (OFB) */
 
-modes.ofb = function (options) {
+modes.ofb = function (options: CipherModeOptions) {
   options = options || {}
   this.name = 'OFB'
   this.cipher = options.cipher
@@ -360,11 +428,11 @@ modes.ofb = function (options) {
   this._ints = this.blockSize / 4
   this._inBlock = null
   this._outBlock = new Array(this._ints)
-  this._partialOutput = forge.util.createBuffer()
+  this._partialOutput = createBuffer()
   this._partialBytes = 0
 }
 
-modes.ofb.prototype.start = function (options) {
+modes.ofb.prototype.start = function (options: CipherModeOptions) {
   if (!('iv' in options)) {
     throw new Error('Invalid IV parameter.')
   }
@@ -374,7 +442,7 @@ modes.ofb.prototype.start = function (options) {
   this._partialBytes = 0
 }
 
-modes.ofb.prototype.encrypt = function (input, output, finish) {
+modes.ofb.prototype.encrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to encrypt
   const inputLength = input.length()
   if (input.length() === 0) {
@@ -387,11 +455,11 @@ modes.ofb.prototype.encrypt = function (input, output, finish) {
   // handle full block
   if (this._partialBytes === 0 && inputLength >= this.blockSize) {
     // XOR input with output and update next input
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       output.putInt32(input.getInt32() ^ this._outBlock[i])
       this._inBlock[i] = this._outBlock[i]
     }
-    return
+    return false
   }
 
   // handle partial block
@@ -402,7 +470,7 @@ modes.ofb.prototype.encrypt = function (input, output, finish) {
 
   // XOR input with output
   this._partialOutput.clear()
-  for (var i = 0; i < this._ints; ++i) {
+  for (let i = 0; i < this._ints; ++i) {
     this._partialOutput.putInt32(input.getInt32() ^ this._outBlock[i])
   }
 
@@ -412,7 +480,7 @@ modes.ofb.prototype.encrypt = function (input, output, finish) {
   }
   else {
     // block complete, update input block
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._inBlock[i] = this._outBlock[i]
     }
   }
@@ -427,20 +495,22 @@ modes.ofb.prototype.encrypt = function (input, output, finish) {
       partialBytes - this._partialBytes,
     ))
     this._partialBytes = partialBytes
-    return true
+    return false
   }
 
   output.putBytes(this._partialOutput.getBytes(
     inputLength - this._partialBytes,
   ))
   this._partialBytes = 0
+
+  return false
 }
 
 modes.ofb.prototype.decrypt = modes.ofb.prototype.encrypt
 
 /** Counter (CTR) */
 
-modes.ctr = function (options) {
+modes.ctr = function (options: CipherModeOptions) {
   options = options || {}
   this.name = 'CTR'
   this.cipher = options.cipher
@@ -448,11 +518,11 @@ modes.ctr = function (options) {
   this._ints = this.blockSize / 4
   this._inBlock = null
   this._outBlock = new Array(this._ints)
-  this._partialOutput = forge.util.createBuffer()
+  this._partialOutput = createBuffer()
   this._partialBytes = 0
 }
 
-modes.ctr.prototype.start = function (options) {
+modes.ctr.prototype.start = function (options: CipherModeOptions) {
   if (!('iv' in options)) {
     throw new Error('Invalid IV parameter.')
   }
@@ -462,7 +532,7 @@ modes.ctr.prototype.start = function (options) {
   this._partialBytes = 0
 }
 
-modes.ctr.prototype.encrypt = function (input, output, finish) {
+modes.ctr.prototype.encrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to encrypt
   const inputLength = input.length()
   if (inputLength === 0) {
@@ -475,7 +545,7 @@ modes.ctr.prototype.encrypt = function (input, output, finish) {
   // handle full block
   if (this._partialBytes === 0 && inputLength >= this.blockSize) {
     // XOR input with output
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       output.putInt32(input.getInt32() ^ this._outBlock[i])
     }
   }
@@ -488,7 +558,7 @@ modes.ctr.prototype.encrypt = function (input, output, finish) {
 
     // XOR input with output
     this._partialOutput.clear()
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._partialOutput.putInt32(input.getInt32() ^ this._outBlock[i])
     }
 
@@ -507,7 +577,7 @@ modes.ctr.prototype.encrypt = function (input, output, finish) {
         partialBytes - this._partialBytes,
       ))
       this._partialBytes = partialBytes
-      return true
+      return false
     }
 
     output.putBytes(this._partialOutput.getBytes(
@@ -518,13 +588,15 @@ modes.ctr.prototype.encrypt = function (input, output, finish) {
 
   // block complete, increment counter (input block)
   inc32(this._inBlock)
+
+  return false
 }
 
 modes.ctr.prototype.decrypt = modes.ctr.prototype.encrypt
 
 /** Galois/Counter Mode (GCM) */
 
-modes.gcm = function (options) {
+modes.gcm = function (options: CipherModeOptions) {
   options = options || {}
   this.name = 'GCM'
   this.cipher = options.cipher
@@ -532,7 +604,7 @@ modes.gcm = function (options) {
   this._ints = this.blockSize / 4
   this._inBlock = new Array(this._ints)
   this._outBlock = new Array(this._ints)
-  this._partialOutput = forge.util.createBuffer()
+  this._partialOutput = createBuffer()
   this._partialBytes = 0
 
   // R is actually this value concatenated with 120 more zero bits, but
@@ -541,12 +613,12 @@ modes.gcm = function (options) {
   this._R = 0xE1000000
 }
 
-modes.gcm.prototype.start = function (options) {
+modes.gcm.prototype.start = function (options: CipherModeOptions): void {
   if (!('iv' in options)) {
     throw new Error('Invalid IV parameter.')
   }
   // ensure IV is a byte buffer
-  const iv = forge.util.createBuffer(options.iv)
+  const iv = createBuffer(options.iv)
 
   // no ciphered data processed yet
   this._cipherLength = 0
@@ -554,10 +626,10 @@ modes.gcm.prototype.start = function (options) {
   // default additional data is none
   let additionalData
   if ('additionalData' in options) {
-    additionalData = forge.util.createBuffer(options.additionalData)
+    additionalData = createBuffer(options.additionalData)
   }
   else {
-    additionalData = forge.util.createBuffer()
+    additionalData = createBuffer()
   }
 
   // default tag length is 128 bits
@@ -572,7 +644,7 @@ modes.gcm.prototype.start = function (options) {
   this._tag = null
   if (options.decrypt) {
     // save tag to check later
-    this._tag = forge.util.createBuffer(options.tag).getBytes()
+    this._tag = createBuffer(options.tag).getBytes()
     if (this._tag.length !== (this._tagLength / 8)) {
       throw new Error('Authentication tag does not match tag length.')
     }
@@ -627,7 +699,7 @@ modes.gcm.prototype.start = function (options) {
   this._partialBytes = 0
 
   // consume authentication data
-  additionalData = forge.util.createBuffer(additionalData)
+  additionalData = createBuffer(additionalData)
   // save additional data length as a BE 64-bit number
   this._aDataLength = from64To32(additionalData.length() * 8)
   // pad additional data to 128 bit (16 byte) block size
@@ -646,7 +718,7 @@ modes.gcm.prototype.start = function (options) {
   }
 }
 
-modes.gcm.prototype.encrypt = function (input, output, finish) {
+modes.gcm.prototype.encrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to encrypt
   const inputLength = input.length()
   if (inputLength === 0) {
@@ -659,7 +731,7 @@ modes.gcm.prototype.encrypt = function (input, output, finish) {
   // handle full block
   if (this._partialBytes === 0 && inputLength >= this.blockSize) {
     // XOR input with output
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       output.putInt32(this._outBlock[i] ^= input.getInt32())
     }
     this._cipherLength += this.blockSize
@@ -673,7 +745,7 @@ modes.gcm.prototype.encrypt = function (input, output, finish) {
 
     // XOR input with output
     this._partialOutput.clear()
-    for (var i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i) {
       this._partialOutput.putInt32(input.getInt32() ^ this._outBlock[i])
     }
 
@@ -691,7 +763,7 @@ modes.gcm.prototype.encrypt = function (input, output, finish) {
       }
 
       // get output block for hashing
-      for (var i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i) {
         this._outBlock[i] = this._partialOutput.getInt32()
       }
       this._partialOutput.read -= this.blockSize
@@ -710,7 +782,7 @@ modes.gcm.prototype.encrypt = function (input, output, finish) {
         partialBytes - this._partialBytes,
       ))
       this._partialBytes = partialBytes
-      return true
+      return false
     }
 
     output.putBytes(this._partialOutput.getBytes(
@@ -724,9 +796,11 @@ modes.gcm.prototype.encrypt = function (input, output, finish) {
 
   // increment counter (input block)
   inc32(this._inBlock)
+
+  return false
 }
 
-modes.gcm.prototype.decrypt = function (input, output, finish) {
+modes.gcm.prototype.decrypt = function (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
   // not enough input to decrypt
   const inputLength = input.length()
   if (inputLength < this.blockSize && !(finish && inputLength > 0)) {
@@ -758,9 +832,11 @@ modes.gcm.prototype.decrypt = function (input, output, finish) {
   else {
     this._cipherLength += this.blockSize
   }
+
+  return false
 }
 
-modes.gcm.prototype.afterFinish = function (output, options) {
+modes.gcm.prototype.afterFinish = function (output: ByteStringBuffer, options: CipherModeOptions): boolean {
   let rval = true
 
   // handle overflow
@@ -769,7 +845,7 @@ modes.gcm.prototype.afterFinish = function (output, options) {
   }
 
   // handle authentication tag
-  this.tag = forge.util.createBuffer()
+  this.tag = createBuffer()
 
   // concatenate additional data length with cipher length
   const lengths = this._aDataLength.concat(from64To32(this._cipherLength * 8))
@@ -820,7 +896,7 @@ modes.gcm.prototype.afterFinish = function (output, options) {
  *
  * @return the block result of the multiplication.
  */
-modes.gcm.prototype.multiply = function (x, y) {
+modes.gcm.prototype.multiply = function (x: number[], y: number[]): number[] {
   const z_i = [0, 0, 0, 0]
   const v_i = y.slice(0)
 
@@ -845,7 +921,7 @@ modes.gcm.prototype.multiply = function (x, y) {
   return z_i
 }
 
-modes.gcm.prototype.pow = function (x, out) {
+modes.gcm.prototype.pow = function (x: number[], out: number[]): void {
   // if LSB(x) is 1, x = x >>> 1
   // else x = (x >>> 1) ^ R
   const lsb = x[3] & 1
@@ -868,7 +944,7 @@ modes.gcm.prototype.pow = function (x, out) {
   }
 }
 
-modes.gcm.prototype.tableMultiply = function (x) {
+modes.gcm.prototype.tableMultiply = function (x: number[]): number[] {
   // assumes 4-bit tables are used
   const z = [0, 0, 0, 0]
   for (let i = 0; i < 32; ++i) {
@@ -894,7 +970,7 @@ modes.gcm.prototype.tableMultiply = function (x) {
  *
  * @return the hashed value (Ym).
  */
-modes.gcm.prototype.ghash = function (h: number[], y: number[], x: number[]) {
+modes.gcm.prototype.ghash = function (h: number[], y: number[], x: number[]): number[] {
   y[0] ^= x[0]
   y[1] ^= x[1]
   y[2] ^= x[2]
@@ -919,7 +995,7 @@ modes.gcm.prototype.ghash = function (h: number[], y: number[], x: number[]) {
  * @param h the hash subkey.
  * @param bits the bit size for a component.
  */
-modes.gcm.prototype.generateHashTable = function (h, bits) {
+modes.gcm.prototype.generateHashTable = function (h: number[], bits: number): any[][] {
   // TODO: There are further optimizations that would use only the
   // first table M_0 (or some variant) along with a remainder table;
   // this can be explored in the future
@@ -944,7 +1020,7 @@ modes.gcm.prototype.generateHashTable = function (h, bits) {
  * @param mid the pre-multiplied value for the middle key of the table.
  * @param bits the bit size for a component.
  */
-modes.gcm.prototype.generateSubHashTable = function (mid, bits) {
+modes.gcm.prototype.generateSubHashTable = function (mid: number[], bits: number): any[][] {
   // compute the table quickly by minimizing the number of
   // POW operations -- they only need to be performed for powers of 2,
   // all other entries can be composed from those powers using XOR
@@ -984,47 +1060,57 @@ modes.gcm.prototype.generateSubHashTable = function (mid, bits) {
 
 /** Utility functions */
 
-function transformIV(iv, blockSize) {
+function isArrayBuffer(x: any): x is ArrayBuffer {
+  return typeof ArrayBuffer !== 'undefined' && x instanceof ArrayBuffer
+}
+
+function isArrayBufferView(x: any): x is ArrayBufferView {
+  return typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(x)
+}
+
+function transformIV(iv: string | number[] | ByteStringBuffer | null, blockSize: number): number[] {
   if (typeof iv === 'string') {
     // convert iv string into byte buffer
-    iv = forge.util.createBuffer(iv)
+    iv = createBuffer(iv)
   }
 
-  if (forge.util.isArray(iv) && iv.length > 4) {
+  if (Array.isArray(iv) && iv.length > 4) {
     // convert iv byte array into byte buffer
     const tmp = iv
-    iv = forge.util.createBuffer()
-    for (var i = 0; i < tmp.length; ++i) {
+    iv = createBuffer()
+    for (let i = 0; i < tmp.length; ++i) {
       iv.putByte(tmp[i])
     }
   }
 
-  if (iv.length() < blockSize) {
-    throw new Error(
-      `Invalid IV length; got ${iv.length()
-      } bytes and expected ${blockSize} bytes.`,
-    )
-  }
-
-  if (!forge.util.isArray(iv)) {
+  if (!Array.isArray(iv)) {
     // convert iv byte buffer into 32-bit integer array
-    const ints = []
+    const ints: number[] = []
     const blocks = blockSize / 4
-    for (var i = 0; i < blocks; ++i) {
-      ints.push(iv.getInt32())
+    for (let i = 0; i < blocks; ++i) {
+      ints.push((iv as ByteStringBuffer).getInt32())
     }
     iv = ints
   }
 
-  return iv
+  if ((iv as ByteStringBuffer).length() < blockSize) {
+    throw new Error(
+      `Invalid IV length; got ${(iv as ByteStringBuffer).length()
+      } bytes and expected ${blockSize} bytes.`,
+    )
+  }
+
+  return iv as number[]
 }
 
-function inc32(block) {
+function inc32(block: number[]): void {
   // increment last 32 bits of block only
   block[block.length - 1] = (block[block.length - 1] + 1) & 0xFFFFFFFF
 }
 
-function from64To32(num) {
+function from64To32(num: number): [number, number] {
   // convert 64-bit number to two BE Int32s
   return [(num / 0x100000000) | 0, num & 0xFFFFFFFF]
 }
+
+export { modes }
