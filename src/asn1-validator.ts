@@ -94,9 +94,9 @@ export const publicKeyValidator: Asn1Validator = {
   }]
 }
 
-const validator: ValidatorMap = {
+export const asn1Validator: ValidatorMap = {
   privateKeyValidator,
   publicKeyValidator,
 }
 
-export default validator
+export default asn1Validator

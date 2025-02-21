@@ -11,7 +11,10 @@
 
 import { getBytesSync } from './random'
 import { ByteBuffer } from './utils'
+import { asn1 } from './asn1'
 import { asn1Validator } from './asn1-validator'
+import { oids } from './oids'
+import { sha512 as sha } from './sha512'
 
 const publicKeyValidator = asn1Validator.publicKeyValidator
 const privateKeyValidator = asn1Validator.privateKeyValidator
@@ -120,20 +123,20 @@ ed25519.generateKeyPair = function (options) {
 ed25519.privateKeyFromAsn1 = function (obj: any) {
   const capture = {} as { privateKeyOid?: string, privateKey?: string }
   const errors: any[] = []
-  const valid = forge.asn1.validate(obj, privateKeyValidator, capture, errors)
+  const valid = asn1.validate(obj, privateKeyValidator, capture, errors)
   if (!valid) {
     const error = new Error('Invalid Key.') as ExtendedError
     error.errors = errors
     throw error
   }
-  const oid = forge.asn1.derToOid(capture.privateKeyOid)
-  const ed25519Oid = forge.oids.EdDSA25519
+  const oid = asn1.derToOid(capture.privateKeyOid)
+  const ed25519Oid = oids.EdDSA25519
   if (oid !== ed25519Oid) {
     throw new Error(`Invalid OID "${oid}"; OID must be "${ed25519Oid}".`)
   }
   const privateKey = capture.privateKey
   const privateKeyBytes = messageToNativeBuffer({
-    message: forge.asn1.fromDer(privateKey).value,
+    message: asn1.fromDer(privateKey).value,
     encoding: 'binary',
   })
   return { privateKeyBytes }
@@ -149,14 +152,14 @@ ed25519.privateKeyFromAsn1 = function (obj: any) {
 ed25519.publicKeyFromAsn1 = function (obj: any): Buffer | Uint8Array {
   const capture = {} as { publicKeyOid?: string, ed25519PublicKey?: Uint8Array }
   const errors: any[] = []
-  const valid = forge.asn1.validate(obj, publicKeyValidator, capture, errors)
+  const valid = asn1.validate(obj, publicKeyValidator, capture, errors)
   if (!valid) {
     const error = new Error('Invalid Key.') as ExtendedError
     error.errors = errors
     throw error
   }
-  const oid = forge.asn1.derToOid(capture.publicKeyOid)
-  const ed25519Oid = forge.oids.EdDSA25519
+  const oid = asn1.derToOid(capture.publicKeyOid)
+  const ed25519Oid = oids.EdDSA25519
   if (oid !== ed25519Oid) {
     throw new Error(`Invalid OID "${oid}"; OID must be "${ed25519Oid}".`)
   }
@@ -164,6 +167,7 @@ ed25519.publicKeyFromAsn1 = function (obj: any): Buffer | Uint8Array {
   if (!publicKeyBytes || publicKeyBytes.length !== ed25519.constants.PUBLIC_KEY_BYTE_LENGTH) {
     throw new Error('Key length is invalid.')
   }
+
   return messageToNativeBuffer({
     message: publicKeyBytes,
     encoding: 'binary',
@@ -240,10 +244,12 @@ ed25519.verify = function (options) {
         ed25519.constants.SIGN_BYTE_LENGTH}`,
     )
   }
+
   const publicKey = messageToNativeBuffer({
     message: options.publicKey,
     encoding: 'binary',
   })
+
   if (publicKey.length !== ed25519.constants.PUBLIC_KEY_BYTE_LENGTH) {
     throw new TypeError(
       `"options.publicKey" must have a byte length of ${
@@ -253,6 +259,7 @@ ed25519.verify = function (options) {
 
   const sm = new NativeBuffer(ed25519.constants.SIGN_BYTE_LENGTH + msg.length)
   const m = new NativeBuffer(ed25519.constants.SIGN_BYTE_LENGTH + msg.length)
+
   let i
   for (i = 0; i < ed25519.constants.SIGN_BYTE_LENGTH; ++i) {
     sm[i] = sig[i]
@@ -435,7 +442,7 @@ const I = gf([
 ])
 
 function sha512(msg: Buffer | Uint8Array, msgLen: number): Buffer | Uint8Array {
-  const md = forge.md.sha512.create()
+  const md = sha.create()
   const buffer = new ByteBuffer()
   const msgStr = Buffer.from(msg).toString('binary')
   buffer.putString(msgStr)
@@ -545,9 +552,11 @@ function crypto_sign_open(
   for (i = 0; i < n; ++i) {
     m[i] = sm[i]
   }
+
   for (i = 0; i < 32; ++i) {
     m[i + 32] = pk[i]
   }
+
   const h = sha512(m, n)
   reduce(h)
   scalarmult(p, q, Array.from(h))
@@ -557,41 +566,52 @@ function crypto_sign_open(
   pack(t, p)
 
   n -= 64
+
   if (crypto_verify_32(sm, 0, t, 0)) {
     for (i = 0; i < n; ++i) {
       m[i] = 0
     }
+
     return -1
   }
 
   for (i = 0; i < n; ++i) {
     m[i] = sm[i + 64]
   }
+
   mlen = n
+
   return mlen
 }
 
 function modL(r: number[], x: number[]) {
   let carry, i, j, k
+
   for (i = 63; i >= 32; --i) {
     carry = 0
+
     for (j = i - 32, k = i - 12; j < k; ++j) {
       x[j] += carry - 16 * x[i] * L[j - (i - 32)]
       carry = (x[j] + 128) >> 8
       x[j] -= carry * 256
     }
+
     x[j] += carry
     x[i] = 0
   }
+
   carry = 0
+
   for (j = 0; j < 32; ++j) {
     x[j] += carry - (x[31] >> 4) * L[j]
     carry = x[j] >> 8
     x[j] &= 255
   }
+
   for (j = 0; j < 32; ++j) {
     x[j] -= carry * L[j]
   }
+
   for (i = 0; i < 32; ++i) {
     x[i + 1] += x[i] >> 8
     r[i] = x[i] & 255
@@ -600,10 +620,12 @@ function modL(r: number[], x: number[]) {
 
 function reduce(r: Buffer | Uint8Array) {
   const x = new Float64Array(64)
+
   for (let i = 0; i < 64; ++i) {
     x[i] = r[i]
     r[i] = 0
   }
+
   modL(r, x)
 }
 
@@ -700,44 +722,52 @@ function unpackneg(r: number[], p: number[]) {
 
   S(chk, r[0])
   M(chk, chk, den)
+
   if (neq25519(chk, num)) {
     M(r[0], r[0], I)
   }
 
   S(chk, r[0])
   M(chk, chk, den)
+
   if (neq25519(chk, num)) {
     return -1
   }
 
-  if (par25519(r[0]) === (p[31] >> 7)) {
+  if (par25519(r[0]) === (p[31] >> 7))
     Z(r[0], gf0, r[0])
-  }
 
   M(r[3], r[0], r[1])
+
   return 0
 }
 
 function unpack25519(o: number[], n: number[]) {
   let i
+
   for (i = 0; i < 16; ++i) {
     o[i] = n[2 * i] + (n[2 * i + 1] << 8)
   }
+
   o[15] &= 0x7FFF
 }
 
 function pow2523(o: number[], i: number[]) {
   const c = gf()
+
   let a
   for (a = 0; a < 16; ++a) {
     c[a] = i[a]
   }
+
   for (a = 250; a >= 0; --a) {
     S(c, c)
+
     if (a !== 1) {
       M(c, c, i)
     }
   }
+
   for (a = 0; a < 16; ++a) {
     o[a] = c[a]
   }
@@ -746,8 +776,10 @@ function pow2523(o: number[], i: number[]) {
 function neq25519(a: number[], b: number[]) {
   const c = new NativeBuffer(32)
   const d = new NativeBuffer(32)
+
   pack25519(c, a)
   pack25519(d, b)
+
   return crypto_verify_32(c, 0, d, 0)
 }
 
@@ -772,10 +804,12 @@ function par25519(a: number[]) {
 
 function scalarmult(p: number[], q: number[], s: number[]) {
   let b, i
+
   set25519(p[0], gf0)
   set25519(p[1], gf1)
   set25519(p[2], gf1)
   set25519(p[3], gf0)
+
   for (i = 255; i >= 0; --i) {
     b = (s[(i / 8) | 0] >> (i & 7)) & 1
     cswap(p, q, b)
@@ -787,6 +821,7 @@ function scalarmult(p: number[], q: number[], s: number[]) {
 
 function scalarbase(p: number[], s: number[]) {
   const q = [gf(), gf(), gf(), gf()]
+
   set25519(q[0], X)
   set25519(q[1], Y)
   set25519(q[2], gf1)
@@ -807,29 +842,37 @@ function inv25519(o: number[], i: number[]) {
   for (a = 0; a < 16; ++a) {
     c[a] = i[a]
   }
+
   for (a = 253; a >= 0; --a) {
     S(c, c)
     if (a !== 2 && a !== 4) {
       M(c, c, i)
     }
   }
+
   for (a = 0; a < 16; ++a) {
     o[a] = c[a]
   }
 }
 
 function car25519(o: number[]) {
-  let i; let v; let c = 1
+  let i
+  let v
+  let c = 1
+
   for (i = 0; i < 16; ++i) {
     v = o[i] + c + 65535
     c = Math.floor(v / 65536)
     o[i] = v - c * 65536
   }
+
   o[0] += c - 1 + 37 * (c - 1)
 }
 
 function sel25519(p: number[], q: number[], b: number) {
-  let t; const c = ~(b - 1)
+  let t
+  const c = ~(b - 1)
+
   for (let i = 0; i < 16; ++i) {
     t = c & (p[i] ^ q[i])
     p[i] ^= t
@@ -838,15 +881,13 @@ function sel25519(p: number[], q: number[], b: number) {
 }
 
 function A(o: number[], a: number[], b: number[]) {
-  for (let i = 0; i < 16; ++i) {
+  for (let i = 0; i < 16; ++i)
     o[i] = a[i] + b[i]
-  }
 }
 
 function Z(o: number[], a: number[], b: number[]) {
-  for (let i = 0; i < 16; ++i) {
+  for (let i = 0; i < 16; ++i)
     o[i] = a[i] - b[i]
-  }
 }
 
 function S(o: number[], a: number[]) {

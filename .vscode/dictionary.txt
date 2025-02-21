@@ -47,6 +47,8 @@ postcompile
 prefetch
 preinstall
 quickfix
+scalarbase
+scalarmult
 shikijs
 shoutout
 socio
