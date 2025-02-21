@@ -21,13 +21,15 @@
 import type { Asn1Object } from './asn1'
 import type { BlockCipher } from './cipher'
 import type { MessageDigest } from './sha1'
+import { aes } from './aes'
 import { asn1 } from './asn1'
 import { createCipher } from './cipher'
+import { des } from './des'
 import { md5 } from './md5'
 import { oids } from './oids'
-import { rc2 } from './rc2'
 import { pbkdf2 } from './pbkdf2'
 import { getBytesSync } from './random'
+import { rc2 } from './rc2'
 import { sha512 } from './sha512'
 import { ByteBuffer, createBuffer, hexToBytes } from './utils'
 
@@ -305,7 +307,7 @@ export function encryptPrivateKeyInfo(obj: any, password: any, options: any): Bu
     const saltBytes = new ByteBuffer(salt)
     var dk = generatePkcs12Key(password, saltBytes, 1, count, dkLen)
     var iv = generatePkcs12Key(password, saltBytes, 2, count, dkLen)
-    var cipher = forge.des.createEncryptionCipher(dk)
+    var cipher = des.createEncryptionCipher(dk)
     cipher.start(iv)
     cipher.update(asn1.toDer(obj))
     cipher.finish()
@@ -473,31 +475,31 @@ pki.encryptRsaPrivateKey = function (rsaKey, password, options) {
       algorithm = 'AES-128-CBC'
       dkLen = 16
       iv = getBytesSync(16)
-      cipherFn = forge.aes.createEncryptionCipher
+      cipherFn = aes.createEncryptionCipher
       break
     case 'aes192':
       algorithm = 'AES-192-CBC'
       dkLen = 24
       iv = getBytesSync(16)
-      cipherFn = forge.aes.createEncryptionCipher
+      cipherFn = aes.createEncryptionCipher
       break
     case 'aes256':
       algorithm = 'AES-256-CBC'
       dkLen = 32
       iv = getBytesSync(16)
-      cipherFn = forge.aes.createEncryptionCipher
+      cipherFn = aes.createEncryptionCipher
       break
     case '3des':
       algorithm = 'DES-EDE3-CBC'
       dkLen = 24
       iv = getBytesSync(8)
-      cipherFn = forge.des.createEncryptionCipher
+      cipherFn = des.createEncryptionCipher
       break
     case 'des':
       algorithm = 'DES-CBC'
       dkLen = 8
       iv = getBytesSync(8)
-      cipherFn = forge.des.createEncryptionCipher
+      cipherFn = des.createEncryptionCipher
       break
     default:
       var error = new Error(`Could not encrypt RSA private key; unsupported `
@@ -556,28 +558,28 @@ pki.decryptRsaPrivateKey = function (pem, password) {
     switch (msg.dekInfo.algorithm) {
       case 'DES-CBC':
         dkLen = 8
-        cipherFn = forge.des.createDecryptionCipher
+        cipherFn = des.createDecryptionCipher
         break
       case 'DES-EDE3-CBC':
         dkLen = 24
-        cipherFn = forge.des.createDecryptionCipher
+        cipherFn = des.createDecryptionCipher
         break
       case 'AES-128-CBC':
         dkLen = 16
-        cipherFn = forge.aes.createDecryptionCipher
+        cipherFn = aes.createDecryptionCipher
         break
       case 'AES-192-CBC':
         dkLen = 24
-        cipherFn = forge.aes.createDecryptionCipher
+        cipherFn = aes.createDecryptionCipher
         break
       case 'AES-256-CBC':
         dkLen = 32
-        cipherFn = forge.aes.createDecryptionCipher
+        cipherFn = aes.createDecryptionCipher
         break
       case 'RC2-40-CBC':
         dkLen = 5
         cipherFn = function (key) {
-          return forge.rc2.createDecryptionCipher(key, 40)
+          return rc2.createDecryptionCipher(key, 40)
         }
         break
       case 'RC2-64-CBC':
@@ -904,7 +906,7 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
     case oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
       dkLen = 24
       dIvLen = 8
-      cipherFn = forge.des.startDecrypting
+      cipherFn = des.startDecrypting
       break
 
     case oids['pbewithSHAAnd40BitRC2-CBC']:

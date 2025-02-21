@@ -16,6 +16,7 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
+import type { Algorithm } from './cipher'
 import type { CipherMode, CipherModeOptions } from './cipher-modes'
 import { registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
@@ -51,7 +52,7 @@ let mix: MixTable = [] // mix-columns table
 let imix: MixTable = [] // inverse mix-columns table
 let xtime: XTimeTable = [] // xtime table for GF(2^8) multiplication
 
-export class Algorithm {
+export class AESAlgorithm implements Algorithm {
   name: string
   mode!: CipherMode // definite assignment assertion
   _init: boolean
@@ -169,7 +170,7 @@ function expandKey(key: number[], decrypt: boolean) {
 
 function registerAESAlgorithm(name: string, mode: any) {
   const factory = function () {
-    return new Algorithm(name, mode)
+    return new AESAlgorithm(name, mode)
   }
   registerCipherAlgorithm(name, factory)
 }

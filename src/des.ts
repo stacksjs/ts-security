@@ -30,11 +30,11 @@
  * Copyright (c) 2012-2014 Digital Bazaar, Inc.
  */
 
-import type { Algorithm, BlockCipher } from './cipher'
+import type { Algorithm } from './cipher'
 import type { CipherMode, CipherModeOptions } from './cipher-modes'
-import { createCipher, createDecipher, registerAlgorithm as registerAlgo } from './cipher'
-import { ByteStringBuffer, createBuffer } from './utils'
+import { createCipher, registerAlgorithm as registerAlgo } from './cipher'
 import { modes } from './cipher-modes'
+import { ByteStringBuffer, createBuffer } from './utils'
 
 /**
  * Creates a new DES cipher algorithm object.
@@ -276,8 +276,8 @@ function _updateBlock(keys: number[], input: ByteStringBuffer, output: ByteStrin
     if (decrypt)
       keysi = keys.length - 4 - i
 
-    let work = right ^ keys[keysi]
-    let work2 = ((right >>> 4) | (right << 28)) ^ keys[keysi + 1]
+    const work = right ^ keys[keysi]
+    const work2 = ((right >>> 4) | (right << 28)) ^ keys[keysi + 1]
 
     // expand right word into 8 bytes for table lookup
     const t1 = work & 0x3F
@@ -290,8 +290,8 @@ function _updateBlock(keys: number[], input: ByteStringBuffer, output: ByteStrin
     const t8 = ((work2 >>> 6) | (work2 << 26)) & 0x3F
 
     // table lookups
-    tmp = spfunction1[t1] | spfunction2[t2] | spfunction3[t3] | spfunction4[t4] |
-          spfunction5[t5] | spfunction6[t6] | spfunction7[t7] | spfunction8[t8]
+    tmp = spfunction1[t1] | spfunction2[t2] | spfunction3[t3] | spfunction4[t4]
+      | spfunction5[t5] | spfunction6[t6] | spfunction7[t7] | spfunction8[t8]
 
     // functions
     const righttemp = left
