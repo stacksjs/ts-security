@@ -25,6 +25,7 @@ import { asn1 } from './asn1'
 import { createCipher } from './cipher'
 import { md5 } from './md5'
 import { oids } from './oids'
+import { rc2 } from './rc2'
 import { pbkdf2 } from './pbkdf2'
 import { getBytesSync } from './random'
 import { sha512 } from './sha512'
@@ -755,14 +756,14 @@ export function generatePkcs12Key(password: string, salt: string, id: number, it
  *
  * @return new cipher object instance.
  */
-pki.pbe.getCipher = function (oid, params, password) {
+export function getCipher(oid: string, params: any, password: string): BlockCipher {
   switch (oid) {
     case oids.pkcs5PBES2:
-      return pki.pbe.getCipherForPBES2(oid, params, password)
+      return getCipherForPBES2(oid, params, password)
 
     case oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
     case oids['pbewithSHAAnd40BitRC2-CBC']:
-      return pki.pbe.getCipherForPKCS12PBE(oid, params, password)
+      return getCipherForPKCS12PBE(oid, params, password)
 
     default:
       var error = new Error('Cannot read encrypted PBE data block. Unsupported OID.')
@@ -788,7 +789,7 @@ pki.pbe.getCipher = function (oid, params, password) {
  *
  * @return new cipher object instance.
  */
-function getCipherForPBES2(oid: string, params: any, password: string) {
+export function getCipherForPBES2(oid: string, params: any, password: string): BlockCipher {
   // get PBE params
   const capture = {}
   const errors = []
@@ -834,26 +835,27 @@ function getCipherForPBES2(oid: string, params: any, password: string) {
   count = count.getInt(count.length() << 3)
   let dkLen
   let cipherFn
+
   switch (oids[oid]) {
     case 'aes128-CBC':
       dkLen = 16
-      cipherFn = forge.aes.createDecryptionCipher
+      cipherFn = createCipher('AES-CBC', key)
       break
     case 'aes192-CBC':
       dkLen = 24
-      cipherFn = forge.aes.createDecryptionCipher
+      cipherFn = createCipher('AES-CBC', key)
       break
     case 'aes256-CBC':
       dkLen = 32
-      cipherFn = forge.aes.createDecryptionCipher
+      cipherFn = createCipher('AES-CBC', key)
       break
     case 'des-EDE3-CBC':
       dkLen = 24
-      cipherFn = forge.des.createDecryptionCipher
+      cipherFn = createCipher('3DES-CBC', key)
       break
     case 'desCBC':
       dkLen = 8
-      cipherFn = forge.des.createDecryptionCipher
+      cipherFn = createCipher('DES-CBC', key)
       break
   }
 
@@ -909,7 +911,7 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
       dkLen = 5
       dIvLen = 8
       cipherFn = function (key, iv) {
-        const cipher = forge.rc2.createDecryptionCipher(key, 40)
+        const cipher = rc2.createDecryptionCipher(key, 40)
         cipher.start(iv, null)
         return cipher
       }
@@ -943,7 +945,7 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
  */
 export function opensslDeriveBytes(password: string, salt: string, dkLen: number, md: any): string {
   if (typeof md === 'undefined' || md === null) {
-    if (!('md5' in forge.md)) {
+    if (!('md5' in md)) {
       throw new Error('"md5" hash algorithm unavailable.')
     }
 

@@ -52,7 +52,7 @@ function create(): MessageDigest {
   let _input = createBuffer()
 
   // used for word storage
-  const _w = Array.from({ length: 16 }).fill(0)
+  const _w: number[] = new Array(16).fill(0)
 
   // message digest object
   const md: MessageDigest = {
@@ -160,7 +160,7 @@ function create(): MessageDigest {
       // _padding starts with 1 byte with first bit is set (byte value 128), then
       // there may be up to (blockSize - 1) other pad bytes
       const overflow = remaining & (md.blockLength - 1)
-      finalBlock.putBytes(_padding.substr(0, md.blockLength - overflow))
+      finalBlock.putBytes(_padding!.substr(0, md.blockLength - overflow))
 
       // serialize message length in bits in little-endian order; since length
       // is stored in bytes we multiply by 8 and add carry
@@ -195,7 +195,7 @@ function create(): MessageDigest {
 }
 
 // padding, constant tables for calculating md5
-let _padding = ''
+let _padding: string | null = null
 let _initialized = false
 const _g: number[] = []
 const _r: number[] = []
@@ -361,7 +361,7 @@ function _init() {
  * @param w the array to use to store words.
  * @param bytes the byte buffer to update with.
  */
-function _update(s: MD5State, w: number[], bytes: ByteStringBuffer) {
+function _update(s: MD5State, w: number[], bytes: ByteStringBuffer): void {
   // consume 512 bit (64 byte) chunks
   let t: number, a: number, b: number, c: number, d: number, f: number, r: number, i: number
   let len = bytes.length()
