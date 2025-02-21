@@ -662,3 +662,14 @@ export function fillString(c: string, n: number): string {
 
   return s
 }
+
+/**
+ * Converts a string of bytes to a hexadecimal string.
+ *
+ * @param bytes the string of bytes to convert.
+ *
+ * @return the hexadecimal string.
+ */
+export function bytesToHex(bytes: string): string {
+  return createBuffer(bytes).toHex()
+}

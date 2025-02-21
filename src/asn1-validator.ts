@@ -4,7 +4,15 @@
 
 import { asn1 } from './asn1'
 
-export const privateKeyValidator = {
+export interface Asn1Validator {
+  name: string
+  tagClass: asn1.Class
+  type: asn1.Type
+  constructed: boolean
+  value: Asn1Validator[]
+}
+
+export const privateKeyValidator: Asn1Validator = {
   // PrivateKeyInfo
   name: 'PrivateKeyInfo',
   tagClass: asn1.Class.UNIVERSAL,
@@ -40,7 +48,7 @@ export const privateKeyValidator = {
   }],
 }
 
-exports.publicKeyValidator = {
+export const publicKeyValidator: Asn1Validator = {
   name: 'SubjectPublicKeyInfo',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -66,5 +74,12 @@ exports.publicKeyValidator = {
     constructed: false,
     composed: true,
     captureBitStringValue: 'ed25519PublicKey',
-  },    // FIXME: this is capture group for rsaPublicKey, use it in this API or    // discard?    /* {      // subjectPublicKey      name: 'SubjectPublicKeyInfo.subjectPublicKey',      tagClass: asn1.Class.UNIVERSAL,      type: asn1.Type.BITSTRING,      constructed: false,      value: [{        // RSAPublicKey        name: 'SubjectPublicKeyInfo.subjectPublicKey.RSAPublicKey',        tagClass: asn1.Class.UNIVERSAL,        type: asn1.Type.SEQUENCE,        constructed: true,        optional: true,        captureAsn1: 'rsaPublicKey'      }]    } */  ],
+  },    // FIXME: this is capture group for rsaPublicKey, use it in this API or    // discard?    /* {      // subjectPublicKey      name: 'SubjectPublicKeyInfo.subjectPublicKey',      tagClass: asn1.Class.UNIVERSAL,      type: asn1.Type.BITSTRING,      constructed: false,      value: [{        // RSAPublicKey        name: 'SubjectPublicKeyInfo.subjectPublicKey.RSAPublicKey',        tagClass: asn1.Class.UNIVERSAL,        type: asn1.Type.SEQUENCE,        constructed: true,        optional: true,        captureAsn1: 'rsaPublicKey'      }]    } */
+]}
+
+const asn1Validator: Asn1Validator = {
+  privateKeyValidator,
+  publicKeyValidator,
 }
+
+export default asn1Validator

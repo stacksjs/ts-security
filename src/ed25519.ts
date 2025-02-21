@@ -11,6 +11,7 @@
 
 import { getBytesSync } from './random'
 import { ByteBuffer } from './utils'
+import { asn1Validator } from './asn1-validator'
 
 const publicKeyValidator = asn1Validator.publicKeyValidator
 const privateKeyValidator = asn1Validator.privateKeyValidator

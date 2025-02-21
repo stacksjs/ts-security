@@ -133,28 +133,25 @@
  * The full OID (including ASN.1 tag and length of 6 bytes) is:
  * 0x06062A864886F70D
  */
-import { createBuffer } from './utils'
+import { createBuffer, bytesToHex, decodeUtf8 } from './utils'
+import { oids } from './oids'
 
-require('./oids')
-
-/* ASN.1 API */
-export const asn1 = {}
 
 /**
  * ASN.1 classes.
  */
-asn1.Class = {
+export const Class = {
   UNIVERSAL: 0x00,
   APPLICATION: 0x40,
   CONTEXT_SPECIFIC: 0x80,
   PRIVATE: 0xC0,
-}
+} as const
 
 /**
  * ASN.1 types. Not all types are supported by this implementation, only
  * those necessary to implement a simple PKI are implemented.
  */
-asn1.Type = {
+export const Type = {
   NONE: 0,
   BOOLEAN: 1,
   INTEGER: 2,
@@ -176,7 +173,7 @@ asn1.Type = {
   UTCTIME: 23,
   GENERALIZEDTIME: 24,
   BMPSTRING: 30,
-}
+} as const
 
 /**
  * Creates a new asn1 object.
@@ -191,7 +188,7 @@ asn1.Type = {
  *
  * @return the asn1 object.
  */
-asn1.create = function (tagClass: number, type: number, constructed: boolean, value: any, options: any) {
+export function create(tagClass: number, type: number, constructed: boolean, value: any, options: any): any {
   /* An asn1 object has a tagClass, a type, a constructed flag, and a
     value. The value's type depends on the constructed flag. If
     constructed, it will contain a list of other asn1 objects. If not,
@@ -235,7 +232,7 @@ asn1.create = function (tagClass: number, type: number, constructed: boolean, va
  *
  * @return the a copy of the asn1 object.
  */
-asn1.copy = function (obj: any, options: any) {
+export function copy(obj: any, options: any): any {
   let copy
 
   if (Array.isArray(obj)) {
@@ -262,6 +259,7 @@ asn1.copy = function (obj: any, options: any) {
     // TODO: copy byte buffer if it's a buffer not a string
     copy.bitStringContents = obj.bitStringContents
   }
+
   return copy
 }
 
@@ -277,7 +275,7 @@ asn1.copy = function (obj: any, options: any) {
  *
  * @return true if the asn1 objects are equal.
  */
-asn1.equals = function (obj1: any, obj2: any, options: any) {
+export function equals(obj1: any, obj2: any, options: any): boolean {
   if (Array.isArray(obj1)) {
     if (!Array.isArray(obj2))
       return false
@@ -285,10 +283,10 @@ asn1.equals = function (obj1: any, obj2: any, options: any) {
     if (obj1.length !== obj2.length)
       return false
 
-    for (let i = 0; i < obj1.length; ++i) {
+    for (let i = 0; i < obj1.length; ++i)
       if (!asn1.equals(obj1[i], obj2[i]))
         return false
-    }
+
     return true
   }
 
@@ -320,7 +318,7 @@ asn1.equals = function (obj1: any, obj2: any, options: any) {
  *
  * @return the length of the BER-encoded ASN.1 value or undefined.
  */
-asn1.getBerValueLength = function (b: any) {
+export function getBerValueLength(b: any): number | undefined {
   // TODO: move this function and related DER/BER functions to a der.js
   // file; better abstract ASN.1 away from der/ber.
   const b2 = b.getByte()
@@ -351,7 +349,7 @@ asn1.getBerValueLength = function (b: any) {
  * @param remaining the bytes remaining in the current parsing state.
  * @param n the number of bytes the buffer must have.
  */
-function _checkBufferLength(bytes: any, remaining: number, n: number) {
+function _checkBufferLength(bytes: any, remaining: number, n: number): void {
   if (n > remaining) {
     const error = new Error('Too few bytes to parse DER.')
     error.available = bytes.length()
@@ -371,7 +369,7 @@ function _checkBufferLength(bytes: any, remaining: number, n: number) {
  *
  * @return the length of the BER-encoded ASN.1 value or undefined.
  */
-function _getValueLength(bytes: any, remaining: number) {
+function _getValueLength(bytes: any, remaining: number): number | undefined {
   // TODO: move this function and related DER/BER functions to a der.js
   // file; better abstract ASN.1 away from der/ber.
   // fromDer already checked that this byte exists
@@ -424,7 +422,7 @@ function _getValueLength(bytes: any, remaining: number) {
  *
  * @return the parsed asn1 object.
  */
-asn1.fromDer = function (bytes: any, options: any) {
+export function fromDer(bytes: any, options: any): Asn1 {
   if (options === undefined) {
     options = {
       strict: true,
@@ -475,7 +473,7 @@ asn1.fromDer = function (bytes: any, options: any) {
  *
  * @return the parsed asn1 object.
  */
-function _fromDer(bytes: any, remaining: number, depth: number, options: any) {
+function _fromDer(bytes: any, remaining: number, depth: number, options: any): Asn1 {
   // temporary storage for consumption calculations
   let start
 
@@ -656,7 +654,7 @@ function _fromDer(bytes: any, remaining: number, depth: number, options: any) {
  *
  * @return the buffer of bytes.
  */
-asn1.toDer = function (obj: any) {
+export function toDer(obj: any): Buffer {
   const bytes = createBuffer()
 
   // build the first byte
@@ -768,7 +766,7 @@ asn1.toDer = function (obj: any) {
  *
  * @return the byte buffer.
  */
-asn1.oidToDer = function (oid: string) {
+export function oidToDer(oid: string): Buffer {
   // split OID into individual values
   const values = oid.split('.')
   const bytes = createBuffer()
@@ -813,7 +811,7 @@ asn1.oidToDer = function (oid: string) {
  *
  * @return the OID dot-separated string.
  */
-asn1.derToOid = function (bytes: any) {
+export function derToOid(bytes: any): string {
   let oid
 
   // wrap in buffer if needed
@@ -855,7 +853,7 @@ asn1.derToOid = function (bytes: any) {
  *
  * @return the date.
  */
-asn1.utcTimeToDate = function (utc: string) {
+export function utcTimeToDate(utc: string): Date {
   /* The following formats can be used:
 
     YYMMDDhhmmZ
@@ -938,7 +936,7 @@ asn1.utcTimeToDate = function (utc: string) {
  *
  * @return the date.
  */
-asn1.generalizedTimeToDate = function (gentime: string) {
+export function generalizedTimeToDate(gentime: string): Date {
   /* The following formats can be used:
 
     YYYYMMDDHHMMSS
@@ -1028,11 +1026,10 @@ asn1.generalizedTimeToDate = function (gentime: string) {
  *
  * @return the UTCTime value.
  */
-asn1.dateToUtcTime = function (date: Date) {
+export function dateToUtcTime(date: Date): string {
   // TODO: validate; currently assumes proper format
-  if (typeof date === 'string') {
+  if (typeof date === 'string')
     return date
-  }
 
   let rval = ''
 
@@ -1064,7 +1061,7 @@ asn1.dateToUtcTime = function (date: Date) {
  *
  * @return the GeneralizedTime value as a string.
  */
-asn1.dateToGeneralizedTime = function (date: Date) {
+export function dateToGeneralizedTime(date: Date): string {
   // TODO: validate; currently assumes proper format
   if (typeof date === 'string') {
     return date
@@ -1101,20 +1098,20 @@ asn1.dateToGeneralizedTime = function (date: Date) {
  *
  * @return the byte buffer.
  */
-asn1.integerToDer = function (x) {
+export function integerToDer(x: number): Buffer {
   const rval = createBuffer()
-  if (x >= -0x80 && x < 0x80) {
+  if (x >= -0x80 && x < 0x80)
     return rval.putSignedInt(x, 8)
-  }
-  if (x >= -0x8000 && x < 0x8000) {
+
+  if (x >= -0x8000 && x < 0x8000)
     return rval.putSignedInt(x, 16)
-  }
-  if (x >= -0x800000 && x < 0x800000) {
+
+  if (x >= -0x800000 && x < 0x800000)
     return rval.putSignedInt(x, 24)
-  }
-  if (x >= -0x80000000 && x < 0x80000000) {
+
+  if (x >= -0x80000000 && x < 0x80000000)
     return rval.putSignedInt(x, 32)
-  }
+
   const error = new Error('Integer too large; max is 32-bits.')
   error.integer = x
   throw error
@@ -1128,7 +1125,7 @@ asn1.integerToDer = function (x) {
  *
  * @return the integer.
  */
-asn1.derToInteger = function (bytes: any) {
+export function derToInteger(bytes: any): number {
   // wrap in buffer if needed
   if (typeof bytes === 'string') {
     bytes = createBuffer(bytes)
@@ -1164,7 +1161,7 @@ asn1.derToInteger = function (bytes: any) {
  *
  * @return true on success, false on failure.
  */
-asn1.validate = function (obj: any, v: any, capture: any, errors: any) {
+export function validate(obj: any, v: any, capture: any, errors: any): boolean {
   let rval = false
 
   // ensure tag class and type are the same if specified
@@ -1267,7 +1264,7 @@ const _nonLatinRegex = /[^u0-\\f]/
  *
  * @return the string.
  */
-asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
+export function prettyPrint(obj: any, level: number, indentation: number): string {
   let rval = ''
 
   // set default level and indentation
@@ -1398,10 +1395,8 @@ asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
     if (obj.type === asn1.Type.OID) {
       const oid = asn1.derToOid(obj.value)
       rval += oid
-      if (forge.pki && forge.pki.oids) {
-        if (oid in forge.pki.oids) {
-          rval += ` (${forge.pki.oids[oid]}) `
-        }
+      if (oid in oids) {
+        rval += ` (${oids[oid]}) `
       }
     }
     if (obj.type === asn1.Type.INTEGER) {
@@ -1409,14 +1404,14 @@ asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
         rval += asn1.derToInteger(obj.value)
       }
       catch (ex) {
-        rval += `0x${forge.util.bytesToHex(obj.value)}`
+        rval += `0x${bytesToHex(obj.value)}`
       }
     }
     else if (obj.type === asn1.Type.BITSTRING) {
       // TODO: shift bits as needed to display without padding
       if (obj.value.length > 1) {
         // remove unused bits field
-        rval += `0x${forge.util.bytesToHex(obj.value.slice(1))}`
+        rval += `0x${bytesToHex(obj.value.slice(1))}`
       }
       else {
         rval += '(none)'
@@ -1436,16 +1431,16 @@ asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
       if (!_nonLatinRegex.test(obj.value)) {
         rval += `(${obj.value}) `
       }
-      rval += `0x${forge.util.bytesToHex(obj.value)}`
+      rval += `0x${bytesToHex(obj.value)}`
     }
     else if (obj.type === asn1.Type.UTF8) {
       try {
-        rval += forge.util.decodeUtf8(obj.value)
+        rval += decodeUtf8(obj.value)
       }
       catch (e) {
         if (e.message === 'URI malformed') {
           rval
-            += `0x${forge.util.bytesToHex(obj.value)} (malformed UTF8)`
+            += `0x${bytesToHex(obj.value)} (malformed UTF8)`
         }
         else {
           throw e
@@ -1457,7 +1452,7 @@ asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
       rval += obj.value
     }
     else if (_nonLatinRegex.test(obj.value)) {
-      rval += `0x${forge.util.bytesToHex(obj.value)}`
+      rval += `0x${bytesToHex(obj.value)}`
     }
     else if (obj.value.length === 0) {
       rval += '[null]'
@@ -1469,3 +1464,47 @@ asn1.prettyPrint = function (obj: any, level: number, indentation: number) {
 
   return rval
 }
+
+interface Asn1 {
+  Class: typeof Class
+  Type: typeof Type
+  create: typeof create
+  copy: typeof copy
+  equals: typeof equals
+  getBerValueLength: typeof getBerValueLength
+  fromDer: typeof fromDer
+  oidToDer: typeof oidToDer
+  derToOid: typeof derToOid
+  utcTimeToDate: typeof utcTimeToDate
+  generalizedTimeToDate: typeof generalizedTimeToDate
+  dateToUtcTime: typeof dateToUtcTime
+  dateToGeneralizedTime: typeof dateToGeneralizedTime
+  integerToDer: typeof integerToDer
+  derToInteger: typeof derToInteger
+  validate: typeof validate
+  prettyPrint: typeof prettyPrint
+  toDer: typeof toDer
+}
+
+const asn1: Asn1 = {
+  Class,
+  Type,
+  create,
+  copy,
+  equals,
+  getBerValueLength,
+  fromDer,
+  oidToDer,
+  derToOid,
+  utcTimeToDate,
+  generalizedTimeToDate,
+  dateToUtcTime,
+  dateToGeneralizedTime,
+  integerToDer,
+  derToInteger,
+  validate,
+  prettyPrint,
+  toDer
+}
+
+export default asn1
