@@ -7,144 +7,169 @@
  *
  * Copyright (c) 2010-2012 Digital Bazaar, Inc. All rights reserved.
  */
-const forge = require('./forge')
-require('./md')
-require('./util')
 
-/* HMAC API */
-const hmac = module.exports = forge.hmac = forge.hmac || {}
+import { ByteStringBuffer, createBuffer } from "./utils"
+
+type MessageDigest = {
+  start: () => MessageDigest
+  update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
+  digest: () => ByteStringBuffer
+  blockLength: number
+}
+
+type NativeBuffer = Buffer | Uint8Array | ArrayBuffer
+
+type HMACInput = string | ByteStringBuffer | NativeBuffer
+
+interface HMAC {
+  start: (md: MessageDigest, key: HMACInput) => void
+  update: (bytes: HMACInput) => void
+  getMac: () => ByteStringBuffer
+  digest: () => ByteStringBuffer
+}
+
+interface HMACModule {
+  create: () => HMAC
+}
 
 /**
  * Creates an HMAC object that uses the given message digest object.
  *
  * @return an HMAC object.
  */
-hmac.create = function () {
+function create(): HMAC {
   // the hmac key to use
-  let _key = null
+  let _key: ByteStringBuffer | null = null
 
   // the message digest to use
-  let _md = null
+  let _md: MessageDigest | null = null
 
   // the inner padding
-  let _ipadding = null
+  let _ipadding: string | null = null
 
   // the outer padding
-  let _opadding = null
+  let _opadding: string | null = null
 
   // hmac context
-  const ctx = {}
+  const ctx: HMAC = {
+    start: (md: MessageDigest, key: HMACInput) => {
+      if (!md) {
+        throw new TypeError('"md" argument is required')
+      }
 
-  /**
-   * Starts or restarts the HMAC with the given key and message digest.
-   *
-   * @param md the message digest to use, null to reuse the previous one,
-   *           a string to use builtin 'sha1', 'md5', 'sha256'.
-   * @param key the key to use as a string, array of bytes, byte buffer,
-   *           or null to reuse the previous key.
-   */
-  ctx.start = function (md, key) {
-    if (md !== null) {
-      if (typeof md === 'string') {
-        // create builtin message digest
-        md = md.toLowerCase()
-        if (md in forge.md.algorithms) {
-          _md = forge.md.algorithms[md].create()
+      _md = md
+
+      if (key === null) {
+        if (!_key) {
+          throw new TypeError('Key is required for first call to start()')
         }
-        else {
-          throw new Error(`Unknown hash algorithm "${md}"`)
+        key = _key
+      }
+
+      // convert key to ByteStringBuffer
+      let keyBuffer: ByteStringBuffer
+      if (typeof key === 'string') {
+        keyBuffer = createBuffer(key)
+      }
+      else if (key instanceof ByteStringBuffer) {
+        keyBuffer = key
+      }
+      else if (key instanceof Uint8Array || key instanceof Buffer || key instanceof ArrayBuffer) {
+        keyBuffer = createBuffer()
+        const view = key instanceof ArrayBuffer ? new Uint8Array(key) : key
+        for (let i = 0; i < view.length; ++i) {
+          keyBuffer.putByte(view[i])
         }
       }
       else {
-        // store message digest
-        _md = md
-      }
-    }
-
-    if (key === null) {
-      // reuse previous key
-      key = _key
-    }
-    else {
-      if (typeof key === 'string') {
-        // convert string into byte buffer
-        key = forge.util.createBuffer(key)
-      }
-      else if (forge.util.isArray(key)) {
-        // convert byte array into byte buffer
-        var tmp = key
-        key = forge.util.createBuffer()
-        for (var i = 0; i < tmp.length; ++i) {
-          key.putByte(tmp[i])
-        }
+        throw new TypeError(
+          '"key" must be a string, ByteStringBuffer, Buffer, Uint8Array, or ArrayBuffer',
+        )
       }
 
       // if key is longer than blocksize, hash it
-      let keylen = key.length()
+      let keylen = keyBuffer.length()
       if (keylen > _md.blockLength) {
         _md.start()
-        _md.update(key.bytes())
-        key = _md.digest()
+        _md.update(keyBuffer)
+        keyBuffer = _md.digest()
       }
 
       // mix key into inner and outer padding
       // ipadding = [0x36 * blocksize] ^ key
       // opadding = [0x5C * blocksize] ^ key
-      _ipadding = forge.util.createBuffer()
-      _opadding = forge.util.createBuffer()
-      keylen = key.length()
-      for (var i = 0; i < keylen; ++i) {
-        var tmp = key.at(i)
-        _ipadding.putByte(0x36 ^ tmp)
-        _opadding.putByte(0x5C ^ tmp)
+      const ipadding = createBuffer()
+      const opadding = createBuffer()
+      keylen = keyBuffer.length()
+
+      for (let i = 0; i < keylen; ++i) {
+        const tmp = keyBuffer.at(i)
+        ipadding.putByte(0x36 ^ tmp)
+        opadding.putByte(0x5C ^ tmp)
       }
 
       // if key is shorter than blocksize, add additional padding
       if (keylen < _md.blockLength) {
-        var tmp = _md.blockLength - keylen
-        for (var i = 0; i < tmp; ++i) {
-          _ipadding.putByte(0x36)
-          _opadding.putByte(0x5C)
+        const remaining = _md.blockLength - keylen
+        for (let i = 0; i < remaining; ++i) {
+          ipadding.putByte(0x36)
+          opadding.putByte(0x5C)
         }
       }
-      _key = key
-      _ipadding = _ipadding.bytes()
-      _opadding = _opadding.bytes()
+
+      _key = keyBuffer
+      _ipadding = ipadding.bytes()
+      _opadding = opadding.bytes()
+
+      // digest is done like so: hash(opadding | hash(ipadding | message))
+      // prepare to do inner hash
+      // hash(ipadding | message)
+      _md.start()
+      _md.update(_ipadding)
+    },
+
+    update: (bytes: HMACInput) => {
+      if (!_md) {
+        throw new Error('HMAC not started. Call start() first.')
+      }
+
+      // convert bytes to ByteStringBuffer if needed
+      if (bytes instanceof ByteStringBuffer || typeof bytes === 'string') {
+        _md.update(bytes)
+      }
+      else {
+        const buffer = createBuffer()
+        const view = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes
+        for (let i = 0; i < view.length; ++i) {
+          buffer.putByte(view[i])
+        }
+        _md.update(buffer.bytes())
+      }
+    },
+
+    getMac: () => {
+      if (!_md || !_opadding) {
+        throw new Error('HMAC not started. Call start() first.')
+      }
+
+      // digest is done like so: hash(opadding | hash(ipadding | message))
+      // here we do the outer hashing
+      const inner = _md.digest().bytes()
+      _md.start()
+      _md.update(_opadding)
+      _md.update(inner)
+      return _md.digest()
+    },
+
+    digest() {
+      return this.getMac()
     }
-
-    // digest is done like so: hash(opadding | hash(ipadding | message))
-
-    // prepare to do inner hash
-    // hash(ipadding | message)
-    _md.start()
-    _md.update(_ipadding)
   }
-
-  /**
-   * Updates the HMAC with the given message bytes.
-   *
-   * @param bytes the bytes to update with.
-   */
-  ctx.update = function (bytes) {
-    _md.update(bytes)
-  }
-
-  /**
-   * Produces the Message Authentication Code (MAC).
-   *
-   * @return a byte buffer containing the digest value.
-   */
-  ctx.getMac = function () {
-    // digest is done like so: hash(opadding | hash(ipadding | message))
-    // here we do the outer hashing
-    const inner = _md.digest().bytes()
-    _md.start()
-    _md.update(_opadding)
-    _md.update(inner)
-    return _md.digest()
-  }
-  // alias for getMac
-  ctx.digest = ctx.getMac
 
   return ctx
+}
+
+// Export the HMAC implementation
+export const hmac: HMACModule = {
+  create,
 }
