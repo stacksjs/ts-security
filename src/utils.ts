@@ -1083,3 +1083,53 @@ function _detectSubtleMsCrypto(fn: string): boolean {
     && typeof (util.globalScope as any).msCrypto.subtle === 'object'
     && typeof (util.globalScope as any).msCrypto.subtle[fn] === 'function')
 }
+
+/**
+ * Converts an 32-bit integer to 4-big-endian byte string.
+ *
+ * @param i the integer.
+ *
+ * @return the byte string.
+ */
+export function int32ToBytes(i: number): string {
+  return (
+    String.fromCharCode(i >> 24 & 0xFF)
+    + String.fromCharCode(i >> 16 & 0xFF)
+    + String.fromCharCode(i >> 8 & 0xFF)
+    + String.fromCharCode(i & 0xFF))
+};
+
+/**
+ * Performs a per byte XOR between two byte strings and returns the result as a
+ * string of bytes.
+ *
+ * @param s1 first string of bytes.
+ * @param s2 second string of bytes.
+ * @param n the number of bytes to XOR.
+ *
+ * @return the XOR'd result.
+ */
+export function xorBytes(s1: string, s2: string, n: number): string {
+  let s3 = ''
+  let b = ''
+  let t = ''
+  let i = 0
+  let c = 0
+
+  for (; n > 0; --n, ++i) {
+    b = s1.charCodeAt(i) ^ s2.charCodeAt(i)
+
+    if (c >= 10) {
+      s3 += t
+      t = ''
+      c = 0
+    }
+
+    t += String.fromCharCode(b)
+    ++c
+  }
+
+  s3 += t
+
+  return s3
+};

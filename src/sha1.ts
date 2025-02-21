@@ -7,7 +7,7 @@
  */
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
 
-interface MessageDigest {
+export interface MessageDigest {
   algorithm: string
   blockLength: number
   digestLength: number

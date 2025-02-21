@@ -17,30 +17,16 @@
  *
  * EncryptedData ::= OCTET STRING
  */
-const forge = require('./forge')
-require('./aes')
-require('./asn1')
-require('./des')
-require('./md')
-require('./oids')
-require('./pbkdf2')
-require('./pem')
-require('./random')
-require('./rc2')
-require('./rsa')
-require('./util')
 
-if (typeof BigInteger === 'undefined') {
-  var BigInteger = forge.jsbn.BigInteger
-}
-
-// shortcut for asn.1 API
-const asn1 = forge.asn1
-
-/* Password-based encryption implementation. */
-const pki = forge.pki = forge.pki || {}
-module.exports = pki.pbe = forge.pbe = forge.pbe || {}
-const oids = pki.oids
+import { asn1, type Asn1Object } from './asn1'
+import { BlockCipher, createCipher } from './cipher'
+import { oids } from './oids'
+import { getBytesSync } from './random'
+import { createBuffer, hexToBytes } from './utils'
+import { md5 } from './md5'
+import type { MessageDigest } from './sha1'
+import { sha512 } from './sha512'
+import { pbkdf2 } from './pbkdf2'
 
 // validator for an EncryptedPrivateKeyInfo structure
 // Note: Currently only works w/algorithm params
@@ -216,7 +202,7 @@ const pkcs12PbeParamsValidator = {
  *
  * @return the ASN.1 EncryptedPrivateKeyInfo.
  */
-pki.encryptPrivateKeyInfo = function (obj, password, options) {
+export function encryptPrivateKeyInfo(obj: any, password: any, options: any): Buffer {
   // set default options
   options = options || {}
   options.saltSize = options.saltSize || 8
@@ -225,7 +211,7 @@ pki.encryptPrivateKeyInfo = function (obj, password, options) {
   options.prfAlgorithm = options.prfAlgorithm || 'sha1'
 
   // generate PBE params
-  const salt = forge.random.getBytesSync(options.saltSize)
+  const salt = getBytesSync(options.saltSize)
   const count = options.count
   const countBytes = asn1.integerToDer(count)
   let dkLen
@@ -239,28 +225,28 @@ pki.encryptPrivateKeyInfo = function (obj, password, options) {
         dkLen = 16
         ivLen = 16
         encOid = oids['aes128-CBC']
-        cipherFn = forge.aes.createEncryptionCipher
+        cipherFn = createCipher('AES-CBC', getBytesSync(16))
         break
       case 'aes192':
         dkLen = 24
         ivLen = 16
         encOid = oids['aes192-CBC']
-        cipherFn = forge.aes.createEncryptionCipher
+        cipherFn = createCipher('AES-CBC', getBytesSync(16))
         break
       case 'aes256':
         dkLen = 32
         ivLen = 16
         encOid = oids['aes256-CBC']
-        cipherFn = forge.aes.createEncryptionCipher
+        cipherFn = createCipher('AES-CBC', getBytesSync(16))
         break
       case 'des':
         dkLen = 8
         ivLen = 8
         encOid = oids.desCBC
-        cipherFn = forge.des.createEncryptionCipher
+        cipherFn = createCipher('DES-CBC', getBytesSync(8))
         break
       default:
-        var error = new Error('Cannot encrypt private key. Unknown encryption algorithm.')
+        const error = new Error('Cannot encrypt private key. Unknown encryption algorithm.')
         error.algorithm = options.algorithm
         throw error
     }
@@ -271,7 +257,7 @@ pki.encryptPrivateKeyInfo = function (obj, password, options) {
 
     // encrypt private key using pbe SHA-1 and AES/DES
     var dk = forge.pkcs5.pbkdf2(password, salt, count, dkLen, md)
-    var iv = forge.random.getBytesSync(ivLen)
+    var iv = getBytesSync(ivLen)
     var cipher = cipherFn(dk)
     cipher.start(iv)
     cipher.update(asn1.toDer(obj))
@@ -339,7 +325,7 @@ pki.encryptPrivateKeyInfo = function (obj, password, options) {
     )
   }
   else {
-    var error = new Error('Cannot encrypt private key. Unknown encryption algorithm.')
+    const error = new Error('Cannot encrypt private key. Unknown encryption algorithm.')
     error.algorithm = options.algorithm
     throw error
   }
@@ -385,7 +371,7 @@ pki.decryptPrivateKeyInfo = function (obj, password) {
   const cipher = pki.pbe.getCipher(oid, capture.encryptionParams, password)
 
   // get encrypted data
-  const encrypted = forge.util.createBuffer(capture.encryptedData)
+  const encrypted = createBuffer(capture.encryptedData)
 
   cipher.update(encrypted)
   if (cipher.finish()) {
@@ -483,31 +469,31 @@ pki.encryptRsaPrivateKey = function (rsaKey, password, options) {
     case 'aes128':
       algorithm = 'AES-128-CBC'
       dkLen = 16
-      iv = forge.random.getBytesSync(16)
+      iv = getBytesSync(16)
       cipherFn = forge.aes.createEncryptionCipher
       break
     case 'aes192':
       algorithm = 'AES-192-CBC'
       dkLen = 24
-      iv = forge.random.getBytesSync(16)
+      iv = getBytesSync(16)
       cipherFn = forge.aes.createEncryptionCipher
       break
     case 'aes256':
       algorithm = 'AES-256-CBC'
       dkLen = 32
-      iv = forge.random.getBytesSync(16)
+      iv = getBytesSync(16)
       cipherFn = forge.aes.createEncryptionCipher
       break
     case '3des':
       algorithm = 'DES-EDE3-CBC'
       dkLen = 24
-      iv = forge.random.getBytesSync(8)
+      iv = getBytesSync(8)
       cipherFn = forge.des.createEncryptionCipher
       break
     case 'des':
       algorithm = 'DES-CBC'
       dkLen = 8
-      iv = forge.random.getBytesSync(8)
+      iv = getBytesSync(8)
       cipherFn = forge.des.createEncryptionCipher
       break
     default:
@@ -518,7 +504,7 @@ pki.encryptRsaPrivateKey = function (rsaKey, password, options) {
   }
 
   // encrypt private key using OpenSSL legacy key derivation
-  const dk = forge.pbe.opensslDeriveBytes(password, iv.substr(0, 8), dkLen)
+  const dk = opensslDeriveBytes(password, iv.substr(0, 8), dkLen)
   const cipher = cipherFn(dk)
   cipher.start(iv)
   cipher.update(asn1.toDer(pki.privateKeyToAsn1(rsaKey)))
@@ -611,11 +597,11 @@ pki.decryptRsaPrivateKey = function (pem, password) {
     }
 
     // use OpenSSL legacy key derivation
-    const iv = forge.util.hexToBytes(msg.dekInfo.parameters)
-    const dk = forge.pbe.opensslDeriveBytes(password, iv.substr(0, 8), dkLen)
+    const iv = hexToBytes(msg.dekInfo.parameters)
+    const dk = opensslDeriveBytes(password, iv.substr(0, 8), dkLen)
     const cipher = cipherFn(dk)
     cipher.start(iv)
-    cipher.update(forge.util.createBuffer(msg.body))
+    cipher.update(createBuffer(msg.body))
     if (cipher.finish()) {
       rval = cipher.output.getBytes()
     }
@@ -769,11 +755,11 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
  */
 pki.pbe.getCipher = function (oid, params, password) {
   switch (oid) {
-    case pki.oids.pkcs5PBES2:
+    case oids.pkcs5PBES2:
       return pki.pbe.getCipherForPBES2(oid, params, password)
 
-    case pki.oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
-    case pki.oids['pbewithSHAAnd40BitRC2-CBC']:
+    case oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
+    case oids['pbewithSHAAnd40BitRC2-CBC']:
       return pki.pbe.getCipherForPKCS12PBE(oid, params, password)
 
     default:
@@ -813,7 +799,7 @@ pki.pbe.getCipherForPBES2 = function (oid, params, password) {
 
   // check oids
   oid = asn1.derToOid(capture.kdfOid)
-  if (oid !== pki.oids.pkcs5PBKDF2) {
+  if (oid !== oids.pkcs5PBKDF2) {
     var error = new Error('Cannot read encrypted private key. '
       + 'Unsupported key derivation function OID.')
     error.oid = oid
@@ -821,11 +807,11 @@ pki.pbe.getCipherForPBES2 = function (oid, params, password) {
     throw error
   }
   oid = asn1.derToOid(capture.encOid)
-  if (oid !== pki.oids['aes128-CBC']
-    && oid !== pki.oids['aes192-CBC']
-    && oid !== pki.oids['aes256-CBC']
-    && oid !== pki.oids['des-EDE3-CBC']
-    && oid !== pki.oids.desCBC) {
+  if (oid !== oids['aes128-CBC']
+    && oid !== oids['aes192-CBC']
+    && oid !== oids['aes256-CBC']
+    && oid !== oids['des-EDE3-CBC']
+    && oid !== oids.desCBC) {
     var error = new Error('Cannot read encrypted private key. '
       + 'Unsupported encryption scheme OID.')
     error.oid = oid
@@ -841,11 +827,11 @@ pki.pbe.getCipherForPBES2 = function (oid, params, password) {
 
   // set PBE params
   const salt = capture.kdfSalt
-  let count = forge.util.createBuffer(capture.kdfIterationCount)
+  let count = createBuffer(capture.kdfIterationCount)
   count = count.getInt(count.length() << 3)
   let dkLen
   let cipherFn
-  switch (pki.oids[oid]) {
+  switch (oids[oid]) {
     case 'aes128-CBC':
       dkLen = 16
       cipherFn = forge.aes.createDecryptionCipher
@@ -872,7 +858,7 @@ pki.pbe.getCipherForPBES2 = function (oid, params, password) {
   const md = prfOidToMessageDigest(capture.prfOid)
 
   // decrypt private key using pbe with chosen PRF and AES/DES
-  const dk = forge.pkcs5.pbkdf2(password, salt, count, dkLen, md)
+  const dk = pbkdf2(password, salt, count, dkLen, md)
   const iv = capture.encIv
   const cipher = cipherFn(dk)
   cipher.start(iv)
@@ -892,10 +878,11 @@ pki.pbe.getCipherForPBES2 = function (oid, params, password) {
  *
  * @return the new cipher object instance.
  */
-pki.pbe.getCipherForPKCS12PBE = function (oid, params, password) {
+export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password: string): BlockCipher {
   // get PBE params
   const capture = {}
   const errors = []
+
   if (!asn1.validate(params, pkcs12PbeParamsValidator, capture, errors)) {
     var error = new Error('Cannot read password-based-encryption algorithm '
       + 'parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')
@@ -903,19 +890,19 @@ pki.pbe.getCipherForPKCS12PBE = function (oid, params, password) {
     throw error
   }
 
-  const salt = forge.util.createBuffer(capture.salt)
-  let count = forge.util.createBuffer(capture.iterations)
+  const salt = createBuffer(capture.salt)
+  let count = createBuffer(capture.iterations)
   count = count.getInt(count.length() << 3)
 
   let dkLen, dIvLen, cipherFn
   switch (oid) {
-    case pki.oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
+    case oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
       dkLen = 24
       dIvLen = 8
       cipherFn = forge.des.startDecrypting
       break
 
-    case pki.oids['pbewithSHAAnd40BitRC2-CBC']:
+    case oids['pbewithSHAAnd40BitRC2-CBC']:
       dkLen = 5
       dIvLen = 8
       cipherFn = function (key, iv) {
@@ -951,35 +938,40 @@ pki.pbe.getCipherForPKCS12PBE = function (oid, params, password) {
  * @param [options] the options to use:
  *          [md] an optional message digest object to use.
  */
-pki.pbe.opensslDeriveBytes = function (password, salt, dkLen, md) {
+export function opensslDeriveBytes(password: string, salt: string, dkLen: number, md: any): string {
   if (typeof md === 'undefined' || md === null) {
     if (!('md5' in forge.md)) {
       throw new Error('"md5" hash algorithm unavailable.')
     }
-    md = forge.md.md5.create()
+
+    md = md5.create()
   }
+
   if (salt === null) {
     salt = ''
   }
+
   const digests = [hash(md, password + salt)]
-  for (let length = 16, i = 1; length < dkLen; ++i, length += 16) {
+
+  for (let length = 16, i = 1; length < dkLen; ++i, length += 16)
     digests.push(hash(md, digests[i - 1] + password + salt))
-  }
+
   return digests.join('').substr(0, dkLen)
 }
 
-function hash(md, bytes) {
+export function hash(md: MessageDigest, bytes: string): string {
   return md.start().update(bytes).digest().getBytes()
 }
 
-function prfOidToMessageDigest(prfOid) {
+export function prfOidToMessageDigest(prfOid: string): MessageDigest {
   // get PRF algorithm, default to SHA-1
   let prfAlgorithm
-  if (!prfOid) {
+
+  if (!prfOid)
     prfAlgorithm = 'hmacWithSHA1'
-  }
+
   else {
-    prfAlgorithm = pki.oids[asn1.derToOid(prfOid)]
+    prfAlgorithm = oids[asn1.derToOid(prfOid)]
     if (!prfAlgorithm) {
       const error = new Error('Unsupported PRF OID.')
       error.oid = prfOid
@@ -996,11 +988,12 @@ function prfOidToMessageDigest(prfOid) {
   return prfAlgorithmToMessageDigest(prfAlgorithm)
 }
 
-function prfAlgorithmToMessageDigest(prfAlgorithm) {
-  let factory = forge.md
+export function prfAlgorithmToMessageDigest(prfAlgorithm: string): MessageDigest {
+  let factory
+
   switch (prfAlgorithm) {
     case 'hmacWithSHA224':
-      factory = forge.md.sha512
+      factory = sha512
     case 'hmacWithSHA1':
     case 'hmacWithSHA256':
     case 'hmacWithSHA384':
@@ -1025,7 +1018,7 @@ function prfAlgorithmToMessageDigest(prfAlgorithm) {
   return factory[prfAlgorithm].create()
 }
 
-function createPbkdf2Params(salt, countBytes, dkLen, prfAlgorithm) {
+export function createPbkdf2Params(salt: string, countBytes: Buffer, dkLen: number, prfAlgorithm: string): Asn1Object {
   const params = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // salt
     asn1.create(
@@ -1037,19 +1030,21 @@ function createPbkdf2Params(salt, countBytes, dkLen, prfAlgorithm) {
     // iteration count
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, countBytes.getBytes()),
   ])
+
   // when PRF algorithm is not SHA-1 default, add key length and PRF algorithm
   if (prfAlgorithm !== 'hmacWithSHA1') {
     params.value.push(
       // key length
-      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, forge.util.hexToBytes(dkLen.toString(16))),
+      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, hexToBytes(dkLen.toString(16))),
       // AlgorithmIdentifier
       asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
         // algorithm
-        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(pki.oids[prfAlgorithm]).getBytes()),
+        asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(oids[prfAlgorithm]).getBytes()),
         // parameters (null)
         asn1.create(asn1.Class.UNIVERSAL, asn1.Type.NULL, false, ''),
       ]),
     )
   }
+
   return params
 }
