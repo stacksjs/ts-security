@@ -30,10 +30,11 @@
  * Copyright (c) 2012-2014 Digital Bazaar, Inc.
  */
 
-import type { BlockCipher } from './cipher'
-import type { CipherMode } from './cipher-modes'
+import type { Algorithm, BlockCipher } from './cipher'
+import type { CipherMode, CipherModeOptions } from './cipher-modes'
 import { createCipher, createDecipher, registerAlgorithm as registerAlgo } from './cipher'
-import { ByteBuffer, createBuffer } from './utils'
+import { ByteStringBuffer, createBuffer } from './utils'
+import { modes } from './cipher-modes'
 
 /**
  * Creates a new DES cipher algorithm object.
@@ -43,24 +44,24 @@ import { ByteBuffer, createBuffer } from './utils'
  *
  * @return the DES algorithm object.
  */
-export class DESAlgorithm {
+export class DESAlgorithm implements Algorithm {
   name: string
   mode: CipherMode
-  _init: boolean
-  _keys!: number[]
+  private _init: boolean
+  private _keys!: number[]
 
-  constructor(name: string, mode: CipherMode) {
+  constructor(name: string, modeFactory: (options?: Partial<CipherModeOptions>) => CipherMode) {
+    const self = this
     this._init = false
     this.name = name
-    this.mode = new mode({
+    this.mode = modeFactory({
       blockSize: 8,
       cipher: {
-        encrypt(inBlock: typeof ByteBuffer, outBlock: typeof ByteBuffer) {
-          return _updateBlock(self._keys, inBlock, outBlock, false)
+        encrypt(inBlock: ByteStringBuffer, outBlock: ByteStringBuffer): void {
+          _updateBlock(self._keys, inBlock, outBlock, false)
         },
-
-        decrypt(inBlock: typeof ByteBuffer, outBlock: typeof ByteBuffer) {
-          return _updateBlock(self._keys, inBlock, outBlock, true)
+        decrypt(inBlock: ByteStringBuffer, outBlock: ByteStringBuffer): void {
+          _updateBlock(self._keys, inBlock, outBlock, true)
         },
       },
     })
@@ -72,29 +73,39 @@ export class DESAlgorithm {
    * @param options the options to use.
    * @param options.key the key to use with this algorithm.
    * @param options.decrypt true if the algorithm should be initialized for decryption, false for encryption.
+   * @param options.output optional output buffer.
    */
   initialize(options: {
-    key: string
+    key: string | ByteStringBuffer
     decrypt?: boolean
-    output?: Buffer
+    output?: ByteStringBuffer
   }): void {
     if (this._init)
       return
 
-    const key = createBuffer(options.key)
+    const key = options.key instanceof ByteStringBuffer ? options.key : createBuffer(options.key)
     if (this.name.indexOf('3DES') === 0) {
-      if (key.length() !== 24) {
-        throw new Error(`Invalid Triple-DES key size: ${key.length() * 8}`)
-      }
+      if (key.length() !== 24)
+        throw new Error(`Invalid Triple-DES key size: ${key.length() * 8} bits`)
+    }
+    else {
+      if (key.length() !== 8)
+        throw new Error(`Invalid DES key size: ${key.length() * 8} bits`)
     }
 
     // do key expansion to 16 or 48 subkeys (single or triple DES)
     this._keys = _createKeys(key)
     this._init = true
   }
-};
+}
 
 /** Register DES algorithms */
+function registerAlgorithm(name: string, modeFactory: (options?: Partial<CipherModeOptions>) => CipherMode) {
+  const factory = function () {
+    return new DESAlgorithm(name, modeFactory)
+  }
+  registerAlgo(name, factory)
+}
 
 registerAlgorithm('DES-ECB', modes.ecb)
 registerAlgorithm('DES-CBC', modes.cbc)
@@ -108,16 +119,6 @@ registerAlgorithm('3DES-CFB', modes.cfb)
 registerAlgorithm('3DES-OFB', modes.ofb)
 registerAlgorithm('3DES-CTR', modes.ctr)
 
-function registerAlgorithm(name: string, mode: CipherMode) {
-  const factory = function () {
-    return new DESAlgorithm(name, mode)
-  }
-
-  registerAlgo(name, factory)
-}
-
-/** DES implementation */
-
 const spfunction1 = [0x1010400, 0, 0x10000, 0x1010404, 0x1010004, 0x10404, 0x4, 0x10000, 0x400, 0x1010400, 0x1010404, 0x400, 0x1000404, 0x1010004, 0x1000000, 0x4, 0x404, 0x1000400, 0x1000400, 0x10400, 0x10400, 0x1010000, 0x1010000, 0x1000404, 0x10004, 0x1000004, 0x1000004, 0x10004, 0, 0x404, 0x10404, 0x1000000, 0x10000, 0x1010404, 0x4, 0x1010000, 0x1010400, 0x1000000, 0x1000000, 0x400, 0x1010004, 0x10000, 0x10400, 0x1000004, 0x400, 0x4, 0x1000404, 0x10404, 0x1010404, 0x10004, 0x1010000, 0x1000404, 0x1000004, 0x404, 0x10404, 0x1010400, 0x404, 0x1000400, 0x1000400, 0, 0x10004, 0x10400, 0, 0x1010004]
 const spfunction2 = [-0x7FEF7FE0, -0x7FFF8000, 0x8000, 0x108020, 0x100000, 0x20, -0x7FEFFFE0, -0x7FFF7FE0, -0x7FFFFFE0, -0x7FEF7FE0, -0x7FEF8000, -0x80000000, -0x7FFF8000, 0x100000, 0x20, -0x7FEFFFE0, 0x108000, 0x100020, -0x7FFF7FE0, 0, -0x80000000, 0x8000, 0x108020, -0x7FF00000, 0x100020, -0x7FFFFFE0, 0, 0x108000, 0x8020, -0x7FEF8000, -0x7FF00000, 0x8020, 0, 0x108020, -0x7FEFFFE0, 0x100000, -0x7FFF7FE0, -0x7FF00000, -0x7FEF8000, 0x8000, -0x7FF00000, -0x7FFF8000, 0x20, -0x7FEF7FE0, 0x108020, 0x20, 0x8000, -0x80000000, 0x8020, -0x7FEF8000, 0x100000, -0x7FFFFFE0, 0x100020, -0x7FFF7FE0, -0x7FFFFFE0, 0x100020, 0x108000, 0, -0x7FFF8000, 0x8020, -0x80000000, -0x7FEFFFE0, -0x7FEF7FE0, 0x108000]
 const spfunction3 = [0x208, 0x8020200, 0, 0x8020008, 0x8000200, 0, 0x20208, 0x8000200, 0x20008, 0x8000008, 0x8000008, 0x20000, 0x8020208, 0x20008, 0x8020000, 0x208, 0x8000000, 0x8, 0x8020200, 0x200, 0x20200, 0x8020000, 0x8020008, 0x20208, 0x8000208, 0x20200, 0x20000, 0x8000208, 0x8, 0x8020208, 0x200, 0x8000000, 0x8020200, 0x8000000, 0x20008, 0x208, 0x20000, 0x8020200, 0x8000200, 0, 0x200, 0x20008, 0x8020208, 0x8000200, 0x8000008, 0x200, 0, 0x8020008, 0x8000208, 0x20000, 0x8000000, 0x8020208, 0x8, 0x20208, 0x20200, 0x8000008, 0x8020000, 0x8000208, 0x208, 0x8020000, 0x20208, 0x8, 0x8020008, 0x20200]
@@ -130,11 +131,11 @@ const spfunction8 = [0x10001040, 0x1000, 0x40000, 0x10041040, 0x10000000, 0x1000
 /**
  * Create necessary sub keys.
  *
- * @param key the 64-bit or 192-bit key.
+ * @param key the 64-bit or 192-bit key buffer.
  *
  * @return the expanded keys.
  */
-function _createKeys(key: Buffer) {
+function _createKeys(key: ByteStringBuffer): number[] {
   const pc2bytes0 = [0, 0x4, 0x20000000, 0x20000004, 0x10000, 0x10004, 0x20010000, 0x20010004, 0x200, 0x204, 0x20000200, 0x20000204, 0x10200, 0x10204, 0x20010200, 0x20010204]
   const pc2bytes1 = [0, 0x1, 0x100000, 0x100001, 0x4000000, 0x4000001, 0x4100000, 0x4100001, 0x100, 0x101, 0x100100, 0x100101, 0x4000100, 0x4000101, 0x4100100, 0x4100101]
   const pc2bytes2 = [0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808, 0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808]
@@ -169,21 +170,13 @@ function _createKeys(key: Buffer) {
     right ^= tmp
     left ^= (tmp << 4)
 
-    tmp = ((right >>> -16) ^ left) & 0x0000FFFF
-    left ^= tmp
-    right ^= (tmp << -16)
-
-    tmp = ((left >>> 2) ^ right) & 0x33333333
+    tmp = ((left >>> 16) ^ right) & 0x0000FFFF
     right ^= tmp
-    left ^= (tmp << 2)
+    left ^= (tmp << 16)
 
-    tmp = ((right >>> -16) ^ left) & 0x0000FFFF
+    tmp = ((right >>> 2) ^ left) & 0x33333333
     left ^= tmp
-    right ^= (tmp << -16)
-
-    tmp = ((left >>> 1) ^ right) & 0x55555555
-    right ^= tmp
-    left ^= (tmp << 1)
+    right ^= (tmp << 2)
 
     tmp = ((right >>> 8) ^ left) & 0x00FF00FF
     left ^= tmp
@@ -240,179 +233,117 @@ function _createKeys(key: Buffer) {
 }
 
 /**
- * Updates a single block (1 byte) using DES. The update will either
+ * Updates a single block using DES. The update will either
  * encrypt or decrypt the block.
  *
  * @param keys the expanded keys.
- * @param input the input block (an array of 32-bit words).
- * @param output the updated output block.
+ * @param input the input block buffer.
+ * @param output the output block buffer.
  * @param decrypt true to decrypt the block, false to encrypt it.
  */
-function _updateBlock(keys: number[], input: number[], output: number[], decrypt: boolean) {
-  // set up loops for single or triple DES
-  const iterations = keys.length === 32 ? 3 : 9
-  let looping
-  if (iterations === 3) {
-    looping = decrypt ? [30, -2, -2] : [0, 32, 2]
-  }
-  else {
-    looping = (decrypt
-      ? [94, 62, -2, 32, 64, 2, 30, -2, -2]
-      : [0, 32, 2, 62, 30, -2, 64, 96, 2])
-  }
+function _updateBlock(keys: number[], input: ByteStringBuffer, output: ByteStringBuffer, decrypt: boolean): void {
+  // convert input buffer to integers
+  let left = input.getInt32()
+  let right = input.getInt32()
 
+  // initial permutation
   let tmp
-
-  let left = input[0]
-  let right = input[1]
-
-  // first each 64 bit chunk of the message must be permuted according to IP
   tmp = ((left >>> 4) ^ right) & 0x0F0F0F0F
   right ^= tmp
   left ^= (tmp << 4)
-
   tmp = ((left >>> 16) ^ right) & 0x0000FFFF
   right ^= tmp
   left ^= (tmp << 16)
-
   tmp = ((right >>> 2) ^ left) & 0x33333333
   left ^= tmp
   right ^= (tmp << 2)
-
   tmp = ((right >>> 8) ^ left) & 0x00FF00FF
   left ^= tmp
   right ^= (tmp << 8)
-
   tmp = ((left >>> 1) ^ right) & 0x55555555
   right ^= tmp
   left ^= (tmp << 1)
 
-  // rotate left 1 bit
-  left = ((left << 1) | (left >>> 31))
+  // right needs to be shifted and needs to get last 4 bits of left
   right = ((right << 1) | (right >>> 31))
+  tmp = (left ^ right) & 0xAAAAAAAA
+  right ^= tmp
+  left ^= tmp
+  left = ((left << 1) | (left >>> 31))
 
-  for (let j = 0; j < iterations; j += 3) {
-    const endloop = looping[j + 1]
-    const loopinc = looping[j + 2]
+  for (let i = 0; i < keys.length; i += 4) {
+    let keysi = i
+    if (decrypt)
+      keysi = keys.length - 4 - i
 
-    // now go through and perform the encryption or decryption
-    for (let i = looping[j]; i != endloop; i += loopinc) {
-      const right1 = right ^ keys[i]
-      const right2 = ((right >>> 4) | (right << 28)) ^ keys[i + 1]
+    let work = right ^ keys[keysi]
+    let work2 = ((right >>> 4) | (right << 28)) ^ keys[keysi + 1]
 
-      // passing these bytes through the S selection functions
-      tmp = left
-      left = right
-      right = tmp ^ (
-        spfunction2[(right1 >>> 24) & 0x3F]
-        | spfunction4[(right1 >>> 16) & 0x3F]
-        | spfunction6[(right1 >>> 8) & 0x3F]
-        | spfunction8[right1 & 0x3F]
-        | spfunction1[(right2 >>> 24) & 0x3F]
-        | spfunction3[(right2 >>> 16) & 0x3F]
-        | spfunction5[(right2 >>> 8) & 0x3F]
-        | spfunction7[right2 & 0x3F])
-    }
-    // unreverse left and right
-    tmp = left
+    // expand right word into 8 bytes for table lookup
+    const t1 = work & 0x3F
+    const t2 = ((work >>> 6) | (work << 26)) & 0x3F
+    const t3 = ((work >>> 12) | (work << 20)) & 0x3F
+    const t4 = ((work >>> 18) | (work << 14)) & 0x3F
+    const t5 = ((work >>> 24) | (work << 8)) & 0x3F
+    const t6 = ((work >>> 30) | (work << 2)) & 0x3F
+    const t7 = work2 & 0x3F
+    const t8 = ((work2 >>> 6) | (work2 << 26)) & 0x3F
+
+    // table lookups
+    tmp = spfunction1[t1] | spfunction2[t2] | spfunction3[t3] | spfunction4[t4] |
+          spfunction5[t5] | spfunction6[t6] | spfunction7[t7] | spfunction8[t8]
+
+    // functions
+    const righttemp = left
     left = right
-    right = tmp
+    right = righttemp ^ tmp
   }
 
-  // rotate right 1 bit
+  // move left and right by one bit
   left = ((left >>> 1) | (left << 31))
   right = ((right >>> 1) | (right << 31))
 
-  // now perform IP-1, which is IP in the opposite direction
-  tmp = ((left >>> 1) ^ right) & 0x55555555
+  // final permutation
+  tmp = (left ^ right) & 0xAAAAAAAA
+  left ^= tmp
   right ^= tmp
-  left ^= (tmp << 1)
-
+  right = ((right >>> 1) | (right << 31))
   tmp = ((right >>> 8) ^ left) & 0x00FF00FF
   left ^= tmp
   right ^= (tmp << 8)
-
   tmp = ((right >>> 2) ^ left) & 0x33333333
   left ^= tmp
   right ^= (tmp << 2)
-
   tmp = ((left >>> 16) ^ right) & 0x0000FFFF
   right ^= tmp
   left ^= (tmp << 16)
-
   tmp = ((left >>> 4) ^ right) & 0x0F0F0F0F
   right ^= tmp
   left ^= (tmp << 4)
 
-  output[0] = left
-  output[1] = right
+  // write output
+  output.putInt32(right)
+  output.putInt32(left)
 }
 
 /**
- * Deprecated. Instead, use:
+ * Creates a new DES cipher algorithm object.
  *
- * forge.cipher.createCipher('DES-<mode>', key);
- * forge.cipher.createDecipher('DES-<mode>', key);
+ * @param name the name of the algorithm.
+ * @param mode the mode factory function.
  *
- * Creates a deprecated DES cipher object. This object's mode will default to
- * CBC (cipher-block-chaining).
- *
- * The key may be given as a binary-encoded string of bytes or a byte buffer.
- *
- * @param options the options to use.
- *          key the symmetric key to use (64 or 192 bits).
- *          output the buffer to write to.
- *          decrypt true for decryption, false for encryption.
- *          mode the cipher mode to use (default: 'CBC').
- *
- * @return the cipher.
+ * @return the DES algorithm object.
  */
-function _createCipher(options: {
-  mode?: string
-  key: string
-  decrypt?: boolean
-  output?: Buffer
-}): BlockCipher {
-  options = options || {}
-  const mode = (options.mode || 'CBC').toUpperCase()
-  const algorithm = `DES-${mode}`
-
-  let cipher
-  if (options.decrypt) {
-    cipher = createDecipher(algorithm, options.key)
-  }
-  else {
-    cipher = createCipher(algorithm, options.key)
-  }
-
-  // backwards compatible start API
-  const start = cipher.start
-  cipher.start = function (iv: ByteBuffer, options: any) {
-    // backwards compatibility: support second arg as output buffer
-    let output = null
-    if (options instanceof ByteBuffer) {
-      output = options
-      options = {}
-    }
-    options = options || {}
-    options.output = output
-    options.iv = iv
-    start.call(cipher, options)
-  }
-
-  return cipher
-}
-
 export interface DES {
   Algorithm: typeof DESAlgorithm
-  createCipher: typeof _createCipher
+  createCipher: typeof createCipher
   createKeys: typeof _createKeys
   updateBlock: typeof _updateBlock
 }
 
 export const des: DES = {
   Algorithm: DESAlgorithm,
-  createCipher: _createCipher,
+  createCipher,
   createKeys: _createKeys,
   updateBlock: _updateBlock,
 }
