@@ -67,7 +67,8 @@ import { asn1 } from './asn1'
 import { BigInteger } from './jsbn'
 import { oids } from './oids'
 import { getBytes, random } from './random'
-import util, { isServer } from './utils'
+import { encode_rsa_oaep } from './pkcs1'
+import util, { createBuffer, isServer } from './utils'
 
 const _crypto = isServer ? require('node:crypto') : null
 
@@ -1095,7 +1096,7 @@ pki.rsa.generateKeyPair = function (bits, e, options, callback) {
  *
  * @return the public key.
  */
-export function setPublicKey(n: BigInteger, e: BigInteger): {
+export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
   n: BigInteger
   e: BigInteger
 } {
@@ -1139,7 +1140,7 @@ export function setPublicKey(n: BigInteger, e: BigInteger): {
     else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
       scheme = {
         encode(m, key) {
-          return forge.pkcs1.encode_rsa_oaep(key, m, schemeOptions)
+          return encode_rsa_oaep(key, m, schemeOptions)
         },
       }
     }
@@ -1422,6 +1423,8 @@ export function setPrivateKey(
   return key
 }
 
+export const setRsaPrivateKey: (n: BigInteger, e: BigInteger, d: BigInteger, p: BigInteger, q: BigInteger, dP: BigInteger, dQ: BigInteger, qInv: BigInteger) => RSAKey = setPrivateKey
+
 /**
  * Wraps an RSAPrivateKey ASN.1 object in an ASN.1 PrivateKeyInfo object.
  *
@@ -1429,7 +1432,7 @@ export function setPrivateKey(
  *
  * @return the ASN.1 PrivateKeyInfo.
  */
-pki.wrapRsaPrivateKey = function (rsaKey) {
+export function wrapRsaPrivateKey(rsaKey: Asn1Object): Asn1Object {
   // PrivateKeyInfo
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // version (0)
@@ -1452,12 +1455,11 @@ pki.wrapRsaPrivateKey = function (rsaKey) {
 /**
  * Converts a private key from an ASN.1 object.
  *
- * @param obj the ASN.1 representation of a PrivateKeyInfo containing an
- *          RSAPrivateKey or an RSAPrivateKey.
+ * @param obj the ASN.1 representation of a PrivateKeyInfo containing an RSAPrivateKey or an RSAPrivateKey.
  *
  * @return the private key.
  */
-pki.privateKeyFromAsn1 = function (obj) {
+export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   // get PrivateKeyInfo
   let capture = {}
   let errors = []
@@ -1508,7 +1510,16 @@ pki.privateKeyFromAsn1 = function (obj) {
  *
  * @return the ASN.1 representation of an RSAPrivateKey.
  */
-pki.privateKeyToAsn1 = pki.privateKeyToRSAPrivateKey = function (key) {
+export function privateKeyToAsn1(key: {
+  n: BigInteger
+  e: BigInteger
+  d: BigInteger
+  p: BigInteger
+  q: BigInteger
+  dP: BigInteger
+  dQ: BigInteger
+  qInv: BigInteger
+}): Asn1Object {
   // RSAPrivateKey
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // version (0 = only 2 primes, 1 multiple primes)
@@ -1539,7 +1550,7 @@ pki.privateKeyToAsn1 = pki.privateKeyToRSAPrivateKey = function (key) {
  *
  * @return the public key.
  */
-pki.publicKeyFromAsn1 = function (obj) {
+export function publicKeyFromAsn1(obj: Asn1Object): RSAKey {
   // get SubjectPublicKeyInfo
   const capture = {}
   let errors = []
@@ -1568,7 +1579,7 @@ pki.publicKeyFromAsn1 = function (obj) {
   const e = util.createBuffer(capture.publicKeyExponent).toHex()
 
   // set public key
-  return pki.setRsaPublicKey(
+  return setRsaPublicKey(
     new BigInteger(n, 16),
     new BigInteger(e, 16),
   )
@@ -1581,7 +1592,7 @@ pki.publicKeyFromAsn1 = function (obj) {
  *
  * @return the asn1 representation of a SubjectPublicKeyInfo.
  */
-pki.publicKeyToAsn1 = pki.publicKeyToSubjectPublicKeyInfo = function (key) {
+export function publicKeyToAsn1(key: RSAKey): Asn1Object {
   // SubjectPublicKeyInfo
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // AlgorithmIdentifier
@@ -1598,6 +1609,8 @@ pki.publicKeyToAsn1 = pki.publicKeyToSubjectPublicKeyInfo = function (key) {
   ])
 }
 
+export const publicKeyToSubjectPublicKeyInfo: (key: RSAKey) => Asn1Object = publicKeyToAsn1
+
 /**
  * Converts a public key to an ASN.1 RSAPublicKey.
  *
@@ -1605,7 +1618,7 @@ pki.publicKeyToAsn1 = pki.publicKeyToSubjectPublicKeyInfo = function (key) {
  *
  * @return the asn1 representation of a RSAPublicKey.
  */
-function publicKeyToRSAPublicKey(key: {
+export function publicKeyToRSAPublicKey(key: {
   n: BigInteger
   e: BigInteger
 }): Asn1Object {
@@ -1632,7 +1645,7 @@ function _encodePkcs1_v1_5(m: string, key: {
   n: BigInteger
   e: BigInteger
 }, bt: number) {
-  const eb = util.createBuffer()
+  const eb = createBuffer()
 
   // get the length of the modulus in bytes
   const k = Math.ceil(key.n.bitLength() / 8)
@@ -1680,7 +1693,7 @@ function _encodePkcs1_v1_5(m: string, key: {
     // pad with random non-zero values
     while (padNum > 0) {
       let numZeros = 0
-      const padBytes = forge.random.getBytes(padNum)
+      const padBytes = random.getBytes(padNum)
       for (var i = 0; i < padNum; ++i) {
         padByte = padBytes.charCodeAt(i)
         if (padByte === 0) {
@@ -1711,7 +1724,10 @@ function _encodePkcs1_v1_5(m: string, key: {
  *
  * @return the decoded bytes.
  */
-function _decodePkcs1_v1_5(em: any, key: any, pub: boolean, ml?: number) {
+function _decodePkcs1_v1_5(em: string, key: {
+  n: BigInteger
+  e: BigInteger
+}, pub: boolean, ml?: number) {
   // get the length of the modulus in bytes
   const k = Math.ceil(key.n.bitLength() / 8)
 
@@ -1792,7 +1808,17 @@ function _decodePkcs1_v1_5(em: any, key: any, pub: boolean, ml?: number) {
  *            (default: 100).
  * @param callback(err, keypair) called once the operation completes.
  */
-function _generateKeyPair(state: any, options: any, callback: any) {
+function _generateKeyPair(state: {
+  pBits: number
+  qBits: number
+  bits: number
+  e: BigInteger
+}, options: {
+  algorithm?: string
+  workers?: number
+  workLoad?: number
+  workerScript?: string
+}, callback: (err: any, keypair: any) => void) {
   if (typeof options === 'function') {
     callback = options
     options = {}
@@ -1835,7 +1861,7 @@ function _generateKeyPair(state: any, options: any, callback: any) {
     forge.prime.generateProbablePrime(bits, opts, callback)
   }
 
-  function finish(err, num) {
+  function finish(err: any, num: any) {
     if (err) {
       return callback(err)
     }
@@ -1899,7 +1925,7 @@ function _generateKeyPair(state: any, options: any, callback: any) {
         d.mod(state.q1),
         state.q.modInverse(state.p),
       ),
-      publicKey: pki.rsa.setPublicKey(state.n, state.e),
+      publicKey: setRsaPublicKey(state.n, state.e),
     }
 
     callback(null, state.keys)
@@ -1913,12 +1939,13 @@ function _generateKeyPair(state: any, options: any, callback: any) {
  *
  * @return the bytes.
  */
-function _bnToBytes(b) {
+function _bnToBytes(b: BigInteger) {
   // prepend 0x00 if first byte >= 0x80
   let hex = b.toString(16)
   if (hex[0] >= '8') {
     hex = `00${hex}`
   }
+
   const bytes = util.hexToBytes(hex)
 
   // ensure integer is minimally-encoded
@@ -1931,6 +1958,7 @@ function _bnToBytes(b) {
       && (bytes.charCodeAt(1) & 0x80) === 0x80))) {
     return bytes.substr(1)
   }
+
   return bytes
 }
 
@@ -1944,7 +1972,7 @@ function _bnToBytes(b) {
  *
  * @return the required number of iterations.
  */
-function _getMillerRabinTests(bits) {
+function _getMillerRabinTests(bits: number) {
   if (bits <= 100)
     return 27
   if (bits <= 150)
@@ -1977,8 +2005,8 @@ function _getMillerRabinTests(bits) {
  *
  * @return true if detected, false if not.
  */
-function _detectNodeCrypto(fn) {
-  return util.isNodejs && typeof _crypto[fn] === 'function'
+function _detectNodeCrypto(fn: string) {
+  return util.isServer && typeof _crypto[fn] === 'function'
 }
 
 /**
@@ -1988,7 +2016,7 @@ function _detectNodeCrypto(fn) {
  *
  * @return true if detected, false if not.
  */
-function _detectSubtleCrypto(fn) {
+function _detectSubtleCrypto(fn: string) {
   return (typeof util.globalScope !== 'undefined'
     && typeof util.globalScope.crypto === 'object'
     && typeof util.globalScope.crypto.subtle === 'object'
@@ -2004,14 +2032,14 @@ function _detectSubtleCrypto(fn) {
  *
  * @return true if detected, false if not.
  */
-function _detectSubtleMsCrypto(fn) {
+function _detectSubtleMsCrypto(fn: string) {
   return (typeof util.globalScope !== 'undefined'
     && typeof util.globalScope.msCrypto === 'object'
     && typeof util.globalScope.msCrypto.subtle === 'object'
     && typeof util.globalScope.msCrypto.subtle[fn] === 'function')
 }
 
-function _intToUint8Array(x) {
+function _intToUint8Array(x: number) {
   const bytes = util.hexToBytes(x.toString(16))
   const buffer = new Uint8Array(bytes.length)
   for (let i = 0; i < bytes.length; ++i) {
@@ -2048,16 +2076,20 @@ function _privateKeyFromJwk(jwk: {
   )
 }
 
-function _publicKeyFromJwk(jwk) {
+function _publicKeyFromJwk(jwk: {
+  kty: string
+  n: string
+  e: string
+}) {
   if (jwk.kty !== 'RSA') {
     throw new Error('Key algorithm must be "RSA".')
   }
-  return pki.setRsaPublicKey(
+  return setRsaPublicKey(
     _base64ToBigInt(jwk.n),
     _base64ToBigInt(jwk.e),
   )
 }
 
-function _base64ToBigInt(b64) {
+function _base64ToBigInt(b64: string) {
   return new BigInteger(util.bytesToHex(util.decode64(b64)), 16)
 }

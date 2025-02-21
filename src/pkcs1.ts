@@ -45,6 +45,55 @@
  */
 
 import { sha1 } from './sha1'
+import { ByteStringBuffer } from './utils'
+
+// Extended Error interface for PKCS1 specific errors
+interface PKCS1Error extends Error {
+  length?: number
+  maxLength?: number
+  seedLength?: number
+  digestLength?: number
+  expectedLength?: number
+}
+
+// Type definitions for key and options
+interface RSAKey {
+  n: {
+    bitLength: () => number
+  }
+}
+
+interface MessageDigest {
+  start: () => void
+  update: (msg: string, encoding?: string) => void
+  digest: () => ByteStringBuffer
+  digestLength: number
+}
+
+interface PKCS1Options {
+  label?: string
+  seed?: string
+  md?: MessageDigest
+  mgf1?: {
+    md?: MessageDigest
+  }
+}
+
+// Utility functions that were previously from forge
+function getRandomBytes(count: number): string {
+  const bytes = new Uint8Array(count)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes).map(b => String.fromCharCode(b)).join('')
+}
+
+function xorBytes(a: string, b: string, length: number): string {
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += String.fromCharCode(a.charCodeAt(i) ^ b.charCodeAt(i))
+  }
+  return result
+}
+
 /**
  * Encode the given RSAES-OAEP message (M) using key, with optional label (L)
  * and seed.
@@ -63,25 +112,24 @@ import { sha1 } from './sha1'
  *
  * @return the encoded message bytes.
  */
-export function encode_rsa_oaep(key: any, message: any, options: any): string {
+export function encode_rsa_oaep(key: RSAKey, message: string, options: PKCS1Options | string): string {
   // parse arguments
-  let label
-  let seed
-  let md
-  let mgf1Md
+  let label: string | undefined
+  let seed: string | undefined
+  let md: MessageDigest | undefined
+  let mgf1Md: MessageDigest | undefined
 
   // legacy args (label, seed, md)
   if (typeof options === 'string') {
     label = options
-    seed = arguments[3] || undefined
-    md = arguments[4] || undefined
+    seed = arguments[3] as string
+    md = arguments[4] as MessageDigest
   }
   else if (options) {
-    label = options.label || undefined
-    seed = options.seed || undefined
-    md = options.md || undefined
-
-    if (options.mgf1 && options.mgf1.md) {
+    label = options.label
+    seed = options.seed
+    md = options.md
+    if (options.mgf1?.md) {
       mgf1Md = options.mgf1.md
     }
   }
@@ -103,7 +151,7 @@ export function encode_rsa_oaep(key: any, message: any, options: any): string {
   const keyLength = Math.ceil(key.n.bitLength() / 8)
   const maxLength = keyLength - 2 * md.digestLength - 2
   if (message.length > maxLength) {
-    var error = new Error('RSAES-OAEP input message length is too long.')
+    const error = new Error('RSAES-OAEP input message length is too long.') as PKCS1Error
     error.length = message.length
     error.maxLength = maxLength
     throw error
@@ -124,25 +172,24 @@ export function encode_rsa_oaep(key: any, message: any, options: any): string {
   const DB = `${lHash.getBytes() + PS}\x01${message}`
 
   if (!seed) {
-    seed = forge.random.getBytes(md.digestLength)
+    seed = getRandomBytes(md.digestLength)
   }
   else if (seed.length !== md.digestLength) {
-    var error = new Error('Invalid RSAES-OAEP seed. The seed length must '
-      + 'match the digest length.')
+    const error = new Error('Invalid RSAES-OAEP seed. The seed length must match the digest length.') as PKCS1Error
     error.seedLength = seed.length
     error.digestLength = md.digestLength
     throw error
   }
 
   const dbMask = rsa_mgf1(seed, keyLength - md.digestLength - 1, mgf1Md)
-  const maskedDB = forge.util.xorBytes(DB, dbMask, DB.length)
+  const maskedDB = xorBytes(DB, dbMask, DB.length)
 
   const seedMask = rsa_mgf1(maskedDB, md.digestLength, mgf1Md)
-  const maskedSeed = forge.util.xorBytes(seed, seedMask, seed.length)
+  const maskedSeed = xorBytes(seed, seedMask, seed.length)
 
   // return encoded message
   return `\x00${maskedSeed}${maskedDB}`
-};
+}
 
 /**
  * Decode the given RSAES-OAEP encoded message (EM) using key, with optional
@@ -161,20 +208,21 @@ export function encode_rsa_oaep(key: any, message: any, options: any): string {
  *
  * @return the decoded message bytes.
  */
-pkcs1.decode_rsa_oaep = function (key, em, options) {
+export function decode_rsa_oaep(key: RSAKey, em: string, options: PKCS1Options | string): string {
   // parse args
-  let label
-  let md
-  let mgf1Md
+  let label: string | undefined
+  let md: MessageDigest | undefined
+  let mgf1Md: MessageDigest | undefined
+
   // legacy args
   if (typeof options === 'string') {
     label = options
-    md = arguments[3] || undefined
+    md = arguments[3] as MessageDigest
   }
   else if (options) {
-    label = options.label || undefined
-    md = options.md || undefined
-    if (options.mgf1 && options.mgf1.md) {
+    label = options.label
+    md = options.md
+    if (options.mgf1?.md) {
       mgf1Md = options.mgf1.md
     }
   }
@@ -183,7 +231,7 @@ pkcs1.decode_rsa_oaep = function (key, em, options) {
   const keyLength = Math.ceil(key.n.bitLength() / 8)
 
   if (em.length !== keyLength) {
-    var error = new Error('RSAES-OAEP encoded message length is invalid.')
+    const error = new Error('RSAES-OAEP encoded message length is invalid.') as PKCS1Error
     error.length = em.length
     error.expectedLength = keyLength
     throw error
@@ -209,6 +257,7 @@ pkcs1.decode_rsa_oaep = function (key, em, options) {
   if (!label) {
     label = ''
   }
+
   md.update(label, 'raw')
   const lHash = md.digest().getBytes()
 
@@ -218,36 +267,31 @@ pkcs1.decode_rsa_oaep = function (key, em, options) {
   const maskedDB = em.substring(1 + md.digestLength)
 
   const seedMask = rsa_mgf1(maskedDB, md.digestLength, mgf1Md)
-  const seed = forge.util.xorBytes(maskedSeed, seedMask, maskedSeed.length)
+  const seed = xorBytes(maskedSeed, seedMask, maskedSeed.length)
 
   const dbMask = rsa_mgf1(seed, keyLength - md.digestLength - 1, mgf1Md)
-  const db = forge.util.xorBytes(maskedDB, dbMask, maskedDB.length)
+  const db = xorBytes(maskedDB, dbMask, maskedDB.length)
 
   const lHashPrime = db.substring(0, md.digestLength)
 
   // constant time check that all values match what is expected
-  var error = (y !== '\x00')
+  let error = 0
+
+  // constant time check y is 0
+  error |= y.charCodeAt(0)
 
   // constant time check lHash vs lHashPrime
   for (let i = 0; i < md.digestLength; ++i) {
-    error |= (lHash.charAt(i) !== lHashPrime.charAt(i))
+    error |= lHash.charCodeAt(i) ^ lHashPrime.charCodeAt(i)
   }
 
-  // "constant time" find the 0x1 byte separating the padding (zeros) from the
-  // message
-  // TODO: It must be possible to do this in a better/smarter way?
+  // "constant time" find the 0x1 byte separating the padding (zeros) from the message
   let in_ps = 1
   let index = md.digestLength
   for (let j = md.digestLength; j < db.length; j++) {
     const code = db.charCodeAt(j)
-
     const is_0 = (code & 0x1) ^ 0x1
-
-    // non-zero if not 0 or 1 in the ps section
-    const error_mask = in_ps ? 0xFFFE : 0x0000
-    error |= (code & error_mask)
-
-    // latch in_ps to zero after we find 0x1
+    error |= in_ps & (code & 0xFFFE)
     in_ps = in_ps & is_0
     index += in_ps
   }
@@ -259,7 +303,10 @@ pkcs1.decode_rsa_oaep = function (key, em, options) {
   return db.substring(index + 1)
 }
 
-function rsa_mgf1(seed, maskLength, hash) {
+/**
+ * MGF1 using the given hash function to generate a mask of the specified length.
+ */
+function rsa_mgf1(seed: string, maskLength: number, hash: MessageDigest): string {
   // default to SHA-1 message digest
   if (!hash) {
     hash = sha1.create()
@@ -280,7 +327,13 @@ function rsa_mgf1(seed, maskLength, hash) {
   return t.substring(0, maskLength)
 }
 
-export const pkcs1 = {
+export interface PKCS1 {
+  encode_rsa_oaep: (key: RSAKey, message: string, options: PKCS1Options | string) => string
+  decode_rsa_oaep: (key: RSAKey, em: string, options: PKCS1Options | string) => string
+  rsa_mgf1: (seed: string, maskLength: number, hash: MessageDigest) => string
+}
+
+export const pkcs1: PKCS1 = {
   encode_rsa_oaep,
   decode_rsa_oaep,
   rsa_mgf1,
