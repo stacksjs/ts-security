@@ -133,9 +133,36 @@
  * The full OID (including ASN.1 tag and length of 6 bytes) is:
  * 0x06062A864886F70D
  */
-import { createBuffer, bytesToHex, decodeUtf8 } from './utils'
+import { createBuffer, bytesToHex, decodeUtf8, ByteStringBuffer } from './utils'
 import { oids } from './oids'
 
+interface ExtendedError extends Error {
+  available?: number;
+  remaining?: number;
+  requested?: number;
+  byteCount?: number;
+  integer?: number;
+}
+
+interface Asn1Object {
+  tagClass: number;
+  type: number;
+  constructed: boolean;
+  composed: boolean;
+  value: any;
+  bitStringContents?: string;
+  original?: Asn1Object;
+}
+
+interface CreateOptions {
+  bitStringContents?: string;
+}
+
+interface DerOptions {
+  strict?: boolean;
+  parseAllBytes?: boolean;
+  decodeBitStrings?: boolean;
+}
 
 /**
  * ASN.1 classes.
@@ -188,7 +215,7 @@ export const Type = {
  *
  * @return the asn1 object.
  */
-export function create(tagClass: number, type: number, constructed: boolean, value: any, options: any): any {
+export function create(tagClass: number, type: number, constructed: boolean, value: any, options?: CreateOptions): Asn1Object {
   /* An asn1 object has a tagClass, a type, a constructed flag, and a
     value. The value's type depends on the constructed flag. If
     constructed, it will contain a list of other asn1 objects. If not,
@@ -206,7 +233,7 @@ export function create(tagClass: number, type: number, constructed: boolean, val
     value = tmp
   }
 
-  const obj = {
+  const obj: Asn1Object = {
     tagClass,
     type,
     constructed,
@@ -214,11 +241,12 @@ export function create(tagClass: number, type: number, constructed: boolean, val
     value,
   }
   if (options && 'bitStringContents' in options) {
-    // TODO: copy byte buffer if it's a buffer not a string
     obj.bitStringContents = options.bitStringContents
-    // TODO: add readonly flag to avoid this overhead
     // save copy to detect changes
-    obj.original = asn1.copy(obj)
+    const original = copy(obj, { excludeBitStringContents: true })
+    if (typeof original !== 'string' && !Array.isArray(original)) {
+      obj.original = original
+    }
   }
   return obj
 }
@@ -232,11 +260,9 @@ export function create(tagClass: number, type: number, constructed: boolean, val
  *
  * @return the a copy of the asn1 object.
  */
-export function copy(obj: any, options: any): any {
-  let copy
-
+export function copy(obj: Asn1Object | any[] | string, options?: { excludeBitStringContents?: boolean }): Asn1Object | any[] | string {
   if (Array.isArray(obj)) {
-    copy = []
+    const copy = []
     for (let i = 0; i < obj.length; ++i) {
       copy.push(asn1.copy(obj[i], options))
     }
@@ -244,20 +270,20 @@ export function copy(obj: any, options: any): any {
   }
 
   if (typeof obj === 'string') {
-    // TODO: copy byte buffer if it's a buffer not a string
     return obj
   }
 
-  copy = {
-    tagClass: obj.tagClass,
-    type: obj.type,
-    constructed: obj.constructed,
-    composed: obj.composed,
-    value: asn1.copy(obj.value, options),
+  // At this point obj must be Asn1Object
+  const asn1Obj = obj as Asn1Object
+  const copy: Asn1Object = {
+    tagClass: asn1Obj.tagClass,
+    type: asn1Obj.type,
+    constructed: asn1Obj.constructed,
+    composed: asn1Obj.composed,
+    value: asn1.copy(asn1Obj.value, options),
   }
-  if (options && !options.excludeBitStringContents) {
-    // TODO: copy byte buffer if it's a buffer not a string
-    copy.bitStringContents = obj.bitStringContents
+  if (options && !options.excludeBitStringContents && asn1Obj.bitStringContents) {
+    copy.bitStringContents = asn1Obj.bitStringContents
   }
 
   return copy
@@ -275,7 +301,7 @@ export function copy(obj: any, options: any): any {
  *
  * @return true if the asn1 objects are equal.
  */
-export function equals(obj1: any, obj2: any, options: any): boolean {
+export function equals(obj1: Asn1Object | any[] | string, obj2: Asn1Object | any[] | string, options?: { includeBitStringContents?: boolean }): boolean {
   if (Array.isArray(obj1)) {
     if (!Array.isArray(obj2))
       return false
@@ -284,7 +310,7 @@ export function equals(obj1: any, obj2: any, options: any): boolean {
       return false
 
     for (let i = 0; i < obj1.length; ++i)
-      if (!asn1.equals(obj1[i], obj2[i]))
+      if (!asn1.equals(obj1[i], obj2[i], options))
         return false
 
     return true
@@ -296,13 +322,18 @@ export function equals(obj1: any, obj2: any, options: any): boolean {
   if (typeof obj1 === 'string')
     return obj1 === obj2
 
-  let equal = obj1.tagClass === obj2.tagClass
-    && obj1.type === obj2.type
-    && obj1.constructed === obj2.constructed
-    && obj1.composed === obj2.composed
-    && asn1.equals(obj1.value, obj2.value)
+  // At this point both obj1 and obj2 must be Asn1Object
+  const asn1Obj1 = obj1 as Asn1Object
+  const asn1Obj2 = obj2 as Asn1Object
+
+  let equal = asn1Obj1.tagClass === asn1Obj2.tagClass
+    && asn1Obj1.type === asn1Obj2.type
+    && asn1Obj1.constructed === asn1Obj2.constructed
+    && asn1Obj1.composed === asn1Obj2.composed
+    && asn1.equals(asn1Obj1.value, asn1Obj2.value, options)
+
   if (options && options.includeBitStringContents) {
-    equal = equal && (obj1.bitStringContents === obj2.bitStringContents)
+    equal = equal && (asn1Obj1.bitStringContents === asn1Obj2.bitStringContents)
   }
 
   return equal
@@ -349,9 +380,9 @@ export function getBerValueLength(b: any): number | undefined {
  * @param remaining the bytes remaining in the current parsing state.
  * @param n the number of bytes the buffer must have.
  */
-function _checkBufferLength(bytes: any, remaining: number, n: number): void {
+function _checkBufferLength(bytes: ByteStringBuffer, remaining: number, n: number): void {
   if (n > remaining) {
-    const error = new Error('Too few bytes to parse DER.')
+    const error = new Error('Too few bytes to parse DER.') as ExtendedError
     error.available = bytes.length()
     error.remaining = remaining
     error.requested = n
@@ -422,42 +453,29 @@ function _getValueLength(bytes: any, remaining: number): number | undefined {
  *
  * @return the parsed asn1 object.
  */
-export function fromDer(bytes: any, options: any): Asn1 {
-  if (options === undefined) {
-    options = {
-      strict: true,
-      parseAllBytes: true,
-      decodeBitStrings: true,
-    }
+export function fromDer(bytes: ByteStringBuffer | string, options?: DerOptions | boolean): Asn1Object {
+  const opts: DerOptions = {
+    strict: true,
+    parseAllBytes: true,
+    decodeBitStrings: true,
   }
+
   if (typeof options === 'boolean') {
-    options = {
-      strict: options,
-      parseAllBytes: true,
-      decodeBitStrings: true,
-    }
+    opts.strict = options
   }
-  if (!('strict' in options)) {
-    options.strict = true
-  }
-  if (!('parseAllBytes' in options)) {
-    options.parseAllBytes = true
-  }
-  if (!('decodeBitStrings' in options)) {
-    options.decodeBitStrings = true
+  else if (options) {
+    Object.assign(opts, options)
   }
 
   // wrap in buffer if needed
-  if (typeof bytes === 'string') {
-    bytes = createBuffer(bytes)
-  }
+  const buffer = typeof bytes === 'string' ? createBuffer(bytes) : bytes
 
-  const byteCount = bytes.length()
-  const value = _fromDer(bytes, bytes.length(), 0, options)
-  if (options.parseAllBytes && bytes.length() !== 0) {
-    const error = new Error('Unparsed DER bytes remain after ASN.1 parsing.')
+  const byteCount = buffer.length()
+  const value = _fromDer(buffer, buffer.length(), 0, opts)
+  if (opts.parseAllBytes && buffer.length() !== 0) {
+    const error = new Error('Unparsed DER bytes remain after ASN.1 parsing.') as ExtendedError
     error.byteCount = byteCount
-    error.remaining = bytes.length()
+    error.remaining = buffer.length()
     throw error
   }
   return value
@@ -473,7 +491,7 @@ export function fromDer(bytes: any, options: any): Asn1 {
  *
  * @return the parsed asn1 object.
  */
-function _fromDer(bytes: any, remaining: number, depth: number, options: any): Asn1 {
+function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, options: DerOptions): Asn1Object {
   // temporary storage for consumption calculations
   let start
 
@@ -855,16 +873,13 @@ export function derToOid(bytes: any): string {
  */
 export function utcTimeToDate(utc: string): Date {
   /* The following formats can be used:
-
     YYMMDDhhmmZ
     YYMMDDhhmm+hh'mm'
     YYMMDDhhmm-hh'mm'
     YYMMDDhhmmssZ
     YYMMDDhhmmss+hh'mm'
     YYMMDDhhmmss-hh'mm'
-
     Where:
-
     YY is the least significant two digits of the year
     MM is the month (01 to 12)
     DD is the day (01 to 31)
@@ -885,12 +900,13 @@ export function utcTimeToDate(utc: string): Date {
   const hh = Number.parseInt(utc.substr(6, 2), 10)
   const mm = Number.parseInt(utc.substr(8, 2), 10)
   let ss = 0
+  let end = 0
 
   // not just YYMMDDhhmmZ
   if (utc.length > 11) {
     // get character after minutes
     var c = utc.charAt(10)
-    var end = 10
+    end = 10
 
     // see if seconds are present
     if (c !== '+' && c !== '-') {
@@ -938,7 +954,6 @@ export function utcTimeToDate(utc: string): Date {
  */
 export function generalizedTimeToDate(gentime: string): Date {
   /* The following formats can be used:
-
     YYYYMMDDHHMMSS
     YYYYMMDDHHMMSS.fff
     YYYYMMDDHHMMSSZ
@@ -947,9 +962,7 @@ export function generalizedTimeToDate(gentime: string): Date {
     YYYYMMDDHHMMSS.fff+hh'mm'
     YYYYMMDDHHMMSS-hh'mm'
     YYYYMMDDHHMMSS.fff-hh'mm'
-
     Where:
-
     YYYY is the year
     MM is the month (01 to 12)
     DD is the day (01 to 31)
@@ -1098,21 +1111,30 @@ export function dateToGeneralizedTime(date: Date): string {
  *
  * @return the byte buffer.
  */
-export function integerToDer(x: number): Buffer {
+export function integerToDer(x: number): ByteStringBuffer {
   const rval = createBuffer()
   if (x >= -0x80 && x < 0x80)
-    return rval.putSignedInt(x, 8)
+    return rval.putByte(x)
 
-  if (x >= -0x8000 && x < 0x8000)
-    return rval.putSignedInt(x, 16)
+  if (x >= -0x8000 && x < 0x8000) {
+    rval.putByte((x >> 8) & 0xFF)
+    return rval.putByte(x & 0xFF)
+  }
 
-  if (x >= -0x800000 && x < 0x800000)
-    return rval.putSignedInt(x, 24)
+  if (x >= -0x800000 && x < 0x800000) {
+    rval.putByte((x >> 16) & 0xFF)
+    rval.putByte((x >> 8) & 0xFF)
+    return rval.putByte(x & 0xFF)
+  }
 
-  if (x >= -0x80000000 && x < 0x80000000)
-    return rval.putSignedInt(x, 32)
+  if (x >= -0x80000000 && x < 0x80000000) {
+    rval.putByte((x >> 24) & 0xFF)
+    rval.putByte((x >> 16) & 0xFF)
+    rval.putByte((x >> 8) & 0xFF)
+    return rval.putByte(x & 0xFF)
+  }
 
-  const error = new Error('Integer too large; max is 32-bits.')
+  const error = new Error('Integer too large; max is 32-bits.') as ExtendedError
   error.integer = x
   throw error
 }
