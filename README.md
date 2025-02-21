@@ -69,19 +69,19 @@ After installing the package, you can import and use the various cryptographic f
 ```ts
 import {
   aes,
+  ed25519,
+  hmac,
+  pki,
+  random,
+  rsa,
   sha256,
   sha512,
-  random,
-  hmac,
-  rsa,
-  ed25519,
-  pki,
   tls
 } from 'ts-security'
 
 // AES Encryption
 const cipher = aes.createCipher('AES-GCM', key)
-cipher.start({ iv: iv })
+cipher.start({ iv })
 cipher.update(data)
 const encrypted = cipher.finish()
 
