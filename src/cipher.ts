@@ -195,11 +195,19 @@ export class BlockCipher {
   }
 
   /**
-   * Updates the next block according to the cipher mode.
+   * Updates the cipher with data to encrypt/decrypt.
    *
-   * @param input the buffer to read from.
+   * @param input the data to encrypt/decrypt as a string or byte buffer.
    */
   update(input?: any): void {
+    if (!this._input) {
+      this._input = createBuffer()
+    }
+
+    if (!this.output) {
+      this.output = createBuffer()
+    }
+
     if (input) {
       // input given, so empty it into the input buffer
       this._input.putBuffer(input)
@@ -222,15 +230,19 @@ export class BlockCipher {
    * @return true if successful, false on error.
    */
   finish(pad?: (blockSize: number, buffer: any, decrypt: boolean) => boolean): boolean {
+    if (!this._input) {
+      this._input = createBuffer()
+    }
+
+    if (!this.output) {
+      this.output = createBuffer()
+    }
+
     // backwards-compatibility w/deprecated padding API
     // Note: will overwrite padding functions even after another start() call
     if (pad && (this.mode.name === 'ECB' || this.mode.name === 'CBC')) {
-      this.mode.pad = (input: any): boolean => {
-        return pad(this.blockSize, input, false)
-      }
-      this.mode.unpad = (output: any): boolean => {
-        return pad(this.blockSize, output, true)
-      }
+      this.mode.pad = (input: any, options: CipherOptions) => pad(this.blockSize, input, options.decrypt)
+      this.mode.unpad = (output: any, options: CipherOptions) => pad(this.blockSize, output, options.decrypt)
     }
 
     // build options for padding and afterFinish functions
