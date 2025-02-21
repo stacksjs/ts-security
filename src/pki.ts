@@ -6,40 +6,8 @@
  *
  * Copyright (c) 2010-2013 Digital Bazaar, Inc.
  */
-const forge = require('./forge')
-require('./asn1')
-require('./oids')
-require('./pbe')
-require('./pem')
-require('./pbkdf2')
-require('./pkcs12')
-require('./pss')
-require('./rsa')
-require('./util')
-require('./x509')
-
-// shortcut for asn.1 API
-const asn1 = forge.asn1
-
-/* Public Key Infrastructure (PKI) implementation. */
-const pki = module.exports = forge.pki = forge.pki || {}
-
-/**
- * NOTE: THIS METHOD IS DEPRECATED. Use pem.decode() instead.
- *
- * Converts PEM-formatted data to DER.
- *
- * @param pem the PEM-formatted data.
- *
- * @return the DER-formatted data.
- */
-pki.pemToDer = function (pem) {
-  const msg = forge.pem.decode(pem)[0]
-  if (msg.procType && msg.procType.type === 'ENCRYPTED') {
-    throw new Error('Could not convert PEM to DER; PEM is encrypted.')
-  }
-  return forge.util.createBuffer(msg.body)
-}
+import { asn1 } from './asn1'
+import { pem } from './pem'
 
 /**
  * Converts an RSA private key from PEM format.
@@ -48,8 +16,8 @@ pki.pemToDer = function (pem) {
  *
  * @return the private key.
  */
-pki.privateKeyFromPem = function (pem) {
-  const msg = forge.pem.decode(pem)[0]
+export function privateKeyFromPem(pem: string) {
+  const msg = pem.decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
     const error = new Error('Could not convert private key from PEM; PEM '
@@ -57,9 +25,9 @@ pki.privateKeyFromPem = function (pem) {
     error.headerType = msg.type
     throw error
   }
-  if (msg.procType && msg.procType.type === 'ENCRYPTED') {
+
+  if (msg.procType && msg.procType.type === 'ENCRYPTED')
     throw new Error('Could not convert private key from PEM; PEM is encrypted.')
-  }
 
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body)
@@ -75,13 +43,14 @@ pki.privateKeyFromPem = function (pem) {
  *
  * @return the PEM-formatted private key.
  */
-pki.privateKeyToPem = function (key, maxline) {
+export function privateKeyToPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PRIVATE KEY',
-    body: asn1.toDer(pki.privateKeyToAsn1(key)).getBytes(),
+    body: asn1.toDer(privateKeyToAsn1(key)).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }
 
 /**
@@ -92,11 +61,12 @@ pki.privateKeyToPem = function (key, maxline) {
  *
  * @return the PEM-formatted private key.
  */
-pki.privateKeyInfoToPem = function (pki, maxline) {
+export function privateKeyInfoToPem(pki: any, maxline: number): string {
   // convert to DER, then PEM-encode
   const msg = {
     type: 'PRIVATE KEY',
     body: asn1.toDer(pki).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }

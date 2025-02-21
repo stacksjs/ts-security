@@ -26,11 +26,35 @@
  *
  * body: the binary-encoded body.
  */
-const forge = require('./forge')
-require('./util')
+import { encode64, decode64 } from './utils'
 
-// shortcut for pem API
-const pem = module.exports = forge.pem = forge.pem || {}
+interface ProcType {
+  version: string
+  type: string
+}
+
+interface DekInfo {
+  algorithm: string
+  parameters: string | null
+}
+
+interface PemHeader {
+  name: string
+  values: string[]
+}
+
+interface PemMessage {
+  type: string
+  procType: ProcType | null
+  contentDomain: string | null
+  dekInfo: DekInfo | null
+  headers: PemHeader[]
+  body: string
+}
+
+interface PemOptions {
+  maxline?: number
+}
 
 /**
  * Encodes (serializes) the given PEM object.
@@ -41,12 +65,11 @@ const pem = module.exports = forge.pem = forge.pem || {}
  *
  * @return the PEM-formatted string.
  */
-pem.encode = function (msg, options) {
-  options = options || {}
+export function encode(msg: PemMessage, options: PemOptions = {}): string {
   let rval = `-----BEGIN ${msg.type}-----\r\n`
 
   // encode special headers
-  let header
+  let header: PemHeader
   if (msg.procType) {
     header = {
       name: 'Proc-Type',
@@ -79,9 +102,10 @@ pem.encode = function (msg, options) {
   }
 
   // add body
-  rval += `${forge.util.encode64(msg.body, options.maxline || 64)}\r\n`
+  rval += `${encode64(msg.body, options.maxline || 64)}\r\n`
 
   rval += `-----END ${msg.type}-----\r\n`
+
   return rval
 }
 
@@ -92,41 +116,35 @@ pem.encode = function (msg, options) {
  *
  * @return the PEM message objects in an array.
  */
-pem.decode = function (str) {
-  const rval = []
+export function decode(str: string): PemMessage[] {
+  const rval: PemMessage[] = []
 
   // split string into PEM messages (be lenient w/EOF on BEGIN line)
   const rMessage = /\s*-----BEGIN ([A-Z0-9- ]+)-----\r?\n?([\x21-\x7E\s]+?\r?\n\r?\n)?([:A-Za-z0-9+/=\s]+)-----END \1-----/g
   const rHeader = /([\x21-\x7E]+):\s*([\x21-\x7E\s]+)/
   const rCRLF = /\r?\n/
-  let match
+  let match: RegExpExecArray | null
   while (true) {
     match = rMessage.exec(str)
-    if (!match) {
-      break
-    }
+    if (!match) break
 
     // accept "NEW CERTIFICATE REQUEST" as "CERTIFICATE REQUEST"
-    // https://datatracker.ietf.org/doc/html/rfc7468#section-7
     let type = match[1]
-    if (type === 'NEW CERTIFICATE REQUEST') {
+    if (type === 'NEW CERTIFICATE REQUEST')
       type = 'CERTIFICATE REQUEST'
-    }
 
-    const msg = {
+    const msg: PemMessage = {
       type,
       procType: null,
       contentDomain: null,
       dekInfo: null,
       headers: [],
-      body: forge.util.decode64(match[3]),
+      body: decode64(match[3]),
     }
     rval.push(msg)
 
     // no headers
-    if (!match[2]) {
-      continue
-    }
+    if (!match[2]) continue
 
     // parse headers
     const lines = match[2].split(rCRLF)
@@ -138,18 +156,16 @@ pem.decode = function (str) {
       // RFC2822 unfold any following folded lines
       for (let nl = li + 1; nl < lines.length; ++nl) {
         const next = lines[nl]
-        if (!/\s/.test(next[0])) {
-          break
-        }
+        if (!/\s/.test(next[0])) break
         line += next
         li = nl
       }
 
       // parse header
-      match = line.match(rHeader)
-      if (match) {
-        const header = { name: match[1], values: [] }
-        const values = match[2].split(',')
+      const headerMatch = line.match(rHeader)
+      if (headerMatch) {
+        const header: PemHeader = { name: headerMatch[1], values: [] }
+        const values = headerMatch[2].split(',')
         for (let vi = 0; vi < values.length; ++vi) {
           header.values.push(ltrim(values[vi]))
         }
@@ -182,11 +198,10 @@ pem.decode = function (str) {
           msg.headers.push(header)
         }
       }
-
       ++li
     }
 
-    if (msg.procType === 'ENCRYPTED' && !msg.dekInfo) {
+    if (msg.procType?.type === 'ENCRYPTED' && !msg.dekInfo) {
       throw new Error('Invalid PEM formatted message. The "DEK-Info" '
         + 'header must be present if "Proc-Type" is "ENCRYPTED".')
     }
@@ -199,23 +214,26 @@ pem.decode = function (str) {
   return rval
 }
 
-function foldHeader(header) {
+function foldHeader(header: PemHeader): string {
   let rval = `${header.name}: `
 
   // ensure values with CRLF are folded
-  const values = []
-  const insertSpace = function (match, $1) {
+  const values: string[] = []
+  const insertSpace = function (_match: string, $1: string): string {
     return ` ${$1}`
   }
-  for (var i = 0; i < header.values.length; ++i) {
+
+  for (let i = 0; i < header.values.length; ++i) {
     values.push(header.values[i].replace(/^(\S+\r\n)/, insertSpace))
   }
+
   rval += `${values.join(',')}\r\n`
 
   // do folding
   let length = 0
   let candidate = -1
-  for (var i = 0; i < rval.length; ++i, ++length) {
+
+  for (let i = 0; i < rval.length; ++i, ++length) {
     if (length > 65 && candidate !== -1) {
       const insert = rval[candidate]
       if (insert === ',') {
@@ -223,8 +241,7 @@ function foldHeader(header) {
         rval = `${rval.substr(0, candidate)}\r\n ${rval.substr(candidate)}`
       }
       else {
-        rval = `${rval.substr(0, candidate)
-        }\r\n${insert}${rval.substr(candidate + 1)}`
+        rval = `${rval.substr(0, candidate)}\r\n${insert}${rval.substr(candidate + 1)}`
       }
       length = (i - candidate - 1)
       candidate = -1
@@ -238,6 +255,16 @@ function foldHeader(header) {
   return rval
 }
 
-function ltrim(str) {
+function ltrim(str: string): string {
   return str.replace(/^\s+/, '')
+}
+
+export interface Pem {
+  encode: (msg: PemMessage, options?: PemOptions) => string
+  decode: (str: string) => PemMessage[]
+}
+
+export const pem: Pem = {
+  encode: encode,
+  decode: decode,
 }

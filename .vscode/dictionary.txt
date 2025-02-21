@@ -34,6 +34,8 @@ Keypair
 localtunnels
 lockb
 Longley
+ltrim
+maxline
 Millis
 mkcert
 oids
