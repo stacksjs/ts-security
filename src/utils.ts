@@ -677,33 +677,105 @@ export function bytesToHex(bytes: string): string {
 // base64 characters, reverse mapping
 const _base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
 const _base64Idx = [
-  /*43 -43 = 0*/
-  /*'+',  1,  2,  3,'/' */
-  62, -1, -1, -1, 63,
+  /* 43 -43 = 0 */
+  /* '+',  1,  2,  3,'/' */
+  62,
+  -1,
+  -1,
+  -1,
+  63,
 
-  /*'0','1','2','3','4','5','6','7','8','9' */
-  52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+  /* '0','1','2','3','4','5','6','7','8','9' */
+  52,
+  53,
+  54,
+  55,
+  56,
+  57,
+  58,
+  59,
+  60,
+  61,
 
-  /*15, 16, 17,'=', 19, 20, 21 */
-  -1, -1, -1, 64, -1, -1, -1,
+  /* 15, 16, 17,'=', 19, 20, 21 */
+  -1,
+  -1,
+  -1,
+  64,
+  -1,
+  -1,
+  -1,
 
-  /*65 - 43 = 22*/
-  /*'A','B','C','D','E','F','G','H','I','J','K','L','M', */
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+  /* 65 - 43 = 22 */
+  /* 'A','B','C','D','E','F','G','H','I','J','K','L','M', */
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
 
-  /*'N','O','P','Q','R','S','T','U','V','W','X','Y','Z' */
-  13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+  /* 'N','O','P','Q','R','S','T','U','V','W','X','Y','Z' */
+  13,
+  14,
+  15,
+  16,
+  17,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  24,
+  25,
 
-  /*91 - 43 = 48 */
-  /*48, 49, 50, 51, 52, 53 */
-  -1, -1, -1, -1, -1, -1,
+  /* 91 - 43 = 48 */
+  /* 48, 49, 50, 51, 52, 53 */
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
+  -1,
 
-  /*97 - 43 = 54*/
-  /*'a','b','c','d','e','f','g','h','i','j','k','l','m' */
-  26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+  /* 97 - 43 = 54 */
+  /* 'a','b','c','d','e','f','g','h','i','j','k','l','m' */
+  26,
+  27,
+  28,
+  29,
+  30,
+  31,
+  32,
+  33,
+  34,
+  35,
+  36,
+  37,
+  38,
 
-  /*'n','o','p','q','r','s','t','u','v','w','x','y','z' */
-  39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+  /* 'n','o','p','q','r','s','t','u','v','w','x','y','z' */
+  39,
+  40,
+  41,
+  42,
+  43,
+  44,
+  45,
+  46,
+  47,
+  48,
+  49,
+  50,
+  51,
 ]
 
 /**
@@ -721,13 +793,13 @@ export function encode64(input: string, maxline?: number): string {
   let i = 0
 
   while (i < input.length) {
-    chr1 = input.charCodeAt(i++);
-    chr2 = input.charCodeAt(i++);
-    chr3 = input.charCodeAt(i++);
+    chr1 = input.charCodeAt(i++)
+    chr2 = input.charCodeAt(i++)
+    chr3 = input.charCodeAt(i++)
 
     // encode 4 character group
-    line += _base64.charAt(chr1 >> 2);
-    line += _base64.charAt(((chr1 & 3) << 4) | (chr2 >> 4));
+    line += _base64.charAt(chr1 >> 2)
+    line += _base64.charAt(((chr1 & 3) << 4) | (chr2 >> 4))
     if (Number.isNaN(chr2)) {
       line += '=='
     }
@@ -737,7 +809,7 @@ export function encode64(input: string, maxline?: number): string {
     }
 
     if (maxline && line.length > maxline) {
-      output += line.substring(0, maxline) + '\r\n'
+      output += `${line.substring(0, maxline)}\r\n`
       line = line.substring(maxline)
     }
   }
@@ -758,25 +830,25 @@ export function decode64(input: string): string {
   // TODO: deprecate: "Deprecated. Use util.binary.base64.decode instead."
 
   // remove all non-base64 characters
-  input = input.replace(/[^A-Za-z0-9\+\/\=]/g, '');
+  input = input.replace(/[^A-Z0-9+/=]/gi, '')
 
   let output = ''
   let enc1, enc2, enc3, enc4
   let i = 0
 
   while (i < input.length) {
-    enc1 = _base64Idx[input.charCodeAt(i++) - 43];
-    enc2 = _base64Idx[input.charCodeAt(i++) - 43];
-    enc3 = _base64Idx[input.charCodeAt(i++) - 43];
-    enc4 = _base64Idx[input.charCodeAt(i++) - 43];
+    enc1 = _base64Idx[input.charCodeAt(i++) - 43]
+    enc2 = _base64Idx[input.charCodeAt(i++) - 43]
+    enc3 = _base64Idx[input.charCodeAt(i++) - 43]
+    enc4 = _base64Idx[input.charCodeAt(i++) - 43]
 
-    output += String.fromCharCode((enc1 << 2) | (enc2 >> 4));
+    output += String.fromCharCode((enc1 << 2) | (enc2 >> 4))
     if (enc3 !== 64) {
       // decoded at least 2 bytes
-      output += String.fromCharCode(((enc2 & 15) << 4) | (enc3 >> 2));
+      output += String.fromCharCode(((enc2 & 15) << 4) | (enc3 >> 2))
       if (enc4 !== 64) {
         // decoded 3 bytes
-        output += String.fromCharCode(((enc3 & 3) << 6) | enc4);
+        output += String.fromCharCode(((enc3 & 3) << 6) | enc4)
       }
     }
   }
@@ -795,51 +867,219 @@ export function hexToBytes(hex: string): string {
   // TODO: deprecate: "Deprecated. Use util.binary.hex.decode instead."
   let rval = ''
   let i = 0
-  if (hex.length & 1 === 1) {
+  if ((hex.length & 1) === 1) {
     // odd number of characters, convert first character alone
     i = 1
-    rval += String.fromCharCode(parseInt(hex[0], 16))
+    rval += String.fromCharCode(Number.parseInt(hex[0], 16))
   }
 
   // convert 2 characters (1 byte) at a time
-  for (; i < hex.length; i += 2)
-    rval += String.fromCharCode(parseInt(hex.substr(i, 2), 16))
+  for (; i < hex.length; i += 2) {
+    rval += String.fromCharCode(Number.parseInt(hex.substr(i, 2), 16))
+  }
 
   return rval
 }
 
-export const util: {
-  encode64: (input: string, maxline?: number) => string
-  decode64: (input: string) => string
-  encodeUtf8: (str: string) => string
-  decodeUtf8: (bytes: string) => string
-  isArrayBuffer: (x: any) => boolean
-  isArrayBufferView: (x: any) => boolean
+/**
+ * Estimates the number of processes that can be run concurrently. If
+ * creating Web Workers, keep in mind that the main JavaScript process needs
+ * its own core.
+ *
+ * @param options the options to use: update true to force an update (not use the cached value).
+ * @param callback(err, max) called once the operation completes.
+ */
+export function estimateCores(options: any, callback: any): void {
+  if (typeof options === 'function') {
+    callback = options
+    options = {}
+  }
+
+  options = options || {}
+
+  if ('cores' in util && options?.update !== true)
+    return callback(null, util.cores)
+
+  if (typeof navigator !== 'undefined'
+    && 'hardwareConcurrency' in navigator
+    && navigator.hardwareConcurrency > 0) {
+    util.cores = navigator.hardwareConcurrency
+    return callback(null, util.cores)
+  }
+
+  if (typeof Worker === 'undefined') {
+    // workers not available
+    util.cores = 1
+    return callback(null, util.cores)
+  }
+
+  if (typeof Blob === 'undefined') {
+    // can't estimate, default to 2
+    util.cores = 2
+    return callback(null, util.cores)
+  }
+
+  // create worker concurrency estimation code as blob
+  const blobUrl = URL.createObjectURL(new Blob(['(', function () {
+    self.addEventListener('message', (e) => {
+      // run worker for 4 ms
+      const st = Date.now()
+      const et = st + 4
+      while (Date.now() < et);
+      self.postMessage({ st, et })
+    })
+  }.toString(), ')()'], { type: 'application/javascript' }))
+
+  // take 5 samples using 16 workers
+  sample([], 5, 16)
+
+  function sample(max: number[], samples: number, numWorkers: number) {
+    if (samples === 0) {
+      // get overlap average
+      const avg = Math.floor(max.reduce((acc: number, x: number) => acc + x, 0) / max.length)
+      util.cores = Math.max(1, avg)
+      URL.revokeObjectURL(blobUrl)
+      return callback(null, util.cores)
+    }
+
+    map(numWorkers, (err: Error | null, results: any[]) => {
+      max.push(reduce(numWorkers, results))
+      sample(max, samples - 1, numWorkers)
+    })
+  }
+
+  function map(numWorkers: number, callback: (err: Error | null, results: any[]) => void) {
+    const workers: Worker[] = []
+    const results: any[] = []
+
+    for (let i = 0; i < numWorkers; ++i) {
+      const worker = new Worker(blobUrl)
+      workers.push(worker)
+      worker.addEventListener('message', (e: MessageEvent<any>) => {
+        results.push(e.data)
+        if (results.length === numWorkers) {
+          for (let i = 0; i < numWorkers; ++i) {
+            workers[i].terminate()
+          }
+          callback(null, results)
+        }
+      })
+      worker.postMessage(i)
+    }
+  }
+
+  function reduce(numWorkers: number, results: any[]) {
+    // find overlapping time windows
+    const overlaps: number[] = []
+    for (let n = 0; n < numWorkers; ++n) {
+      const r1 = results[n]
+      for (let i = 0; i < numWorkers; ++i) {
+        if (n === i) {
+          continue
+        }
+        const r2 = results[i]
+        if ((r1.st > r2.st && r1.st < r2.et)
+          || (r2.st > r1.st && r2.st < r1.et)) {
+          overlaps.push(i)
+        }
+      }
+    }
+    return overlaps.length
+  }
+}
+
+export interface Util {
+  cores?: number
   isServer: boolean
   globalScope: typeof globalThis
-  fillString: (c: string, n: number) => string
-  bytesToHex: (bytes: string) => string
-  createBuffer: (input?: string, encoding?: string) => ByteStringBuffer
-  ByteBuffer: typeof ByteStringBuffer
+  encode64: typeof encode64
+  decode64: typeof decode64
+  encodeUtf8: typeof encodeUtf8
+  decodeUtf8: typeof decodeUtf8
+  isArrayBuffer: typeof isArrayBuffer
+  isArrayBufferView: typeof isArrayBufferView
   ByteStringBuffer: typeof ByteStringBuffer
-  _checkBitsParam: (n: number) => void
-  hexToBytes: (hex: string) => string
-} = {
+  fillString: typeof fillString
+  hexToBytes: typeof hexToBytes
+  bytesToHex: typeof bytesToHex
+  createBuffer: typeof createBuffer
+  _checkBitsParam: typeof _checkBitsParam
+}
+
+export const util: Util = {
+  isServer,
+  globalScope: (() => {
+    if (typeof globalThis !== 'undefined')
+      return globalThis
+    if (typeof global !== 'undefined')
+      return global as unknown as typeof globalThis
+    if (typeof self !== 'undefined')
+      return (self as unknown) as typeof globalThis
+    if (typeof window !== 'undefined')
+      return (window as unknown) as typeof globalThis
+    return (Object.create(null) as unknown) as typeof globalThis
+  })(),
   encode64,
   decode64,
   encodeUtf8,
   decodeUtf8,
   isArrayBuffer,
   isArrayBufferView,
-  isServer,
-  globalScope,
+  ByteStringBuffer,
   fillString,
+  hexToBytes,
   bytesToHex,
   createBuffer,
-  ByteBuffer,
-  ByteStringBuffer,
   _checkBitsParam,
-  hexToBytes,
 }
 
 export default util
+
+// Add proper type declarations for global objects
+declare global {
+  var self: WorkerGlobalScope
+  var window: Window
+
+  interface Window {
+    msCrypto?: {
+      subtle: {
+        generateKey: Function
+        exportKey: Function
+      }
+    }
+    crypto: {
+      subtle: {
+        generateKey: Function
+        exportKey: Function
+      }
+    }
+  }
+
+  interface WorkerGlobalScope {
+    msCrypto?: Window['msCrypto']
+    crypto: Window['crypto']
+    addEventListener(type: 'message', listener: (e: MessageEvent<any>) => void): void
+    postMessage(message: any): void
+  }
+
+  interface Worker {
+    addEventListener(type: 'message', listener: (e: MessageEvent<any>) => void): void
+    postMessage(message: any): void
+    terminate(): void
+  }
+}
+
+// Update type checking for crypto availability
+function _detectSubtleCrypto(fn: string): boolean {
+  return !!(typeof util.globalScope !== 'undefined'
+    && typeof util.globalScope.crypto === 'object'
+    && typeof util.globalScope.crypto.subtle === 'object'
+    && typeof util.globalScope.crypto.subtle[fn as keyof SubtleCrypto] === 'function')
+}
+
+function _detectSubtleMsCrypto(fn: string): boolean {
+  return !!(typeof util.globalScope !== 'undefined'
+    && typeof (util.globalScope as any).msCrypto === 'object'
+    && typeof (util.globalScope as any).msCrypto.subtle === 'object'
+    && typeof (util.globalScope as any).msCrypto.subtle[fn] === 'function')
+}

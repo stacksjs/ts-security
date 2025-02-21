@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2010-2015 Digital Bazaar, Inc.
  */
-import { createBuffer, fillString, ByteStringBuffer, encodeUtf8 } from './utils'
+import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
 
 interface MessageDigest {
   algorithm: string
@@ -44,7 +44,7 @@ export function create(): MessageDigest {
   let _input = createBuffer()
 
   // used for word storage
-  const _w: number[] = new Array(80).fill(0)
+  const _w: number[] = Array.from({ length: 80 }).fill(0)
 
   // message digest object
   const md: MessageDigest = {
@@ -101,7 +101,7 @@ export function create(): MessageDigest {
       }
 
       // update message length
-      let len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
+      const len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
       md.messageLength += len
       const lenArr = [Math.floor(len / 0x100000000), len >>> 0]
       for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
@@ -158,8 +158,8 @@ export function create(): MessageDigest {
 
       // compute remaining size to be digested (include message length size)
       const remaining = (
-        md.fullMessageLength[md.fullMessageLength.length - 1] +
-        md.messageLengthSize)
+        md.fullMessageLength[md.fullMessageLength.length - 1]
+        + md.messageLengthSize)
 
       // add padding for overflow blockSize - overflow
       // _padding starts with 1 byte with first bit is set (byte value 128), then

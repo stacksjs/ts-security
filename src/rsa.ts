@@ -62,12 +62,12 @@
  * The OID for the RSA key algorithm is: 1.2.840.113549.1.1.1
  */
 
-import { BigInteger } from './jsbn'
-import util, { isServer } from './utils'
 import type { Asn1Object } from './asn1'
 import { asn1 } from './asn1'
+import { BigInteger } from './jsbn'
 import { oids } from './oids'
 import { getBytes, random } from './random'
+import util, { isServer } from './utils'
 
 const _crypto = isServer ? require('node:crypto') : null
 
@@ -1076,11 +1076,14 @@ pki.rsa.generateKeyPair = function (bits, e, options, callback) {
   }
 
   // use JavaScript implementation
-  const state = pki.rsa.createKeyPairGenerationState(bits, e, options)
+  const state = createKeyPairGenerationState(bits, e, options)
+
   if (!callback) {
-    pki.rsa.stepKeyPairGenerationState(state, 0)
+    stepKeyPairGenerationState(state, 0)
+
     return state.keys
   }
+
   _generateKeyPair(state, options, callback)
 }
 
@@ -1092,7 +1095,10 @@ pki.rsa.generateKeyPair = function (bits, e, options, callback) {
  *
  * @return the public key.
  */
-export function setPublicKey(n: BigInteger, e: BigInteger) {
+export function setPublicKey(n: BigInteger, e: BigInteger): {
+  n: BigInteger
+  e: BigInteger
+} {
   const key = {
     n,
     e,
@@ -1302,15 +1308,15 @@ export function setPrivateKey(
   dQ: BigInteger,
   qInv: BigInteger,
 ): {
-  n: BigInteger
-  e: BigInteger
-  d: BigInteger
-  p: BigInteger
-  q: BigInteger
-  dP: BigInteger
-  dQ: BigInteger
-  qInv: BigInteger
-} {
+    n: BigInteger
+    e: BigInteger
+    d: BigInteger
+    p: BigInteger
+    q: BigInteger
+    dP: BigInteger
+    dQ: BigInteger
+    qInv: BigInteger
+  } {
   const key = {
     n,
     e,
@@ -1483,7 +1489,7 @@ pki.privateKeyFromAsn1 = function (obj) {
   qInv = util.createBuffer(capture.privateKeyCoefficient).toHex()
 
   // set private key
-  return pki.setRsaPrivateKey(
+  return setRsaPrivateKey(
     new BigInteger(n, 16),
     new BigInteger(e, 16),
     new BigInteger(d, 16),
@@ -1599,7 +1605,10 @@ pki.publicKeyToAsn1 = pki.publicKeyToSubjectPublicKeyInfo = function (key) {
  *
  * @return the asn1 representation of a RSAPublicKey.
  */
-pki.publicKeyToRSAPublicKey = function (key) {
+function publicKeyToRSAPublicKey(key: {
+  n: BigInteger
+  e: BigInteger
+}): Asn1Object {
   // RSAPublicKey
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // modulus (n)
@@ -1619,7 +1628,10 @@ pki.publicKeyToRSAPublicKey = function (key) {
  *
  * @return the padded byte buffer.
  */
-function _encodePkcs1_v1_5(m, key, bt) {
+function _encodePkcs1_v1_5(m: string, key: {
+  n: BigInteger
+  e: BigInteger
+}, bt: number) {
   const eb = util.createBuffer()
 
   // get the length of the modulus in bytes
@@ -1780,7 +1792,7 @@ function _decodePkcs1_v1_5(em: any, key: any, pub: boolean, ml?: number) {
  *            (default: 100).
  * @param callback(err, keypair) called once the operation completes.
  */
-function _generateKeyPair(state, options, callback) {
+function _generateKeyPair(state: any, options: any, callback: any) {
   if (typeof options === 'function') {
     callback = options
     options = {}
@@ -1805,19 +1817,21 @@ function _generateKeyPair(state, options, callback) {
 
   function generate() {
     // find p and then q (done in series to simplify)
-    getPrime(state.pBits, (err, num) => {
+    getPrime(state.pBits, (err: any, num: any) => {
       if (err) {
         return callback(err)
       }
+
       state.p = num
       if (state.q !== null) {
         return finish(err, state.q)
       }
+
       getPrime(state.qBits, finish)
     })
   }
 
-  function getPrime(bits, callback) {
+  function getPrime(bits: number, callback: (err: any, num: any) => void) {
     forge.prime.generateProbablePrime(bits, opts, callback)
   }
 
@@ -2006,13 +2020,23 @@ function _intToUint8Array(x) {
   return buffer
 }
 
-function _privateKeyFromJwk(jwk) {
+function _privateKeyFromJwk(jwk: {
+  kty: string
+  n: string
+  e: string
+  d: string
+  p: string
+  q: string
+  dp: string
+  dq: string
+  qi: string
+}) {
   if (jwk.kty !== 'RSA') {
     throw new Error(
       `Unsupported key algorithm "${jwk.kty}"; algorithm must be "RSA".`,
     )
   }
-  return pki.setRsaPrivateKey(
+  return setRsaPrivateKey(
     _base64ToBigInt(jwk.n),
     _base64ToBigInt(jwk.e),
     _base64ToBigInt(jwk.d),

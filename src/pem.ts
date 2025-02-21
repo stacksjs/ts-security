@@ -26,7 +26,7 @@
  *
  * body: the binary-encoded body.
  */
-import { encode64, decode64 } from './utils'
+import { decode64, encode64 } from './utils'
 
 interface ProcType {
   version: string
@@ -126,7 +126,8 @@ export function decode(str: string): PemMessage[] {
   let match: RegExpExecArray | null
   while (true) {
     match = rMessage.exec(str)
-    if (!match) break
+    if (!match)
+      break
 
     // accept "NEW CERTIFICATE REQUEST" as "CERTIFICATE REQUEST"
     let type = match[1]
@@ -144,7 +145,8 @@ export function decode(str: string): PemMessage[] {
     rval.push(msg)
 
     // no headers
-    if (!match[2]) continue
+    if (!match[2])
+      continue
 
     // parse headers
     const lines = match[2].split(rCRLF)
@@ -156,7 +158,8 @@ export function decode(str: string): PemMessage[] {
       // RFC2822 unfold any following folded lines
       for (let nl = li + 1; nl < lines.length; ++nl) {
         const next = lines[nl]
-        if (!/\s/.test(next[0])) break
+        if (!/\s/.test(next[0]))
+          break
         line += next
         li = nl
       }
@@ -265,6 +268,6 @@ export interface Pem {
 }
 
 export const pem: Pem = {
-  encode: encode,
-  decode: decode,
+  encode,
+  decode,
 }

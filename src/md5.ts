@@ -8,7 +8,7 @@
 
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
 
-type MD5State = {
+interface MD5State {
   h0: number
   h1: number
   h2: number
@@ -52,7 +52,7 @@ function create(): MessageDigest {
   let _input = createBuffer()
 
   // used for word storage
-  const _w = new Array(16).fill(0)
+  const _w = Array.from({ length: 16 }).fill(0)
 
   // message digest object
   const md: MessageDigest = {
@@ -107,7 +107,7 @@ function create(): MessageDigest {
       }
 
       // update message length
-      let len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
+      const len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
       md.messageLength += len
       const lenArray: LengthArray = [Math.floor(len / 0x100000000) >>> 0, len >>> 0]
       for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
@@ -120,7 +120,8 @@ function create(): MessageDigest {
       // add bytes to input buffer
       if (msg instanceof ByteStringBuffer) {
         _input.putBytes(msg.bytes())
-      } else {
+      }
+      else {
         _input.putBytes(msg)
       }
 
@@ -151,8 +152,8 @@ function create(): MessageDigest {
 
       // compute remaining size to be digested (include message length size)
       const remaining = (
-        md.fullMessageLength[md.fullMessageLength.length - 1] +
-        md.messageLengthSize
+        md.fullMessageLength[md.fullMessageLength.length - 1]
+        + md.messageLengthSize
       )
 
       // add padding for overflow blockSize - overflow
@@ -210,18 +211,138 @@ function _init() {
 
   // g values
   _g.push(
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-    1, 6, 11, 0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12,
-    5, 8, 11, 14, 1, 4, 7, 10, 13, 0, 3, 6, 9, 12, 15, 2,
-    0, 7, 14, 5, 12, 3, 10, 1, 8, 15, 6, 13, 4, 11, 2, 9
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    1,
+    6,
+    11,
+    0,
+    5,
+    10,
+    15,
+    4,
+    9,
+    14,
+    3,
+    8,
+    13,
+    2,
+    7,
+    12,
+    5,
+    8,
+    11,
+    14,
+    1,
+    4,
+    7,
+    10,
+    13,
+    0,
+    3,
+    6,
+    9,
+    12,
+    15,
+    2,
+    0,
+    7,
+    14,
+    5,
+    12,
+    3,
+    10,
+    1,
+    8,
+    15,
+    6,
+    13,
+    4,
+    11,
+    2,
+    9,
   )
 
   // rounds table
   _r.push(
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-    5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
-    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+    7,
+    12,
+    17,
+    22,
+    7,
+    12,
+    17,
+    22,
+    7,
+    12,
+    17,
+    22,
+    7,
+    12,
+    17,
+    22,
+    5,
+    9,
+    14,
+    20,
+    5,
+    9,
+    14,
+    20,
+    5,
+    9,
+    14,
+    20,
+    5,
+    9,
+    14,
+    20,
+    4,
+    11,
+    16,
+    23,
+    4,
+    11,
+    16,
+    23,
+    4,
+    11,
+    16,
+    23,
+    4,
+    11,
+    16,
+    23,
+    6,
+    10,
+    15,
+    21,
+    6,
+    10,
+    15,
+    21,
+    6,
+    10,
+    15,
+    21,
+    6,
+    10,
+    15,
+    21,
   )
 
   // get the result of abs(sin(i + 1)) as a 32-bit integer

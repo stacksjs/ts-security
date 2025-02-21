@@ -8,7 +8,7 @@
  */
 import { asn1 } from './asn1'
 import { pem } from './pem'
-import { privateKeyToAsn1, privateKeyFromAsn1 } from './rsa'
+import { privateKeyFromAsn1, privateKeyToAsn1 } from './rsa'
 
 /**
  * Converts an RSA private key from PEM format.

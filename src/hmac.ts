@@ -8,9 +8,9 @@
  * Copyright (c) 2010-2012 Digital Bazaar, Inc. All rights reserved.
  */
 
-import { ByteStringBuffer, createBuffer } from "./utils"
+import { ByteStringBuffer, createBuffer } from './utils'
 
-type MessageDigest = {
+interface MessageDigest {
   start: () => MessageDigest
   update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
   digest: () => ByteStringBuffer
@@ -163,7 +163,7 @@ function create(): HMAC {
 
     digest() {
       return this.getMac()
-    }
+    },
   }
 
   return ctx
