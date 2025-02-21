@@ -517,7 +517,7 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
   // ensure there are enough bytes to get the value
   if (length !== undefined && length > remaining) {
     if (options.strict) {
-      const error = new Error('Too few bytes to read ASN.1 value.')
+      const error = new Error('Too few bytes to read ASN.1 value.') as ExtendedError
       error.available = bytes.length()
       error.remaining = remaining
       error.requested = length
@@ -530,7 +530,7 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
   // value storage
   let value
   // possible BIT STRING contents storage
-  let bitStringContents
+  let bitStringContents: string | undefined
 
   // constructed flag is bit 6 (32 = 0x20) of the first byte
   const constructed = ((b1 & 0x20) === 0x20)
@@ -565,7 +565,7 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
   // if a BIT STRING, save the contents including padding
   if (value === undefined && tagClass === asn1.Class.UNIVERSAL
     && type === asn1.Type.BITSTRING) {
-    bitStringContents = bytes.bytes(length)
+    bitStringContents = bytes.bytes(length || 0)
   }
 
   // determine if a non-constructed value should be decoded as a composed
@@ -573,25 +573,19 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
   // can be used this way.
   if (value === undefined && options.decodeBitStrings
     && tagClass === asn1.Class.UNIVERSAL
-    // FIXME: OCTET STRINGs not yet supported here
-    // .. other parts of forge expect to decode OCTET STRINGs manually
-    && (type === asn1.Type.BITSTRING /* || type === asn1.Type.OCTETSTRING */)
-    && length > 1) {
+    && type === asn1.Type.BITSTRING
+    && (length || 0) > 1) {
     // save read position
-    const savedRead = bytes.read
+    const savedRead = bytes.length()
     const savedRemaining = remaining
     let unused = 0
-    if (type === asn1.Type.BITSTRING) {
-      /* The first octet gives the number of bits by which the length of the
-        bit string is less than the next multiple of eight (this is called
-        the "number of unused bits").
 
-        The second and following octets give the value of the bit string
-        converted to an octet string. */
+    if (type === asn1.Type.BITSTRING) {
       _checkBufferLength(bytes, remaining, 1)
       unused = bytes.getByte()
       remaining--
     }
+
     // if all bits are used, maybe the BIT/OCTET STRING holds ASN.1 objs
     if (unused === 0) {
       try {
@@ -654,14 +648,8 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
     }
   }
 
-  // add BIT STRING contents if available
-  const asn1Options = bitStringContents === undefined
-    ? null
-    : {
-        bitStringContents,
-      }
-
   // create and return asn1 object
+  const asn1Options = bitStringContents !== undefined ? { bitStringContents } : undefined
   return asn1.create(tagClass, type, constructed, value, asn1Options)
 }
 
@@ -672,7 +660,7 @@ function _fromDer(bytes: ByteStringBuffer, remaining: number, depth: number, opt
  *
  * @return the buffer of bytes.
  */
-export function toDer(obj: any): Buffer {
+export function toDer(obj: Asn1Object): ByteStringBuffer {
   const bytes = createBuffer()
 
   // build the first byte
@@ -686,11 +674,11 @@ export function toDer(obj: any): Buffer {
   if ('bitStringContents' in obj) {
     useBitStringContents = true
     if (obj.original) {
-      useBitStringContents = asn1.equals(obj, obj.original)
+      useBitStringContents = asn1.equals(obj, obj.original, { includeBitStringContents: true })
     }
   }
 
-  if (useBitStringContents) {
+  if (useBitStringContents && obj.bitStringContents) {
     value.putBytes(obj.bitStringContents)
   }
   else if (obj.composed) {
@@ -706,16 +694,17 @@ export function toDer(obj: any): Buffer {
     }
 
     // add all of the child DER bytes together
-    for (var i = 0; i < obj.value.length; ++i) {
+    for (let i = 0; i < obj.value.length; ++i) {
       if (obj.value[i] !== undefined) {
-        value.putBuffer(asn1.toDer(obj.value[i]))
+        const derBytes = asn1.toDer(obj.value[i])
+        value.putBytes(derBytes.bytes())
       }
     }
   }
   else {
     // use asn1.value directly
     if (obj.type === asn1.Type.BMPSTRING) {
-      for (var i = 0; i < obj.value.length; ++i) {
+      for (let i = 0; i < obj.value.length; ++i) {
         value.putInt16(obj.value.charCodeAt(i))
       }
     }
@@ -766,13 +755,13 @@ export function toDer(obj: any): Buffer {
 
     // concatenate length bytes in reverse since they were generated
     // little endian and we need big endian
-    for (var i = lenBytes.length - 1; i >= 0; --i) {
+    for (let i = lenBytes.length - 1; i >= 0; --i) {
       bytes.putByte(lenBytes.charCodeAt(i))
     }
   }
 
   // concatenate value bytes
-  bytes.putBuffer(value)
+  bytes.putBytes(value.bytes())
   return bytes
 }
 
@@ -784,7 +773,7 @@ export function toDer(obj: any): Buffer {
  *
  * @return the byte buffer.
  */
-export function oidToDer(oid: string): Buffer {
+export function oidToDer(oid: string): ByteStringBuffer {
   // split OID into individual values
   const values = oid.split('.')
   const bytes = createBuffer()
@@ -1010,7 +999,7 @@ export function generalizedTimeToDate(gentime: string): Date {
 
   // check for second fraction
   if (gentime.charAt(14) === '.') {
-    fff = Number.parseFloat(gentime.substr(14), 10) * 1000
+    fff = Number.parseFloat(gentime.substr(14)) * 1000
   }
 
   if (isUTC) {
@@ -1377,7 +1366,7 @@ export function prettyPrint(obj: any, level: number, indentation: number): strin
       case asn1.Type.PRINTABLESTRING:
         rval += ' (Printable String)'
         break
-      case asn1.Type.IA5String:
+      case asn1.Type.IA5STRING:
         rval += ' (IA5String (ASCII))'
         break
       case asn1.Type.UTCTIME:
@@ -1459,10 +1448,9 @@ export function prettyPrint(obj: any, level: number, indentation: number): strin
       try {
         rval += decodeUtf8(obj.value)
       }
-      catch (e) {
-        if (e.message === 'URI malformed') {
-          rval
-            += `0x${bytesToHex(obj.value)} (malformed UTF8)`
+      catch (e: unknown) {
+        if (e instanceof Error && e.message === 'URI malformed') {
+          rval += `0x${bytesToHex(obj.value)} (malformed UTF8)`
         }
         else {
           throw e
@@ -1470,7 +1458,7 @@ export function prettyPrint(obj: any, level: number, indentation: number): strin
       }
     }
     else if (obj.type === asn1.Type.PRINTABLESTRING
-      || obj.type === asn1.Type.IA5String) {
+      || obj.type === asn1.Type.IA5STRING) {
       rval += obj.value
     }
     else if (_nonLatinRegex.test(obj.value)) {
@@ -1487,7 +1475,7 @@ export function prettyPrint(obj: any, level: number, indentation: number): strin
   return rval
 }
 
-interface Asn1 {
+export interface Asn1 {
   Class: typeof Class
   Type: typeof Type
   create: typeof create
@@ -1508,7 +1496,7 @@ interface Asn1 {
   toDer: typeof toDer
 }
 
-const asn1: Asn1 = {
+export const asn1: Asn1 = {
   Class,
   Type,
   create,

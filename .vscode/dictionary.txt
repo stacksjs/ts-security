@@ -21,6 +21,7 @@ destructurable
 dnsx
 dtsx
 entrypoints
+gentime
 GHASH
 heroicons
 httx

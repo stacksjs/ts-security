@@ -5,8 +5,8 @@
  */
 export class ByteStringBuffer {
   // Class properties
-  private data: string
-  private read: number
+  public data: string
+  public read: number
   private _constructedStringLength: number
 
   constructor(b?: string | ArrayBuffer | ArrayBufferView) {
