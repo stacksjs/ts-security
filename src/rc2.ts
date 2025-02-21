@@ -9,11 +9,16 @@
  * http://www.ietf.org/rfc/rfc2268.txt
  */
 
-import type { BlockCipher } from "./cipher";
+import { BlockCipher } from "./cipher";
+import type { Algorithm, CipherOptions } from "./cipher";
 import type { ByteStringBuffer } from "./utils";
 import { createBuffer } from "./utils";
 
-var piTable = [
+interface RC2Options extends CipherOptions {
+  bits?: number;
+}
+
+const piTable = [
   0xd9, 0x78, 0xf9, 0xc4, 0x19, 0xdd, 0xb5, 0xed, 0x28, 0xe9, 0xfd, 0x79, 0x4a, 0xa0, 0xd8, 0x9d,
   0xc6, 0x7e, 0x37, 0x83, 0x2b, 0x76, 0x53, 0x8e, 0x62, 0x4c, 0x64, 0x88, 0x44, 0x8b, 0xfb, 0xa2,
   0x17, 0x9a, 0x59, 0xf5, 0x87, 0xb3, 0x4f, 0x13, 0x61, 0x45, 0x6d, 0x8d, 0x09, 0x81, 0x7d, 0x32,
@@ -32,7 +37,7 @@ var piTable = [
   0xc5, 0xf3, 0xdb, 0x47, 0xe5, 0xa5, 0x9c, 0x77, 0x0a, 0xa6, 0x20, 0x68, 0xfe, 0x7f, 0xc1, 0xad
 ];
 
-var s = [1, 2, 3, 5];
+const s = [1, 2, 3, 5];
 
 /**
  * Rotate a word left by given number of bits.
@@ -69,32 +74,129 @@ function ror(word: number, bits: number): number {
  * @param effKeyBits number of effective key bits (default: 128)
  * @return the expanded RC2 key (ByteBuffer of 128 bytes)
  */
-function expandKey(key: string, effKeyBits: number): ByteStringBuffer {
-  if (typeof key === 'string')
-    key = createBuffer(key);
+function expandKey(key: string | ByteStringBuffer, effKeyBits?: number): ByteStringBuffer {
+  let keyBuffer: ByteStringBuffer;
+  if (typeof key === 'string') {
+    keyBuffer = createBuffer(key);
+  } else {
+    keyBuffer = key;
+  }
 
   effKeyBits = effKeyBits || 128;
 
   /* introduce variables that match the names used in RFC #2268 */
-  var L = key;
-  var T = key.length();
-  var T1 = effKeyBits;
-  var T8 = Math.ceil(T1 / 8);
-  var TM = 0xff >> (T1 & 0x07);
-  var i;
+  const L = keyBuffer;
+  const T = keyBuffer.length();
+  const T1 = effKeyBits;
+  const T8 = Math.ceil(T1 / 8);
+  const TM = 0xff >> (T1 & 0x07);
+  let i: number;
 
   for (i = T; i < 128; i++) {
-    L.putByte(piTable[(L.at(i - 1) + L.at(i - T)) & 0xff]);
+    const prevByte = L.at(i - 1) || 0;
+    const tByte = L.at(i - T) || 0;
+    L.putByte(piTable[(prevByte + tByte) & 0xff]);
   }
 
   L.setAt(128 - T8, piTable[L.at(128 - T8) & TM]);
 
   for (i = 127 - T8; i >= 0; i--) {
-    L.setAt(i, piTable[L.at(i + 1) ^ L.at(i + T8)]);
+    const byte1 = L.at(i + 1) || 0;
+    const byte8 = L.at(i + T8) || 0;
+    L.setAt(i, piTable[byte1 ^ byte8]);
   }
 
   return L;
 };
+
+class RC2Algorithm implements Algorithm {
+  name: string = 'RC2';
+  mode: any; // Will be set by cipher modes
+  private _init: boolean = false;
+  private _expandedKey: ByteStringBuffer | null = null;
+  private _bits: number = 128;
+
+  initialize(options: RC2Options): void {
+    if (this._init) return;
+
+    const key = typeof options.key === 'string' ? createBuffer(options.key) : options.key;
+    this._bits = options.bits || 128;
+    this._expandedKey = expandKey(key, this._bits);
+    this._init = true;
+  }
+
+  encrypt(input: number[], output: number[]): void {
+    if (!this._expandedKey) return;
+
+    let i: number;
+    let j: number = 0;
+    const K: number[] = [];
+
+    for (i = 0; i < 64; i++) {
+      K.push(this._expandedKey.getInt16Le());
+    }
+
+    // Copy input to output
+    for (i = 0; i < input.length; i++) {
+      output[i] = input[i];
+    }
+
+    // Perform encryption rounds
+    for (i = 0; i < 4; i++) {
+      output[i] = (output[i] + K[j] + (output[(i + 3) % 4] & output[(i + 2) % 4]) +
+        ((~output[(i + 3) % 4]) & output[(i + 1) % 4])) & 0xffff;
+      output[i] = rol(output[i], s[i]);
+      j++;
+    }
+
+    for (i = 0; i < 4; i++) {
+      output[i] = (output[i] + K[output[(i + 3) % 4] & 63]) & 0xffff;
+    }
+
+    for (i = 0; i < 4; i++) {
+      output[i] = (output[i] + K[j] + (output[(i + 3) % 4] & output[(i + 2) % 4]) +
+        ((~output[(i + 3) % 4]) & output[(i + 1) % 4])) & 0xffff;
+      output[i] = rol(output[i], s[i]);
+      j++;
+    }
+  }
+
+  decrypt(input: number[], output: number[]): void {
+    if (!this._expandedKey) return;
+
+    let i: number;
+    let j: number = 63;
+    const K: number[] = [];
+
+    for (i = 0; i < 64; i++) {
+      K.push(this._expandedKey.getInt16Le());
+    }
+
+    // Copy input to output
+    for (i = 0; i < input.length; i++) {
+      output[i] = input[i];
+    }
+
+    // Perform decryption rounds
+    for (i = 3; i >= 0; i--) {
+      output[i] = ror(output[i], s[i]);
+      output[i] = (output[i] - (K[j] + (output[(i + 3) % 4] & output[(i + 2) % 4]) +
+        ((~output[(i + 3) % 4]) & output[(i + 1) % 4]))) & 0xffff;
+      j--;
+    }
+
+    for (i = 3; i >= 0; i--) {
+      output[i] = (output[i] - K[output[(i + 3) % 4] & 63]) & 0xffff;
+    }
+
+    for (i = 3; i >= 0; i--) {
+      output[i] = ror(output[i], s[i]);
+      output[i] = (output[i] - (K[j] + (output[(i + 3) % 4] & output[(i + 2) % 4]) +
+        ((~output[(i + 3) % 4]) & output[(i + 1) % 4]))) & 0xffff;
+      j--;
+    }
+  }
+}
 
 /**
  * Creates a RC2 cipher object.
@@ -105,230 +207,15 @@ function expandKey(key: string, effKeyBits: number): ByteStringBuffer {
  *
  * @return the cipher.
  */
-function createCipher(key: string, bits: number, encrypt: boolean): BlockCipher {
-  let _finish = false, _input = null, _output = null, _iv = null;
-  let mixRound, mashRound;
-  let i, j, K = [];
-
-  /* Expand key and fill into K[] Array */
-  key = expandKey(key, bits);
-  for (i = 0; i < 64; i++)
-    K.push(key.getInt16Le())
-
-  if (encrypt) {
-    /**
-     * Perform one mixing round "in place".
-     *
-     * @param R Array of four words to perform mixing on.
-     */
-    mixRound = function (R: number[]) {
-      for (i = 0; i < 4; i++) {
-        R[i] += K[j] + (R[(i + 3) % 4] & R[(i + 2) % 4]) +
-          ((~R[(i + 3) % 4]) & R[(i + 1) % 4]);
-        R[i] = rol(R[i], s[i]);
-        j++;
-      }
-    };
-
-    /**
-     * Perform one mashing round "in place".
-     *
-     * @param R Array of four words to perform mashing on.
-     */
-    mashRound = function (R: number[]) {
-      for (i = 0; i < 4; i++) {
-        R[i] += K[R[(i + 3) % 4] & 63];
-      }
-    };
-  } else {
-    /**
-     * Perform one r-mixing round "in place".
-     *
-     * @param R Array of four words to perform mixing on.
-     */
-    mixRound = function (R: number[]) {
-      for (i = 3; i >= 0; i--) {
-        R[i] = ror(R[i], s[i]);
-        R[i] -= K[j] + (R[(i + 3) % 4] & R[(i + 2) % 4]) +
-          ((~R[(i + 3) % 4]) & R[(i + 1) % 4]);
-        j--;
-      }
-    };
-
-    /**
-     * Perform one r-mashing round "in place".
-     *
-     * @param R Array of four words to perform mashing on.
-     */
-    mashRound = function (R: number[]) {
-      for (i = 3; i >= 0; i--) {
-        R[i] -= K[R[(i + 3) % 4] & 63];
-      }
-    };
-  }
-
-  /**
-   * Run the specified cipher execution plan.
-   *
-   * This function takes four words from the input buffer, applies the IV on
-   * it (if requested) and runs the provided execution plan.
-   *
-   * The plan must be put together in form of a array of arrays.  Where the
-   * outer one is simply a list of steps to perform and the inner one needs
-   * to have two elements: the first one telling how many rounds to perform,
-   * the second one telling what to do (i.e. the function to call).
-   *
-   * @param {Array} plan The plan to execute.
-   */
-  function runPlan(plan: number[][]) {
-    let R = [];
-
-    /* Get data from input buffer and fill the four words into R */
-    for (i = 0; i < 4; i++) {
-      var val = _input.getInt16Le();
-
-      if (_iv !== null) {
-        if (encrypt) {
-          /* We're encrypting, apply the IV first. */
-          val ^= _iv.getInt16Le();
-        } else {
-          /* We're decryption, keep cipher text for next block. */
-          _iv.putInt16Le(val);
-        }
-      }
-
-      R.push(val & 0xffff);
-    }
-
-    /* Reset global "j" variable as per spec. */
-    j = encrypt ? 0 : 63;
-
-    /* Run execution plan. */
-    for (var ptr = 0; ptr < plan.length; ptr++) {
-      for (var ctr = 0; ctr < plan[ptr][0]; ctr++) {
-        plan[ptr][1](R);
-      }
-    }
-
-    /* Write back result to output buffer. */
-    for (i = 0; i < 4; i++) {
-      if (_iv !== null) {
-        if (encrypt) {
-          /* We're encrypting in CBC-mode, feed back encrypted bytes into
-             IV buffer to carry it forward to next block. */
-          _iv.putInt16Le(R[i]);
-        } else {
-          R[i] ^= _iv.getInt16Le();
-        }
-      }
-
-      _output.putInt16Le(R[i]);
-    }
-  };
-
-  /* Create cipher object */
-  let cipher = null;
-  cipher = {
-    /**
-     * Starts or restarts the encryption or decryption process, whichever
-     * was previously configured.
-     *
-     * To use the cipher in CBC mode, iv may be given either as a string
-     * of bytes, or as a byte buffer.  For ECB mode, give null as iv.
-     *
-     * @param iv the initialization vector to use, null for ECB mode.
-     * @param output the output the buffer to write to, null to create one.
-     */
-    start: function (iv: string, output: ByteStringBuffer) {
-      if (iv) {
-        /* CBC mode */
-        if (typeof iv === 'string')
-          iv = createBuffer(iv);
-      }
-
-      _finish = false;
-      _input = createBuffer();
-      _output = output || createBuffer();
-      _iv = iv;
-
-      cipher.output = _output;
-    },
-
-    /**
-     * Updates the next block.
-     *
-     * @param input the buffer to read from.
-     */
-    update: function (input: ByteStringBuffer) {
-      if (!_finish)
-        // not finishing, so fill the input buffer with more input
-        _input.putBuffer(input);
-
-      while (_input.length() >= 8) {
-        runPlan([
-          [5, mixRound],
-          [1, mashRound],
-          [6, mixRound],
-          [1, mashRound],
-          [5, mixRound]
-        ]);
-      }
-    },
-
-    /**
-     * Finishes encrypting or decrypting.
-     *
-     * @param pad a padding function to use, null for PKCS#7 padding, signature(blockSize, buffer, decrypt).
-     *
-     * @return true if successful, false on error.
-     */
-    finish: function (pad: (blockSize: number, buffer: ByteStringBuffer, decrypt: boolean) => boolean) {
-      var rval = true;
-
-      if (encrypt) {
-        if (pad) {
-          rval = pad(8, _input, !encrypt);
-        } else {
-          // add PKCS#7 padding to block (each pad byte is the
-          // value of the number of pad bytes)
-          var padding = (_input.length() === 8) ? 8 : (8 - _input.length());
-          _input.fillWithByte(padding, padding);
-        }
-      }
-
-      if (rval) {
-        // do final update
-        _finish = true;
-        cipher.update();
-      }
-
-      if (!encrypt) {
-        // check for error: input data not a multiple of block size
-        rval = (_input.length() === 0);
-        if (rval) {
-          if (pad) {
-            rval = pad(8, _output, !encrypt);
-          } else {
-            // ensure padding byte count is valid
-            var len = _output.length();
-            var count = _output.at(len - 1);
-
-            if (count > len) {
-              rval = false;
-            } else {
-              // trim off padding bytes
-              _output.truncate(count);
-            }
-          }
-        }
-      }
-
-      return rval;
-    }
-  };
-
+function createCipher(key: string | ByteStringBuffer, bits: number, encrypt: boolean): BlockCipher {
+  const algorithm = new RC2Algorithm();
+  const cipher = new BlockCipher({
+    algorithm,
+    key,
+    decrypt: !encrypt,
+  });
   return cipher;
-};
+}
 
 /**
  * Creates an RC2 cipher object to encrypt data in ECB or CBC mode using the
@@ -345,11 +232,10 @@ function createCipher(key: string, bits: number, encrypt: boolean): BlockCipher 
  * @return the cipher.
  */
 export function startEncrypting(key: string, iv: string, output: ByteStringBuffer): BlockCipher {
-  var cipher = createEncryptionCipher(key, 128);
-  cipher.start(iv, output);
-
+  const cipher = createEncryptionCipher(key, 128);
+  cipher.start({ iv } as RC2Options);
   return cipher;
-};
+}
 
 /**
  * Creates an RC2 cipher object to encrypt data in ECB or CBC mode using the
@@ -366,7 +252,7 @@ export function startEncrypting(key: string, iv: string, output: ByteStringBuffe
  */
 export function createEncryptionCipher(key: string, bits: number): BlockCipher {
   return createCipher(key, bits, true);
-};
+}
 
 /**
  * Creates an RC2 cipher object to decrypt data in ECB or CBC mode using the
@@ -383,11 +269,10 @@ export function createEncryptionCipher(key: string, bits: number): BlockCipher {
  * @return the cipher.
  */
 export function startDecrypting(key: string, iv: string, output: ByteStringBuffer): BlockCipher {
-  var cipher = createDecryptionCipher(key, 128);
-  cipher.start(iv, output);
-
+  const cipher = createDecryptionCipher(key, 128);
+  cipher.start({ iv } as RC2Options);
   return cipher;
-};
+}
 
 /**
  * Creates an RC2 cipher object to decrypt data in ECB or CBC mode using the
