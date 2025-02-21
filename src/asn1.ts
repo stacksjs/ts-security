@@ -145,11 +145,13 @@ interface ExtendedError extends Error {
   integer?: number
 }
 
-interface Asn1Object {
+export interface Asn1Object {
+  name: string
   tagClass: number
   type: number
   constructed: boolean
-  composed: boolean
+  composed?: boolean
+  captureAsn1: string
   value: any
   bitStringContents?: string
   original?: Asn1Object

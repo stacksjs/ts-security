@@ -28,6 +28,7 @@ httx
 iconify
 imgx
 ipadding
+jsbn
 keychain
 Keychains
 Keypair

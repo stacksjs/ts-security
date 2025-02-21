@@ -214,6 +214,10 @@ export function getRandomValues(arr: Uint32Array): Uint32Array {
 // Expose PRNG spawning capability
 export const createInstance: () => PRNG = spawnPrng
 
+export function getBytes(count: number): string | void {
+  return createInstance().getBytes(count)
+}
+
 export function getBytesSync(count: number): string {
   return createInstance().getBytesSync(count)
 }

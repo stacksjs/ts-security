@@ -5,29 +5,31 @@
  *
  * Copyright (c) 2010-2015 Digital Bazaar, Inc.
  */
-const forge = require('./forge')
-require('./md')
-require('./util')
-
-const sha1 = module.exports = forge.sha1 = forge.sha1 || {}
-forge.md.sha1 = forge.md.algorithms.sha1 = sha1
+import { createBuffer, fillString } from './utils'
 
 /**
  * Creates a SHA-1 message digest object.
  *
  * @return a message digest object.
  */
-sha1.create = function () {
+export function create(): {
+  algorithm: string
+  blockLength: number
+  digestLength: number
+  messageLength: number
+  fullMessageLength: null
+  messageLengthSize: number
+} {
   // do initialization as necessary
   if (!_initialized) {
     _init()
   }
 
   // SHA-1 state contains five 32-bit integers
-  let _state = null
+  let _state: any = null
 
   // input buffer
-  let _input = forge.util.createBuffer()
+  let _input = createBuffer()
 
   // used for word storage
   const _w = Array.from({ length: 80 })
@@ -60,7 +62,7 @@ sha1.create = function () {
     for (let i = 0; i < int32s; ++i) {
       md.fullMessageLength.push(0)
     }
-    _input = forge.util.createBuffer()
+    _input = createBuffer()
     _state = {
       h0: 0x67452301,
       h1: 0xEFCDAB89,
@@ -139,7 +141,7 @@ sha1.create = function () {
     must *always* be present, so if the message length is already
     congruent to 448 mod 512, then 512 padding bits must be added. */
 
-    const finalBlock = forge.util.createBuffer()
+    const finalBlock = createBuffer()
     finalBlock.putBytes(_input.bytes())
 
     // compute remaining size to be digested (include message length size)
@@ -174,7 +176,7 @@ sha1.create = function () {
       h4: _state.h4,
     }
     _update(s2, _w, finalBlock)
-    const rval = forge.util.createBuffer()
+    const rval = createBuffer()
     rval.putInt32(s2.h0)
     rval.putInt32(s2.h1)
     rval.putInt32(s2.h2)
@@ -196,7 +198,7 @@ var _initialized = false
 function _init() {
   // create padding
   _padding = String.fromCharCode(128)
-  _padding += forge.util.fillString(String.fromCharCode(0x00), 64)
+  _padding += fillString(String.fromCharCode(0x00), 64)
 
   // now initialized
   _initialized = true
@@ -209,7 +211,7 @@ function _init() {
  * @param w the array to use to store words.
  * @param bytes the byte buffer to update with.
  */
-function _update(s, w, bytes) {
+function _update(s: any, w: any, bytes: any) {
   // consume 512 bit (64 byte) chunks
   let t, a, b, c, d, e, f, i
   let len = bytes.length()
@@ -316,4 +318,8 @@ function _update(s, w, bytes) {
 
     len -= 64
   }
+}
+
+export const sha1 = {
+  create,
 }

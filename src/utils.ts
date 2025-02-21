@@ -783,3 +783,63 @@ export function decode64(input: string): string {
 
   return output
 }
+
+/**
+ * Converts a hex string into a 'binary' encoded string of bytes.
+ *
+ * @param hex the hexadecimal string to convert.
+ *
+ * @return the binary-encoded string of bytes.
+ */
+export function hexToBytes(hex: string): string {
+  // TODO: deprecate: "Deprecated. Use util.binary.hex.decode instead."
+  let rval = ''
+  let i = 0
+  if (hex.length & 1 === 1) {
+    // odd number of characters, convert first character alone
+    i = 1
+    rval += String.fromCharCode(parseInt(hex[0], 16))
+  }
+
+  // convert 2 characters (1 byte) at a time
+  for (; i < hex.length; i += 2)
+    rval += String.fromCharCode(parseInt(hex.substr(i, 2), 16))
+
+  return rval
+}
+
+export const util: {
+  encode64: (input: string, maxline?: number) => string
+  decode64: (input: string) => string
+  encodeUtf8: (str: string) => string
+  decodeUtf8: (bytes: string) => string
+  isArrayBuffer: (x: any) => boolean
+  isArrayBufferView: (x: any) => boolean
+  isServer: boolean
+  globalScope: typeof globalThis
+  fillString: (c: string, n: number) => string
+  bytesToHex: (bytes: string) => string
+  createBuffer: (input?: string, encoding?: string) => ByteStringBuffer
+  ByteBuffer: typeof ByteStringBuffer
+  ByteStringBuffer: typeof ByteStringBuffer
+  _checkBitsParam: (n: number) => void
+  hexToBytes: (hex: string) => string
+} = {
+  encode64,
+  decode64,
+  encodeUtf8,
+  decodeUtf8,
+  isArrayBuffer,
+  isArrayBufferView,
+  isServer,
+  globalScope,
+  fillString,
+  bytesToHex,
+  createBuffer,
+  ByteBuffer,
+  ByteStringBuffer,
+  _checkBitsParam,
+  hexToBytes,
+}
+
+export default util

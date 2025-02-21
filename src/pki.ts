@@ -8,6 +8,7 @@
  */
 import { asn1 } from './asn1'
 import { pem } from './pem'
+import { privateKeyToAsn1, privateKeyFromAsn1 } from './rsa'
 
 /**
  * Converts an RSA private key from PEM format.
@@ -16,7 +17,7 @@ import { pem } from './pem'
  *
  * @return the private key.
  */
-export function privateKeyFromPem(pem: string) {
+export function privateKeyFromPem(pem: string): any {
   const msg = pem.decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
@@ -32,7 +33,7 @@ export function privateKeyFromPem(pem: string) {
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body)
 
-  return pki.privateKeyFromAsn1(obj)
+  return privateKeyFromAsn1(obj)
 }
 
 /**

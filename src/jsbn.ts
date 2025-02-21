@@ -119,7 +119,7 @@ export class BigInteger {
     return c
   }
 
-  private fromNumber(value: number, length: number, randomizer?: IPRNG | number): void {
+  public fromNumber(value: number, length: number, randomizer?: IPRNG | number): void {
     if (typeof randomizer === 'number') {
       // New BigInteger(int, int, RNG)
       if (value < 2) {
@@ -157,7 +157,7 @@ export class BigInteger {
     }
   }
 
-  private fromInt(value: number): void {
+  public fromInt(value: number): void {
     this.t = 1
     this.s = (value < 0) ? -1 : 0
     if (value > 0) {
@@ -171,7 +171,7 @@ export class BigInteger {
     }
   }
 
-  private fromString(s: string | number[], b: number): void {
+  public fromString(s: string | number[], b: number): void {
     let k: number
     if (b === 16) {
       k = 4
