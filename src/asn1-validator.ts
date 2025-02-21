@@ -2,84 +2,101 @@
  * Copyright (c) 2019 Digital Bazaar, Inc.
  */
 
-import { asn1 } from './asn1'
+import { Class, Type } from './asn1'
 
 export interface Asn1Validator {
   name: string
-  tagClass: asn1.Class
-  type: asn1.Type
+  tagClass: number
+  type: number
   constructed: boolean
   value: Asn1Validator[]
+  capture?: string
+  captureAsn1?: string
+  captureBitStringContents?: string
+  captureBitStringValue?: string
+  optional?: boolean
+  composed?: boolean
+}
+
+export interface ValidatorMap {
+  privateKeyValidator: Asn1Validator
+  publicKeyValidator: Asn1Validator
 }
 
 export const privateKeyValidator: Asn1Validator = {
   // PrivateKeyInfo
   name: 'PrivateKeyInfo',
-  tagClass: asn1.Class.UNIVERSAL,
-  type: asn1.Type.SEQUENCE,
+  tagClass: Class.UNIVERSAL,
+  type: Type.SEQUENCE,
   constructed: true,
   value: [{
     // Version (INTEGER)
     name: 'PrivateKeyInfo.version',
-    tagClass: asn1.Class.UNIVERSAL,
-    type: asn1.Type.INTEGER,
+    tagClass: Class.UNIVERSAL,
+    type: Type.INTEGER,
     constructed: false,
     capture: 'privateKeyVersion',
+    value: []
   }, {
     // privateKeyAlgorithm
     name: 'PrivateKeyInfo.privateKeyAlgorithm',
-    tagClass: asn1.Class.UNIVERSAL,
-    type: asn1.Type.SEQUENCE,
+    tagClass: Class.UNIVERSAL,
+    type: Type.SEQUENCE,
     constructed: true,
     value: [{
       name: 'AlgorithmIdentifier.algorithm',
-      tagClass: asn1.Class.UNIVERSAL,
-      type: asn1.Type.OID,
+      tagClass: Class.UNIVERSAL,
+      type: Type.OID,
       constructed: false,
       capture: 'privateKeyOid',
+      value: []
     }],
   }, {
     // PrivateKey
     name: 'PrivateKeyInfo',
-    tagClass: asn1.Class.UNIVERSAL,
-    type: asn1.Type.OCTETSTRING,
+    tagClass: Class.UNIVERSAL,
+    type: Type.OCTETSTRING,
     constructed: false,
     capture: 'privateKey',
+    value: []
   }],
 }
 
 export const publicKeyValidator: Asn1Validator = {
   name: 'SubjectPublicKeyInfo',
-  tagClass: asn1.Class.UNIVERSAL,
-  type: asn1.Type.SEQUENCE,
+  tagClass: Class.UNIVERSAL,
+  type: Type.SEQUENCE,
   constructed: true,
   captureAsn1: 'subjectPublicKeyInfo',
   value: [{
     name: 'SubjectPublicKeyInfo.AlgorithmIdentifier',
-    tagClass: asn1.Class.UNIVERSAL,
-    type: asn1.Type.SEQUENCE,
+    tagClass: Class.UNIVERSAL,
+    type: Type.SEQUENCE,
     constructed: true,
     value: [{
       name: 'AlgorithmIdentifier.algorithm',
-      tagClass: asn1.Class.UNIVERSAL,
-      type: asn1.Type.OID,
+      tagClass: Class.UNIVERSAL,
+      type: Type.OID,
       constructed: false,
       capture: 'publicKeyOid',
+      value: []
     }],
   },
   // capture group for ed25519PublicKey
   {
-    tagClass: asn1.Class.UNIVERSAL,
-    type: asn1.Type.BITSTRING,
+    name: 'SubjectPublicKeyInfo.subjectPublicKey',
+    tagClass: Class.UNIVERSAL,
+    type: Type.BITSTRING,
     constructed: false,
     composed: true,
     captureBitStringValue: 'ed25519PublicKey',
-  },    // FIXME: this is capture group for rsaPublicKey, use it in this API or    // discard?    /* {      // subjectPublicKey      name: 'SubjectPublicKeyInfo.subjectPublicKey',      tagClass: asn1.Class.UNIVERSAL,      type: asn1.Type.BITSTRING,      constructed: false,      value: [{        // RSAPublicKey        name: 'SubjectPublicKeyInfo.subjectPublicKey.RSAPublicKey',        tagClass: asn1.Class.UNIVERSAL,        type: asn1.Type.SEQUENCE,        constructed: true,        optional: true,        captureAsn1: 'rsaPublicKey'      }]    } */
-]}
+    value: []
+  }]
+}
 
-const asn1Validator: Asn1Validator = {
+const validator: ValidatorMap = {
   privateKeyValidator,
   publicKeyValidator,
 }
 
-export default asn1Validator
+export default validator

@@ -1515,6 +1515,6 @@ export const asn1: Asn1 = {
   validate,
   prettyPrint,
   toDer
-}
+} as const
 
 export default asn1
