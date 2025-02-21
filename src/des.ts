@@ -7,7 +7,7 @@
  * Paul Tero, July 2001
  * http://www.tero.co.uk/des/
  *
- * Optimised for performance with large blocks by
+ * Optimized for performance with large blocks by
  * Michael Hayworth, November 2001
  * http://www.netdealing.com
  *
@@ -48,6 +48,7 @@ export class DESAlgorithm {
   _init: boolean
 
   constructor(name: string, mode: CipherMode) {
+    this._init = false;
     this.name = name
     this.mode = new mode({
     blockSize: 8,
@@ -59,8 +60,30 @@ export class DESAlgorithm {
         return _updateBlock(self._keys, inBlock, outBlock, true);
       }
     }
-  });
-  self._init = false;
+  })
+  }
+
+  initialize(options: {
+    key: string
+    decrypt?: boolean
+    output?: Buffer
+  }): void {
+    if (this._init) {
+      return;
+    }
+
+    var key = createBuffer(options.key);
+    if (this.name.indexOf('3DES') === 0) {
+      if (key.length() !== 24) {
+        throw new Error('Invalid Triple-DES key size: ' + key.length() * 8);
+      }
+    }
+
+    // do key expansion to 16 or 48 subkeys (single or triple DES)
+    this._keys = _createKeys(key);
+    this._init = true;
+  }
+
 };
 
 /**
@@ -71,22 +94,6 @@ export class DESAlgorithm {
  *          decrypt true if the algorithm should be initialized for decryption,
  *            false for encryption.
  */
-forge.des.Algorithm.prototype.initialize = function (options) {
-  if (this._init) {
-    return;
-  }
-
-  var key = createBuffer(options.key);
-  if (this.name.indexOf('3DES') === 0) {
-    if (key.length() !== 24) {
-      throw new Error('Invalid Triple-DES key size: ' + key.length() * 8);
-    }
-  }
-
-  // do key expansion to 16 or 48 subkeys (single or triple DES)
-  this._keys = _createKeys(key);
-  this._init = true;
-};
 
 /** Register DES algorithms **/
 

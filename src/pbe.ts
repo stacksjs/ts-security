@@ -18,15 +18,17 @@
  * EncryptedData ::= OCTET STRING
  */
 
-import { asn1, type Asn1Object } from './asn1'
-import { BlockCipher, createCipher } from './cipher'
-import { oids } from './oids'
-import { getBytesSync } from './random'
-import { createBuffer, hexToBytes } from './utils'
-import { md5 } from './md5'
+import type { Asn1Object } from './asn1'
+import type { BlockCipher } from './cipher'
 import type { MessageDigest } from './sha1'
-import { sha512 } from './sha512'
+import { asn1 } from './asn1'
+import { createCipher } from './cipher'
+import { md5 } from './md5'
+import { oids } from './oids'
 import { pbkdf2 } from './pbkdf2'
+import { getBytesSync } from './random'
+import { sha512 } from './sha512'
+import { createBuffer, hexToBytes } from './utils'
 
 // validator for an EncryptedPrivateKeyInfo structure
 // Note: Currently only works w/algorithm params
@@ -967,8 +969,9 @@ export function prfOidToMessageDigest(prfOid: string): MessageDigest {
   // get PRF algorithm, default to SHA-1
   let prfAlgorithm
 
-  if (!prfOid)
+  if (!prfOid) {
     prfAlgorithm = 'hmacWithSHA1'
+  }
 
   else {
     prfAlgorithm = oids[asn1.derToOid(prfOid)]

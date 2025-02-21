@@ -8,11 +8,10 @@
  * Copyright (c) 2010-2013 Digital Bazaar, Inc.
  */
 
-import { hmac } from './hmac'
-import { int32ToBytes, isServer, xorBytes } from './utils'
-import type { ByteStringBuffer } from './utils'
 import type { MessageDigest } from './sha1'
+import { hmac } from './hmac'
 import { sha1 } from './sha1'
+import { int32ToBytes, isServer, xorBytes } from './utils'
 
 let crypto: typeof import('node:crypto') | undefined
 if (isServer) {
@@ -20,7 +19,7 @@ if (isServer) {
 }
 
 const hashAlgorithms: { [key: string]: { create: () => MessageDigest } } = {
-  sha1: { create: () => sha1.create() }
+  sha1: { create: () => sha1.create() },
 }
 
 /**
@@ -41,7 +40,7 @@ export function pbkdf2(
   c: number,
   dkLen: number,
   md?: MessageDigest | string | ((err: Error | null, key?: string) => void),
-  callback?: (err: Error | null, key?: string) => void
+  callback?: (err: Error | null, key?: string) => void,
 ): string | void {
   if (typeof md === 'function') {
     callback = md
@@ -85,7 +84,8 @@ export function pbkdf2(
       throw new Error(`Unknown hash algorithm: ${md}`)
     }
     hashAlgorithm = hashAlgorithms[md].create()
-  } else {
+  }
+  else {
     hashAlgorithm = md
   }
 
@@ -219,7 +219,7 @@ export function pbkdf2Sync(p: Buffer, s: Buffer, c: number, dkLen: number, md?: 
   return pbkdf2(p, s, c, dkLen, md) as string
 }
 
-export type Pkcs5 = {
+export interface Pkcs5 {
   pbkdf2: typeof pbkdf2
   pbkdf2Sync: typeof pbkdf2Sync
 }
