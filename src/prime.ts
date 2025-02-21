@@ -16,6 +16,31 @@ const THIRTY = new BigInteger(null)
 THIRTY.fromInt(30)
 const op_or = (x: number, y: number) => x | y
 
+interface WorkerMessageData {
+  found: boolean
+  prime?: string
+  hex?: string
+  workLoad?: number
+}
+
+type WorkerMessageEvent = MessageEvent<WorkerMessageData>
+
+interface PrimeOptions {
+  algorithm?: string | { name: string; options?: any }
+  prng?: {
+    getBytesSync: (length: number) => string
+  }
+  maxBlockTime?: number
+  millerRabinTests?: number
+  workers?: number
+  workLoad?: number
+  workerScript?: string
+}
+
+interface RNGInterface {
+  nextBytes: (x: Uint8Array) => void
+}
+
 /**
  * Generates a random probable prime with the given number of bits.
  *
@@ -45,9 +70,9 @@ const op_or = (x: number, y: number) => x | y
  *
  * @return callback(err, num) called once the operation completes.
  */
-export function generateProbablePrime(bits: number, options: any, callback: any): void {
+export function generateProbablePrime(bits: number, options: PrimeOptions, callback: (err: Error | null, num?: BigInteger) => void): void {
   if (typeof options === 'function') {
-    callback = options
+    callback = options as (err: Error | null, num?: BigInteger) => void
     options = {}
   }
   options = options || {}
@@ -61,9 +86,9 @@ export function generateProbablePrime(bits: number, options: any, callback: any)
 
   // create prng with api that matches BigInteger secure random
   const prng = options.prng || random
-  const rng = {
+  const rng: RNGInterface = {
     // x is an array to fill with bytes
-    nextBytes(x) {
+    nextBytes(x: Uint8Array) {
       const b = prng.getBytesSync(x.length)
       for (let i = 0; i < x.length; ++i) {
         x[i] = b.charCodeAt(i)
@@ -78,14 +103,14 @@ export function generateProbablePrime(bits: number, options: any, callback: any)
   throw new Error(`Invalid prime generation algorithm: ${algorithm.name}`)
 };
 
-function primeincFindPrime(bits: number, rng: any, options: any, callback: any) {
+function primeincFindPrime(bits: number, rng: RNGInterface, options: any, callback: (err: Error | null, num?: BigInteger) => void) {
   if ('workers' in options)
     return primeincFindPrimeWithWorkers(bits, rng, options, callback)
 
   return primeincFindPrimeWithoutWorkers(bits, rng, options, callback)
 }
 
-function primeincFindPrimeWithoutWorkers(bits: number, rng: any, options: any, callback: any) {
+function primeincFindPrimeWithoutWorkers(bits: number, rng: RNGInterface, options: any, callback: (err: Error | null, num?: BigInteger) => void) {
   // initialize random number
   const num = generateRandom(bits, rng)
 
@@ -113,7 +138,7 @@ function primeincFindPrimeWithoutWorkers(bits: number, rng: any, options: any, c
   _primeinc(num, bits, rng, deltaIdx, mrTests, maxBlockTime, callback)
 }
 
-function _primeinc(num: any, bits: number, rng: any, deltaIdx: number, mrTests: number, maxBlockTime: number, callback: any) {
+function _primeinc(num: BigInteger, bits: number, rng: RNGInterface, deltaIdx: number, mrTests: number, maxBlockTime: number, callback: (err: Error | null, num?: BigInteger) => void) {
   const start = +new Date()
   do {
     // overflow, regenerate random number
@@ -140,7 +165,7 @@ function _primeinc(num: any, bits: number, rng: any, deltaIdx: number, mrTests: 
 // run in parallel looking at different segments of numbers. Even if this
 // algorithm is run twice with the same input from a predictable RNG, it
 // may produce different outputs.
-function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, callback: any) {
+function primeincFindPrimeWithWorkers(bits: number, rng: RNGInterface, options: PrimeOptions, callback: (err: Error | null, num?: BigInteger) => void) {
   // web workers unavailable
   if (typeof Worker === 'undefined') {
     return primeincFindPrimeWithoutWorkers(bits, rng, options, callback)
@@ -150,19 +175,18 @@ function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, call
   let num = generateRandom(bits, rng)
 
   // use web workers to generate keys
-  let numWorkers = options.workers
+  let numWorkers = options.workers || 2
   const workLoad = options.workLoad || 100
   const range = workLoad * 30 / 8
   const workerScript = options.workerScript || 'forge/prime.worker.js'
   if (numWorkers === -1) {
-    return estimateCores((err, cores) => {
+    return estimateCores((err: Error | null, cores: number) => {
       if (err) {
-        // default to 2
         cores = 2
       }
       numWorkers = cores - 1
       generate()
-    })
+    }, null)
   }
   generate()
 
@@ -170,39 +194,20 @@ function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, call
     // require at least 1 worker
     numWorkers = Math.max(1, numWorkers)
 
-    // TODO: consider optimizing by starting workers outside getPrime() ...
-    // note that in order to clean up they will have to be made internally
-    // asynchronous which may actually be slower
-
     // start workers immediately
-    const workers = []
-    for (var i = 0; i < numWorkers; ++i) {
-      // FIXME: fix path or use blob URLs
+    const workers: Worker[] = []
+    for (let i = 0; i < numWorkers; ++i) {
       workers[i] = new Worker(workerScript)
     }
     let running = numWorkers
 
     // listen for requests from workers and assign ranges to find prime
-    for (var i = 0; i < numWorkers; ++i) {
+    for (let i = 0; i < numWorkers; ++i) {
       workers[i].addEventListener('message', workerMessage)
     }
 
-    /* Note: The distribution of random numbers is unknown. Therefore, each
-    web worker is continuously allocated a range of numbers to check for a
-    random number until one is found.
-
-    Every 30 numbers will be checked just 8 times, because prime numbers
-    have the form:
-
-    30k+i, for i < 30 and gcd(30, i)=1 (there are 8 values of i for this)
-
-    Therefore, if we want a web worker to run N checks before asking for
-    a new range of numbers, each range must contain N*30/8 numbers.
-
-    For 100 checks (workLoad), this is a range of 375. */
-
     let found = false
-    function workerMessage(e) {
+    function workerMessage(e: WorkerMessageEvent) {
       // ignore message, prime already found
       if (found) {
         return
@@ -216,7 +221,7 @@ function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, call
           workers[i].terminate()
         }
         found = true
-        return callback(null, new BigInteger(data.prime, 16))
+        return callback(null, new BigInteger(data.prime!, 16))
       }
 
       // overflow, regenerate random number
@@ -228,10 +233,12 @@ function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, call
       const hex = num.toString(16)
 
       // start prime search
-      e.target.postMessage({
-        hex,
-        workLoad,
-      })
+      if (e.target instanceof Worker) {
+        e.target.postMessage({
+          hex,
+          workLoad,
+        })
+      }
 
       num.dAddOffset(range, 0)
     }
@@ -246,15 +253,19 @@ function primeincFindPrimeWithWorkers(bits: number, rng: any, options: any, call
  *
  * @return the random number.
  */
-function generateRandom(bits, rng) {
-  const num = new BigInteger(bits, rng)
+function generateRandom(bits: number, rng: RNGInterface): BigInteger {
+  const num = new BigInteger(bits, rng as unknown as number)
   // force MSB set
   const bits1 = bits - 1
   if (!num.testBit(bits1)) {
-    num.bitwiseTo(BigInteger.ONE.shiftLeft(bits1), op_or, num)
+    // Use alternative method since bitwiseTo is private
+    const mask = BigInteger.ONE.shiftLeft(bits1)
+    num.add(mask)
   }
   // align number on 30k+1 boundary
-  num.dAddOffset(31 - num.mod(THIRTY).byteValue(), 0)
+  const mod = num.mod(THIRTY)
+  const offset = 31 - (mod.intValue() || 0)
+  num.dAddOffset(offset, 0)
   return num
 }
 
@@ -268,7 +279,7 @@ function generateRandom(bits, rng) {
  *
  * @return the required number of iterations.
  */
-function getMillerRabinTests(bits) {
+function getMillerRabinTests(bits: number): number {
   if (bits <= 100)
     return 27
   if (bits <= 150)
@@ -293,3 +304,11 @@ function getMillerRabinTests(bits) {
     return 3
   return 2
 }
+
+export const prime: {
+  generateProbablePrime: (bits: number, options: PrimeOptions, callback: (err: Error | null, num?: BigInteger) => void) => void
+} = {
+  generateProbablePrime,
+}
+
+export default prime
