@@ -30,9 +30,10 @@
  * Copyright (c) 2012-2014 Digital Bazaar, Inc.
  */
 
-import type { CipherMode } from "./cipher-modes";
-import { ByteBuffer, createBuffer } from "./utils";
-import { createDecipher, createCipher, BlockCipher } from "./cipher";
+import type { BlockCipher } from './cipher'
+import type { CipherMode } from './cipher-modes'
+import { createCipher, createDecipher, registerAlgorithm as registerAlgo } from './cipher'
+import { ByteBuffer, createBuffer } from './utils'
 
 /**
  * Creates a new DES cipher algorithm object.
@@ -46,86 +47,85 @@ export class DESAlgorithm {
   name: string
   mode: CipherMode
   _init: boolean
+  _keys!: number[]
 
   constructor(name: string, mode: CipherMode) {
-    this._init = false;
+    this._init = false
     this.name = name
     this.mode = new mode({
-    blockSize: 8,
-    cipher: {
-      encrypt: function (inBlock, outBlock) {
-        return _updateBlock(self._keys, inBlock, outBlock, false);
+      blockSize: 8,
+      cipher: {
+        encrypt(inBlock: typeof ByteBuffer, outBlock: typeof ByteBuffer) {
+          return _updateBlock(self._keys, inBlock, outBlock, false)
+        },
+
+        decrypt(inBlock: typeof ByteBuffer, outBlock: typeof ByteBuffer) {
+          return _updateBlock(self._keys, inBlock, outBlock, true)
+        },
       },
-      decrypt: function (inBlock, outBlock) {
-        return _updateBlock(self._keys, inBlock, outBlock, true);
-      }
-    }
-  })
+    })
   }
 
+  /**
+   * Initializes this DES algorithm by expanding its key.
+   *
+   * @param options the options to use.
+   * @param options.key the key to use with this algorithm.
+   * @param options.decrypt true if the algorithm should be initialized for decryption, false for encryption.
+   */
   initialize(options: {
     key: string
     decrypt?: boolean
     output?: Buffer
   }): void {
-    if (this._init) {
-      return;
-    }
+    if (this._init)
+      return
 
-    var key = createBuffer(options.key);
+    const key = createBuffer(options.key)
     if (this.name.indexOf('3DES') === 0) {
       if (key.length() !== 24) {
-        throw new Error('Invalid Triple-DES key size: ' + key.length() * 8);
+        throw new Error(`Invalid Triple-DES key size: ${key.length() * 8}`)
       }
     }
 
     // do key expansion to 16 or 48 subkeys (single or triple DES)
-    this._keys = _createKeys(key);
-    this._init = true;
+    this._keys = _createKeys(key)
+    this._init = true
   }
-
 };
 
-/**
- * Initializes this DES algorithm by expanding its key.
- *
- * @param options the options to use.
- *          key the key to use with this algorithm.
- *          decrypt true if the algorithm should be initialized for decryption,
- *            false for encryption.
- */
+/** Register DES algorithms */
 
-/** Register DES algorithms **/
+registerAlgorithm('DES-ECB', modes.ecb)
+registerAlgorithm('DES-CBC', modes.cbc)
+registerAlgorithm('DES-CFB', modes.cfb)
+registerAlgorithm('DES-OFB', modes.ofb)
+registerAlgorithm('DES-CTR', modes.ctr)
 
-registerAlgorithm('DES-ECB', forge.cipher.modes.ecb);
-registerAlgorithm('DES-CBC', forge.cipher.modes.cbc);
-registerAlgorithm('DES-CFB', forge.cipher.modes.cfb);
-registerAlgorithm('DES-OFB', forge.cipher.modes.ofb);
-registerAlgorithm('DES-CTR', forge.cipher.modes.ctr);
-
-registerAlgorithm('3DES-ECB', forge.cipher.modes.ecb);
-registerAlgorithm('3DES-CBC', forge.cipher.modes.cbc);
-registerAlgorithm('3DES-CFB', forge.cipher.modes.cfb);
-registerAlgorithm('3DES-OFB', forge.cipher.modes.ofb);
-registerAlgorithm('3DES-CTR', forge.cipher.modes.ctr);
+registerAlgorithm('3DES-ECB', modes.ecb)
+registerAlgorithm('3DES-CBC', modes.cbc)
+registerAlgorithm('3DES-CFB', modes.cfb)
+registerAlgorithm('3DES-OFB', modes.ofb)
+registerAlgorithm('3DES-CTR', modes.ctr)
 
 function registerAlgorithm(name: string, mode: CipherMode) {
-  var factory = function () {
-    return new forge.des.Algorithm(name, mode);
-  };
-  forge.cipher.registerAlgorithm(name, factory);
+  const factory = function () {
+    return new DESAlgorithm(name, mode)
+  }
+
+  registerAlgo(name, factory)
 }
 
-/** DES implementation **/
+/** DES implementation */
 
-var spfunction1 = [0x1010400, 0, 0x10000, 0x1010404, 0x1010004, 0x10404, 0x4, 0x10000, 0x400, 0x1010400, 0x1010404, 0x400, 0x1000404, 0x1010004, 0x1000000, 0x4, 0x404, 0x1000400, 0x1000400, 0x10400, 0x10400, 0x1010000, 0x1010000, 0x1000404, 0x10004, 0x1000004, 0x1000004, 0x10004, 0, 0x404, 0x10404, 0x1000000, 0x10000, 0x1010404, 0x4, 0x1010000, 0x1010400, 0x1000000, 0x1000000, 0x400, 0x1010004, 0x10000, 0x10400, 0x1000004, 0x400, 0x4, 0x1000404, 0x10404, 0x1010404, 0x10004, 0x1010000, 0x1000404, 0x1000004, 0x404, 0x10404, 0x1010400, 0x404, 0x1000400, 0x1000400, 0, 0x10004, 0x10400, 0, 0x1010004];
-var spfunction2 = [-0x7fef7fe0, -0x7fff8000, 0x8000, 0x108020, 0x100000, 0x20, -0x7fefffe0, -0x7fff7fe0, -0x7fffffe0, -0x7fef7fe0, -0x7fef8000, -0x80000000, -0x7fff8000, 0x100000, 0x20, -0x7fefffe0, 0x108000, 0x100020, -0x7fff7fe0, 0, -0x80000000, 0x8000, 0x108020, -0x7ff00000, 0x100020, -0x7fffffe0, 0, 0x108000, 0x8020, -0x7fef8000, -0x7ff00000, 0x8020, 0, 0x108020, -0x7fefffe0, 0x100000, -0x7fff7fe0, -0x7ff00000, -0x7fef8000, 0x8000, -0x7ff00000, -0x7fff8000, 0x20, -0x7fef7fe0, 0x108020, 0x20, 0x8000, -0x80000000, 0x8020, -0x7fef8000, 0x100000, -0x7fffffe0, 0x100020, -0x7fff7fe0, -0x7fffffe0, 0x100020, 0x108000, 0, -0x7fff8000, 0x8020, -0x80000000, -0x7fefffe0, -0x7fef7fe0, 0x108000];
-var spfunction3 = [0x208, 0x8020200, 0, 0x8020008, 0x8000200, 0, 0x20208, 0x8000200, 0x20008, 0x8000008, 0x8000008, 0x20000, 0x8020208, 0x20008, 0x8020000, 0x208, 0x8000000, 0x8, 0x8020200, 0x200, 0x20200, 0x8020000, 0x8020008, 0x20208, 0x8000208, 0x20200, 0x20000, 0x8000208, 0x8, 0x8020208, 0x200, 0x8000000, 0x8020200, 0x8000000, 0x20008, 0x208, 0x20000, 0x8020200, 0x8000200, 0, 0x200, 0x20008, 0x8020208, 0x8000200, 0x8000008, 0x200, 0, 0x8020008, 0x8000208, 0x20000, 0x8000000, 0x8020208, 0x8, 0x20208, 0x20200, 0x8000008, 0x8020000, 0x8000208, 0x208, 0x8020000, 0x20208, 0x8, 0x8020008, 0x20200];
-var spfunction4 = [0x802001, 0x2081, 0x2081, 0x80, 0x802080, 0x800081, 0x800001, 0x2001, 0, 0x802000, 0x802000, 0x802081, 0x81, 0, 0x800080, 0x800001, 0x1, 0x2000, 0x800000, 0x802001, 0x80, 0x800000, 0x2001, 0x2080, 0x800081, 0x1, 0x2080, 0x800080, 0x2000, 0x802080, 0x802081, 0x81, 0x800080, 0x800001, 0x802000, 0x802081, 0x81, 0, 0, 0x802000, 0x2080, 0x800080, 0x800081, 0x1, 0x802001, 0x2081, 0x2081, 0x80, 0x802081, 0x81, 0x1, 0x2000, 0x800001, 0x2001, 0x802080, 0x800081, 0x2001, 0x2080, 0x800000, 0x802001, 0x80, 0x800000, 0x2000, 0x802080];
-var spfunction5 = [0x100, 0x2080100, 0x2080000, 0x42000100, 0x80000, 0x100, 0x40000000, 0x2080000, 0x40080100, 0x80000, 0x2000100, 0x40080100, 0x42000100, 0x42080000, 0x80100, 0x40000000, 0x2000000, 0x40080000, 0x40080000, 0, 0x40000100, 0x42080100, 0x42080100, 0x2000100, 0x42080000, 0x40000100, 0, 0x42000000, 0x2080100, 0x2000000, 0x42000000, 0x80100, 0x80000, 0x42000100, 0x100, 0x2000000, 0x40000000, 0x2080000, 0x42000100, 0x40080100, 0x2000100, 0x40000000, 0x42080000, 0x2080100, 0x40080100, 0x100, 0x2000000, 0x42080000, 0x42080100, 0x80100, 0x42000000, 0x42080100, 0x2080000, 0, 0x40080000, 0x42000000, 0x80100, 0x2000100, 0x40000100, 0x80000, 0, 0x40080000, 0x2080100, 0x40000100];
-var spfunction6 = [0x20000010, 0x20400000, 0x4000, 0x20404010, 0x20400000, 0x10, 0x20404010, 0x400000, 0x20004000, 0x404010, 0x400000, 0x20000010, 0x400010, 0x20004000, 0x20000000, 0x4010, 0, 0x400010, 0x20004010, 0x4000, 0x404000, 0x20004010, 0x10, 0x20400010, 0x20400010, 0, 0x404010, 0x20404000, 0x4010, 0x404000, 0x20404000, 0x20000000, 0x20004000, 0x10, 0x20400010, 0x404000, 0x20404010, 0x400000, 0x4010, 0x20000010, 0x400000, 0x20004000, 0x20000000, 0x4010, 0x20000010, 0x20404010, 0x404000, 0x20400000, 0x404010, 0x20404000, 0, 0x20400010, 0x10, 0x4000, 0x20400000, 0x404010, 0x4000, 0x400010, 0x20004010, 0, 0x20404000, 0x20000000, 0x400010, 0x20004010];
-var spfunction7 = [0x200000, 0x4200002, 0x4000802, 0, 0x800, 0x4000802, 0x200802, 0x4200800, 0x4200802, 0x200000, 0, 0x4000002, 0x2, 0x4000000, 0x4200002, 0x802, 0x4000800, 0x200802, 0x200002, 0x4000800, 0x4000002, 0x4200000, 0x4200800, 0x200002, 0x4200000, 0x800, 0x802, 0x4200802, 0x200800, 0x2, 0x4000000, 0x200800, 0x4000000, 0x200800, 0x200000, 0x4000802, 0x4000802, 0x4200002, 0x4200002, 0x2, 0x200002, 0x4000000, 0x4000800, 0x200000, 0x4200800, 0x802, 0x200802, 0x4200800, 0x802, 0x4000002, 0x4200802, 0x4200000, 0x200800, 0, 0x2, 0x4200802, 0, 0x200802, 0x4200000, 0x800, 0x4000002, 0x4000800, 0x800, 0x200002];
-var spfunction8 = [0x10001040, 0x1000, 0x40000, 0x10041040, 0x10000000, 0x10001040, 0x40, 0x10000000, 0x40040, 0x10040000, 0x10041040, 0x41000, 0x10041000, 0x41040, 0x1000, 0x40, 0x10040000, 0x10000040, 0x10001000, 0x1040, 0x41000, 0x40040, 0x10040040, 0x10041000, 0x1040, 0, 0, 0x10040040, 0x10000040, 0x10001000, 0x41040, 0x40000, 0x41040, 0x40000, 0x10041000, 0x1000, 0x40, 0x10040040, 0x1000, 0x41040, 0x10001000, 0x40, 0x10000040, 0x10040000, 0x10040040, 0x10000000, 0x40000, 0x10001040, 0, 0x10041040, 0x40040, 0x10000040, 0x10040000, 0x10001000, 0x10001040, 0, 0x10041040, 0x41000, 0x41000, 0x1040, 0x1040, 0x40040, 0x10000000, 0x10041000];
+const spfunction1 = [0x1010400, 0, 0x10000, 0x1010404, 0x1010004, 0x10404, 0x4, 0x10000, 0x400, 0x1010400, 0x1010404, 0x400, 0x1000404, 0x1010004, 0x1000000, 0x4, 0x404, 0x1000400, 0x1000400, 0x10400, 0x10400, 0x1010000, 0x1010000, 0x1000404, 0x10004, 0x1000004, 0x1000004, 0x10004, 0, 0x404, 0x10404, 0x1000000, 0x10000, 0x1010404, 0x4, 0x1010000, 0x1010400, 0x1000000, 0x1000000, 0x400, 0x1010004, 0x10000, 0x10400, 0x1000004, 0x400, 0x4, 0x1000404, 0x10404, 0x1010404, 0x10004, 0x1010000, 0x1000404, 0x1000004, 0x404, 0x10404, 0x1010400, 0x404, 0x1000400, 0x1000400, 0, 0x10004, 0x10400, 0, 0x1010004]
+const spfunction2 = [-0x7FEF7FE0, -0x7FFF8000, 0x8000, 0x108020, 0x100000, 0x20, -0x7FEFFFE0, -0x7FFF7FE0, -0x7FFFFFE0, -0x7FEF7FE0, -0x7FEF8000, -0x80000000, -0x7FFF8000, 0x100000, 0x20, -0x7FEFFFE0, 0x108000, 0x100020, -0x7FFF7FE0, 0, -0x80000000, 0x8000, 0x108020, -0x7FF00000, 0x100020, -0x7FFFFFE0, 0, 0x108000, 0x8020, -0x7FEF8000, -0x7FF00000, 0x8020, 0, 0x108020, -0x7FEFFFE0, 0x100000, -0x7FFF7FE0, -0x7FF00000, -0x7FEF8000, 0x8000, -0x7FF00000, -0x7FFF8000, 0x20, -0x7FEF7FE0, 0x108020, 0x20, 0x8000, -0x80000000, 0x8020, -0x7FEF8000, 0x100000, -0x7FFFFFE0, 0x100020, -0x7FFF7FE0, -0x7FFFFFE0, 0x100020, 0x108000, 0, -0x7FFF8000, 0x8020, -0x80000000, -0x7FEFFFE0, -0x7FEF7FE0, 0x108000]
+const spfunction3 = [0x208, 0x8020200, 0, 0x8020008, 0x8000200, 0, 0x20208, 0x8000200, 0x20008, 0x8000008, 0x8000008, 0x20000, 0x8020208, 0x20008, 0x8020000, 0x208, 0x8000000, 0x8, 0x8020200, 0x200, 0x20200, 0x8020000, 0x8020008, 0x20208, 0x8000208, 0x20200, 0x20000, 0x8000208, 0x8, 0x8020208, 0x200, 0x8000000, 0x8020200, 0x8000000, 0x20008, 0x208, 0x20000, 0x8020200, 0x8000200, 0, 0x200, 0x20008, 0x8020208, 0x8000200, 0x8000008, 0x200, 0, 0x8020008, 0x8000208, 0x20000, 0x8000000, 0x8020208, 0x8, 0x20208, 0x20200, 0x8000008, 0x8020000, 0x8000208, 0x208, 0x8020000, 0x20208, 0x8, 0x8020008, 0x20200]
+const spfunction4 = [0x802001, 0x2081, 0x2081, 0x80, 0x802080, 0x800081, 0x800001, 0x2001, 0, 0x802000, 0x802000, 0x802081, 0x81, 0, 0x800080, 0x800001, 0x1, 0x2000, 0x800000, 0x802001, 0x80, 0x800000, 0x2001, 0x2080, 0x800081, 0x1, 0x2080, 0x800080, 0x2000, 0x802080, 0x802081, 0x81, 0x800080, 0x800001, 0x802000, 0x802081, 0x81, 0, 0, 0x802000, 0x2080, 0x800080, 0x800081, 0x1, 0x802001, 0x2081, 0x2081, 0x80, 0x802081, 0x81, 0x1, 0x2000, 0x800001, 0x2001, 0x802080, 0x800081, 0x2001, 0x2080, 0x800000, 0x802001, 0x80, 0x800000, 0x2000, 0x802080]
+const spfunction5 = [0x100, 0x2080100, 0x2080000, 0x42000100, 0x80000, 0x100, 0x40000000, 0x2080000, 0x40080100, 0x80000, 0x2000100, 0x40080100, 0x42000100, 0x42080000, 0x80100, 0x40000000, 0x2000000, 0x40080000, 0x40080000, 0, 0x40000100, 0x42080100, 0x42080100, 0x2000100, 0x42080000, 0x40000100, 0, 0x42000000, 0x2080100, 0x2000000, 0x42000000, 0x80100, 0x80000, 0x42000100, 0x100, 0x2000000, 0x40000000, 0x2080000, 0x42000100, 0x40080100, 0x2000100, 0x40000000, 0x42080000, 0x2080100, 0x40080100, 0x100, 0x2000000, 0x42080000, 0x42080100, 0x80100, 0x42000000, 0x42080100, 0x2080000, 0, 0x40080000, 0x42000000, 0x80100, 0x2000100, 0x40000100, 0x80000, 0, 0x40080000, 0x2080100, 0x40000100]
+const spfunction6 = [0x20000010, 0x20400000, 0x4000, 0x20404010, 0x20400000, 0x10, 0x20404010, 0x400000, 0x20004000, 0x404010, 0x400000, 0x20000010, 0x400010, 0x20004000, 0x20000000, 0x4010, 0, 0x400010, 0x20004010, 0x4000, 0x404000, 0x20004010, 0x10, 0x20400010, 0x20400010, 0, 0x404010, 0x20404000, 0x4010, 0x404000, 0x20404000, 0x20000000, 0x20004000, 0x10, 0x20400010, 0x404000, 0x20404010, 0x400000, 0x4010, 0x20000010, 0x400000, 0x20004000, 0x20000000, 0x4010, 0x20000010, 0x20404010, 0x404000, 0x20400000, 0x404010, 0x20404000, 0, 0x20400010, 0x10, 0x4000, 0x20400000, 0x404010, 0x4000, 0x400010, 0x20004010, 0, 0x20404000, 0x20000000, 0x400010, 0x20004010]
+const spfunction7 = [0x200000, 0x4200002, 0x4000802, 0, 0x800, 0x4000802, 0x200802, 0x4200800, 0x4200802, 0x200000, 0, 0x4000002, 0x2, 0x4000000, 0x4200002, 0x802, 0x4000800, 0x200802, 0x200002, 0x4000800, 0x4000002, 0x4200000, 0x4200800, 0x200002, 0x4200000, 0x800, 0x802, 0x4200802, 0x200800, 0x2, 0x4000000, 0x200800, 0x4000000, 0x200800, 0x200000, 0x4000802, 0x4000802, 0x4200002, 0x4200002, 0x2, 0x200002, 0x4000000, 0x4000800, 0x200000, 0x4200800, 0x802, 0x200802, 0x4200800, 0x802, 0x4000002, 0x4200802, 0x4200000, 0x200800, 0, 0x2, 0x4200802, 0, 0x200802, 0x4200000, 0x800, 0x4000002, 0x4000800, 0x800, 0x200002]
+const spfunction8 = [0x10001040, 0x1000, 0x40000, 0x10041040, 0x10000000, 0x10001040, 0x40, 0x10000000, 0x40040, 0x10040000, 0x10041040, 0x41000, 0x10041000, 0x41040, 0x1000, 0x40, 0x10040000, 0x10000040, 0x10001000, 0x1040, 0x41000, 0x40040, 0x10040040, 0x10041000, 0x1040, 0, 0, 0x10040040, 0x10000040, 0x10001000, 0x41040, 0x40000, 0x41040, 0x40000, 0x10041000, 0x1000, 0x40, 0x10040040, 0x1000, 0x41040, 0x10001000, 0x40, 0x10000040, 0x10040000, 0x10040040, 0x10000000, 0x40000, 0x10001040, 0, 0x10041040, 0x40040, 0x10000040, 0x10040000, 0x10001000, 0x10001040, 0, 0x10041040, 0x41000, 0x41000, 0x1040, 0x1040, 0x40040, 0x10000000, 0x10041000]
 
 /**
  * Create necessary sub keys.
@@ -135,107 +135,108 @@ var spfunction8 = [0x10001040, 0x1000, 0x40000, 0x10041040, 0x10000000, 0x100010
  * @return the expanded keys.
  */
 function _createKeys(key: Buffer) {
-  var pc2bytes0 = [0, 0x4, 0x20000000, 0x20000004, 0x10000, 0x10004, 0x20010000, 0x20010004, 0x200, 0x204, 0x20000200, 0x20000204, 0x10200, 0x10204, 0x20010200, 0x20010204],
-    pc2bytes1 = [0, 0x1, 0x100000, 0x100001, 0x4000000, 0x4000001, 0x4100000, 0x4100001, 0x100, 0x101, 0x100100, 0x100101, 0x4000100, 0x4000101, 0x4100100, 0x4100101],
-    pc2bytes2 = [0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808, 0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808],
-    pc2bytes3 = [0, 0x200000, 0x8000000, 0x8200000, 0x2000, 0x202000, 0x8002000, 0x8202000, 0x20000, 0x220000, 0x8020000, 0x8220000, 0x22000, 0x222000, 0x8022000, 0x8222000],
-    pc2bytes4 = [0, 0x40000, 0x10, 0x40010, 0, 0x40000, 0x10, 0x40010, 0x1000, 0x41000, 0x1010, 0x41010, 0x1000, 0x41000, 0x1010, 0x41010],
-    pc2bytes5 = [0, 0x400, 0x20, 0x420, 0, 0x400, 0x20, 0x420, 0x2000000, 0x2000400, 0x2000020, 0x2000420, 0x2000000, 0x2000400, 0x2000020, 0x2000420],
-    pc2bytes6 = [0, 0x10000000, 0x80000, 0x10080000, 0x2, 0x10000002, 0x80002, 0x10080002, 0, 0x10000000, 0x80000, 0x10080000, 0x2, 0x10000002, 0x80002, 0x10080002],
-    pc2bytes7 = [0, 0x10000, 0x800, 0x10800, 0x20000000, 0x20010000, 0x20000800, 0x20010800, 0x20000, 0x30000, 0x20800, 0x30800, 0x20020000, 0x20030000, 0x20020800, 0x20030800],
-    pc2bytes8 = [0, 0x40000, 0, 0x40000, 0x2, 0x40002, 0x2, 0x40002, 0x2000000, 0x2040000, 0x2000000, 0x2040000, 0x2000002, 0x2040002, 0x2000002, 0x2040002],
-    pc2bytes9 = [0, 0x10000000, 0x8, 0x10000008, 0, 0x10000000, 0x8, 0x10000008, 0x400, 0x10000400, 0x408, 0x10000408, 0x400, 0x10000400, 0x408, 0x10000408],
-    pc2bytes10 = [0, 0x20, 0, 0x20, 0x100000, 0x100020, 0x100000, 0x100020, 0x2000, 0x2020, 0x2000, 0x2020, 0x102000, 0x102020, 0x102000, 0x102020],
-    pc2bytes11 = [0, 0x1000000, 0x200, 0x1000200, 0x200000, 0x1200000, 0x200200, 0x1200200, 0x4000000, 0x5000000, 0x4000200, 0x5000200, 0x4200000, 0x5200000, 0x4200200, 0x5200200],
-    pc2bytes12 = [0, 0x1000, 0x8000000, 0x8001000, 0x80000, 0x81000, 0x8080000, 0x8081000, 0x10, 0x1010, 0x8000010, 0x8001010, 0x80010, 0x81010, 0x8080010, 0x8081010],
-    pc2bytes13 = [0, 0x4, 0x100, 0x104, 0, 0x4, 0x100, 0x104, 0x1, 0x5, 0x101, 0x105, 0x1, 0x5, 0x101, 0x105];
+  const pc2bytes0 = [0, 0x4, 0x20000000, 0x20000004, 0x10000, 0x10004, 0x20010000, 0x20010004, 0x200, 0x204, 0x20000200, 0x20000204, 0x10200, 0x10204, 0x20010200, 0x20010204]
+  const pc2bytes1 = [0, 0x1, 0x100000, 0x100001, 0x4000000, 0x4000001, 0x4100000, 0x4100001, 0x100, 0x101, 0x100100, 0x100101, 0x4000100, 0x4000101, 0x4100100, 0x4100101]
+  const pc2bytes2 = [0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808, 0, 0x8, 0x800, 0x808, 0x1000000, 0x1000008, 0x1000800, 0x1000808]
+  const pc2bytes3 = [0, 0x200000, 0x8000000, 0x8200000, 0x2000, 0x202000, 0x8002000, 0x8202000, 0x20000, 0x220000, 0x8020000, 0x8220000, 0x22000, 0x222000, 0x8022000, 0x8222000]
+  const pc2bytes4 = [0, 0x40000, 0x10, 0x40010, 0, 0x40000, 0x10, 0x40010, 0x1000, 0x41000, 0x1010, 0x41010, 0x1000, 0x41000, 0x1010, 0x41010]
+  const pc2bytes5 = [0, 0x400, 0x20, 0x420, 0, 0x400, 0x20, 0x420, 0x2000000, 0x2000400, 0x2000020, 0x2000420, 0x2000000, 0x2000400, 0x2000020, 0x2000420]
+  const pc2bytes6 = [0, 0x10000000, 0x80000, 0x10080000, 0x2, 0x10000002, 0x80002, 0x10080002, 0, 0x10000000, 0x80000, 0x10080000, 0x2, 0x10000002, 0x80002, 0x10080002]
+  const pc2bytes7 = [0, 0x10000, 0x800, 0x10800, 0x20000000, 0x20010000, 0x20000800, 0x20010800, 0x20000, 0x30000, 0x20800, 0x30800, 0x20020000, 0x20030000, 0x20020800, 0x20030800]
+  const pc2bytes8 = [0, 0x40000, 0, 0x40000, 0x2, 0x40002, 0x2, 0x40002, 0x2000000, 0x2040000, 0x2000000, 0x2040000, 0x2000002, 0x2040002, 0x2000002, 0x2040002]
+  const pc2bytes9 = [0, 0x10000000, 0x8, 0x10000008, 0, 0x10000000, 0x8, 0x10000008, 0x400, 0x10000400, 0x408, 0x10000408, 0x400, 0x10000400, 0x408, 0x10000408]
+  const pc2bytes10 = [0, 0x20, 0, 0x20, 0x100000, 0x100020, 0x100000, 0x100020, 0x2000, 0x2020, 0x2000, 0x2020, 0x102000, 0x102020, 0x102000, 0x102020]
+  const pc2bytes11 = [0, 0x1000000, 0x200, 0x1000200, 0x200000, 0x1200000, 0x200200, 0x1200200, 0x4000000, 0x5000000, 0x4000200, 0x5000200, 0x4200000, 0x5200000, 0x4200200, 0x5200200]
+  const pc2bytes12 = [0, 0x1000, 0x8000000, 0x8001000, 0x80000, 0x81000, 0x8080000, 0x8081000, 0x10, 0x1010, 0x8000010, 0x8001010, 0x80010, 0x81010, 0x8080010, 0x8081010]
+  const pc2bytes13 = [0, 0x4, 0x100, 0x104, 0, 0x4, 0x100, 0x104, 0x1, 0x5, 0x101, 0x105, 0x1, 0x5, 0x101, 0x105]
 
   // how many iterations (1 for des, 3 for triple des)
   // changed by Paul 16/6/2007 to use Triple DES for 9+ byte keys
-  var iterations = key.length() > 8 ? 3 : 1;
+  const iterations = key.length() > 8 ? 3 : 1
 
   // stores the return keys
-  var keys = [];
+  const keys = []
 
   // now define the left shifts which need to be done
-  var shifts = [0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0];
+  const shifts = [0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0]
 
-  var n = 0, tmp;
-  for (var j = 0; j < iterations; j++) {
-    var left = key.getInt32();
-    var right = key.getInt32();
+  let n = 0; let tmp
+  for (let j = 0; j < iterations; j++) {
+    let left = key.getInt32()
+    let right = key.getInt32()
 
-    tmp = ((left >>> 4) ^ right) & 0x0f0f0f0f;
-    right ^= tmp;
-    left ^= (tmp << 4);
+    tmp = ((left >>> 4) ^ right) & 0x0F0F0F0F
+    right ^= tmp
+    left ^= (tmp << 4)
 
-    tmp = ((right >>> -16) ^ left) & 0x0000ffff;
-    left ^= tmp;
-    right ^= (tmp << -16);
+    tmp = ((right >>> -16) ^ left) & 0x0000FFFF
+    left ^= tmp
+    right ^= (tmp << -16)
 
-    tmp = ((left >>> 2) ^ right) & 0x33333333;
-    right ^= tmp;
-    left ^= (tmp << 2);
+    tmp = ((left >>> 2) ^ right) & 0x33333333
+    right ^= tmp
+    left ^= (tmp << 2)
 
-    tmp = ((right >>> -16) ^ left) & 0x0000ffff;
-    left ^= tmp;
-    right ^= (tmp << -16);
+    tmp = ((right >>> -16) ^ left) & 0x0000FFFF
+    left ^= tmp
+    right ^= (tmp << -16)
 
-    tmp = ((left >>> 1) ^ right) & 0x55555555;
-    right ^= tmp;
-    left ^= (tmp << 1);
+    tmp = ((left >>> 1) ^ right) & 0x55555555
+    right ^= tmp
+    left ^= (tmp << 1)
 
-    tmp = ((right >>> 8) ^ left) & 0x00ff00ff;
-    left ^= tmp;
-    right ^= (tmp << 8);
+    tmp = ((right >>> 8) ^ left) & 0x00FF00FF
+    left ^= tmp
+    right ^= (tmp << 8)
 
-    tmp = ((left >>> 1) ^ right) & 0x55555555;
-    right ^= tmp;
-    left ^= (tmp << 1);
+    tmp = ((left >>> 1) ^ right) & 0x55555555
+    right ^= tmp
+    left ^= (tmp << 1)
 
     // right needs to be shifted and OR'd with last four bits of left
-    tmp = (left << 8) | ((right >>> 20) & 0x000000f0);
+    tmp = (left << 8) | ((right >>> 20) & 0x000000F0)
 
     // left needs to be put upside down
-    left = ((right << 24) | ((right << 8) & 0xff0000) |
-      ((right >>> 8) & 0xff00) | ((right >>> 24) & 0xf0));
-    right = tmp;
+    left = ((right << 24) | ((right << 8) & 0xFF0000)
+      | ((right >>> 8) & 0xFF00) | ((right >>> 24) & 0xF0))
+    right = tmp
 
     // now go through and perform these shifts on the left and right keys
-    for (var i = 0; i < shifts.length; ++i) {
-      //shift the keys either one or two bits to the left
+    for (let i = 0; i < shifts.length; ++i) {
+      // shift the keys either one or two bits to the left
       if (shifts[i]) {
-        left = (left << 2) | (left >>> 26);
-        right = (right << 2) | (right >>> 26);
-      } else {
-        left = (left << 1) | (left >>> 27);
-        right = (right << 1) | (right >>> 27);
+        left = (left << 2) | (left >>> 26)
+        right = (right << 2) | (right >>> 26)
       }
-      left &= -0xf;
-      right &= -0xf;
+      else {
+        left = (left << 1) | (left >>> 27)
+        right = (right << 1) | (right >>> 27)
+      }
+      left &= -0xF
+      right &= -0xF
 
       // now apply PC-2, in such a way that E is easier when encrypting or
       // decrypting this conversion will look like PC-2 except only the last 6
       // bits of each byte are used rather than 48 consecutive bits and the
       // order of lines will be according to how the S selection functions will
       // be applied: S2, S4, S6, S8, S1, S3, S5, S7
-      var lefttmp = (
-        pc2bytes0[left >>> 28] | pc2bytes1[(left >>> 24) & 0xf] |
-        pc2bytes2[(left >>> 20) & 0xf] | pc2bytes3[(left >>> 16) & 0xf] |
-        pc2bytes4[(left >>> 12) & 0xf] | pc2bytes5[(left >>> 8) & 0xf] |
-        pc2bytes6[(left >>> 4) & 0xf]);
-      var righttmp = (
-        pc2bytes7[right >>> 28] | pc2bytes8[(right >>> 24) & 0xf] |
-        pc2bytes9[(right >>> 20) & 0xf] | pc2bytes10[(right >>> 16) & 0xf] |
-        pc2bytes11[(right >>> 12) & 0xf] | pc2bytes12[(right >>> 8) & 0xf] |
-        pc2bytes13[(right >>> 4) & 0xf]);
-      tmp = ((righttmp >>> 16) ^ lefttmp) & 0x0000ffff;
-      keys[n++] = lefttmp ^ tmp;
-      keys[n++] = righttmp ^ (tmp << 16);
+      const lefttmp = (
+        pc2bytes0[left >>> 28] | pc2bytes1[(left >>> 24) & 0xF]
+        | pc2bytes2[(left >>> 20) & 0xF] | pc2bytes3[(left >>> 16) & 0xF]
+        | pc2bytes4[(left >>> 12) & 0xF] | pc2bytes5[(left >>> 8) & 0xF]
+        | pc2bytes6[(left >>> 4) & 0xF])
+      const righttmp = (
+        pc2bytes7[right >>> 28] | pc2bytes8[(right >>> 24) & 0xF]
+        | pc2bytes9[(right >>> 20) & 0xF] | pc2bytes10[(right >>> 16) & 0xF]
+        | pc2bytes11[(right >>> 12) & 0xF] | pc2bytes12[(right >>> 8) & 0xF]
+        | pc2bytes13[(right >>> 4) & 0xF])
+      tmp = ((righttmp >>> 16) ^ lefttmp) & 0x0000FFFF
+      keys[n++] = lefttmp ^ tmp
+      keys[n++] = righttmp ^ (tmp << 16)
     }
   }
 
-  return keys;
+  return keys
 }
 
 /**
@@ -249,101 +250,102 @@ function _createKeys(key: Buffer) {
  */
 function _updateBlock(keys: number[], input: number[], output: number[], decrypt: boolean) {
   // set up loops for single or triple DES
-  var iterations = keys.length === 32 ? 3 : 9;
-  var looping;
+  const iterations = keys.length === 32 ? 3 : 9
+  let looping
   if (iterations === 3) {
-    looping = decrypt ? [30, -2, -2] : [0, 32, 2];
-  } else {
-    looping = (decrypt ?
-      [94, 62, -2, 32, 64, 2, 30, -2, -2] :
-      [0, 32, 2, 62, 30, -2, 64, 96, 2]);
+    looping = decrypt ? [30, -2, -2] : [0, 32, 2]
+  }
+  else {
+    looping = (decrypt
+      ? [94, 62, -2, 32, 64, 2, 30, -2, -2]
+      : [0, 32, 2, 62, 30, -2, 64, 96, 2])
   }
 
-  var tmp;
+  let tmp
 
-  var left = input[0];
-  var right = input[1];
+  let left = input[0]
+  let right = input[1]
 
   // first each 64 bit chunk of the message must be permuted according to IP
-  tmp = ((left >>> 4) ^ right) & 0x0f0f0f0f;
-  right ^= tmp;
-  left ^= (tmp << 4);
+  tmp = ((left >>> 4) ^ right) & 0x0F0F0F0F
+  right ^= tmp
+  left ^= (tmp << 4)
 
-  tmp = ((left >>> 16) ^ right) & 0x0000ffff;
-  right ^= tmp;
-  left ^= (tmp << 16);
+  tmp = ((left >>> 16) ^ right) & 0x0000FFFF
+  right ^= tmp
+  left ^= (tmp << 16)
 
-  tmp = ((right >>> 2) ^ left) & 0x33333333;
-  left ^= tmp;
-  right ^= (tmp << 2);
+  tmp = ((right >>> 2) ^ left) & 0x33333333
+  left ^= tmp
+  right ^= (tmp << 2)
 
-  tmp = ((right >>> 8) ^ left) & 0x00ff00ff;
-  left ^= tmp;
-  right ^= (tmp << 8);
+  tmp = ((right >>> 8) ^ left) & 0x00FF00FF
+  left ^= tmp
+  right ^= (tmp << 8)
 
-  tmp = ((left >>> 1) ^ right) & 0x55555555;
-  right ^= tmp;
-  left ^= (tmp << 1);
+  tmp = ((left >>> 1) ^ right) & 0x55555555
+  right ^= tmp
+  left ^= (tmp << 1)
 
   // rotate left 1 bit
-  left = ((left << 1) | (left >>> 31));
-  right = ((right << 1) | (right >>> 31));
+  left = ((left << 1) | (left >>> 31))
+  right = ((right << 1) | (right >>> 31))
 
-  for (var j = 0; j < iterations; j += 3) {
-    var endloop = looping[j + 1];
-    var loopinc = looping[j + 2];
+  for (let j = 0; j < iterations; j += 3) {
+    const endloop = looping[j + 1]
+    const loopinc = looping[j + 2]
 
     // now go through and perform the encryption or decryption
-    for (var i = looping[j]; i != endloop; i += loopinc) {
-      var right1 = right ^ keys[i];
-      var right2 = ((right >>> 4) | (right << 28)) ^ keys[i + 1];
+    for (let i = looping[j]; i != endloop; i += loopinc) {
+      const right1 = right ^ keys[i]
+      const right2 = ((right >>> 4) | (right << 28)) ^ keys[i + 1]
 
       // passing these bytes through the S selection functions
-      tmp = left;
-      left = right;
+      tmp = left
+      left = right
       right = tmp ^ (
-        spfunction2[(right1 >>> 24) & 0x3f] |
-        spfunction4[(right1 >>> 16) & 0x3f] |
-        spfunction6[(right1 >>> 8) & 0x3f] |
-        spfunction8[right1 & 0x3f] |
-        spfunction1[(right2 >>> 24) & 0x3f] |
-        spfunction3[(right2 >>> 16) & 0x3f] |
-        spfunction5[(right2 >>> 8) & 0x3f] |
-        spfunction7[right2 & 0x3f]);
+        spfunction2[(right1 >>> 24) & 0x3F]
+        | spfunction4[(right1 >>> 16) & 0x3F]
+        | spfunction6[(right1 >>> 8) & 0x3F]
+        | spfunction8[right1 & 0x3F]
+        | spfunction1[(right2 >>> 24) & 0x3F]
+        | spfunction3[(right2 >>> 16) & 0x3F]
+        | spfunction5[(right2 >>> 8) & 0x3F]
+        | spfunction7[right2 & 0x3F])
     }
     // unreverse left and right
-    tmp = left;
-    left = right;
-    right = tmp;
+    tmp = left
+    left = right
+    right = tmp
   }
 
   // rotate right 1 bit
-  left = ((left >>> 1) | (left << 31));
-  right = ((right >>> 1) | (right << 31));
+  left = ((left >>> 1) | (left << 31))
+  right = ((right >>> 1) | (right << 31))
 
   // now perform IP-1, which is IP in the opposite direction
-  tmp = ((left >>> 1) ^ right) & 0x55555555;
-  right ^= tmp;
-  left ^= (tmp << 1);
+  tmp = ((left >>> 1) ^ right) & 0x55555555
+  right ^= tmp
+  left ^= (tmp << 1)
 
-  tmp = ((right >>> 8) ^ left) & 0x00ff00ff;
-  left ^= tmp;
-  right ^= (tmp << 8);
+  tmp = ((right >>> 8) ^ left) & 0x00FF00FF
+  left ^= tmp
+  right ^= (tmp << 8)
 
-  tmp = ((right >>> 2) ^ left) & 0x33333333;
-  left ^= tmp;
-  right ^= (tmp << 2);
+  tmp = ((right >>> 2) ^ left) & 0x33333333
+  left ^= tmp
+  right ^= (tmp << 2)
 
-  tmp = ((left >>> 16) ^ right) & 0x0000ffff;
-  right ^= tmp;
-  left ^= (tmp << 16);
+  tmp = ((left >>> 16) ^ right) & 0x0000FFFF
+  right ^= tmp
+  left ^= (tmp << 16)
 
-  tmp = ((left >>> 4) ^ right) & 0x0f0f0f0f;
-  right ^= tmp;
-  left ^= (tmp << 4);
+  tmp = ((left >>> 4) ^ right) & 0x0F0F0F0F
+  right ^= tmp
+  left ^= (tmp << 4)
 
-  output[0] = left;
-  output[1] = right;
+  output[0] = left
+  output[1] = right
 }
 
 /**
@@ -371,33 +373,34 @@ function _createCipher(options: {
   decrypt?: boolean
   output?: Buffer
 }): BlockCipher {
-  options = options || {};
-  var mode = (options.mode || 'CBC').toUpperCase();
-  var algorithm = 'DES-' + mode;
+  options = options || {}
+  const mode = (options.mode || 'CBC').toUpperCase()
+  const algorithm = `DES-${mode}`
 
-  var cipher;
+  let cipher
   if (options.decrypt) {
-    cipher = createDecipher(algorithm, options.key);
-  } else {
-    cipher = createCipher(algorithm, options.key);
+    cipher = createDecipher(algorithm, options.key)
+  }
+  else {
+    cipher = createCipher(algorithm, options.key)
   }
 
   // backwards compatible start API
-  var start = cipher.start;
-  cipher.start = function (iv, options) {
+  const start = cipher.start
+  cipher.start = function (iv: ByteBuffer, options: any) {
     // backwards compatibility: support second arg as output buffer
-    var output = null;
+    let output = null
     if (options instanceof ByteBuffer) {
-      output = options;
-      options = {};
+      output = options
+      options = {}
     }
-    options = options || {};
-    options.output = output;
-    options.iv = iv;
-    start.call(cipher, options);
-  };
+    options = options || {}
+    options.output = output
+    options.iv = iv
+    start.call(cipher, options)
+  }
 
-  return cipher;
+  return cipher
 }
 
 export interface DES {

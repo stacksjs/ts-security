@@ -28,7 +28,7 @@ import { oids } from './oids'
 import { pbkdf2 } from './pbkdf2'
 import { getBytesSync } from './random'
 import { sha512 } from './sha512'
-import { createBuffer, hexToBytes } from './utils'
+import { ByteBuffer, createBuffer, hexToBytes } from './utils'
 
 // validator for an EncryptedPrivateKeyInfo structure
 // Note: Currently only works w/algorithm params
@@ -258,7 +258,7 @@ export function encryptPrivateKeyInfo(obj: any, password: any, options: any): Bu
     const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
     // encrypt private key using pbe SHA-1 and AES/DES
-    var dk = forge.pkcs5.pbkdf2(password, salt, count, dkLen, md)
+    var dk = pbkdf2(password, salt, count, dkLen, md)
     var iv = getBytesSync(ivLen)
     var cipher = cipherFn(dk)
     cipher.start(iv)
@@ -301,9 +301,9 @@ export function encryptPrivateKeyInfo(obj: any, password: any, options: any): Bu
     // Do PKCS12 PBE
     dkLen = 24
 
-    const saltBytes = new forge.util.ByteBuffer(salt)
-    var dk = pki.pbe.generatePkcs12Key(password, saltBytes, 1, count, dkLen)
-    var iv = pki.pbe.generatePkcs12Key(password, saltBytes, 2, count, dkLen)
+    const saltBytes = new ByteBuffer(salt)
+    var dk = generatePkcs12Key(password, saltBytes, 1, count, dkLen)
+    var iv = generatePkcs12Key(password, saltBytes, 2, count, dkLen)
     var cipher = forge.des.createEncryptionCipher(dk)
     cipher.start(iv)
     cipher.update(asn1.toDer(obj))
@@ -643,7 +643,7 @@ pki.decryptRsaPrivateKey = function (pem, password) {
  *
  * @return a ByteBuffer with the bytes derived from the password.
  */
-pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
+export function generatePkcs12Key(password: string, salt: string, id: number, iter: number, n: number, md: any): ByteBuffer {
   let j, l
 
   if (typeof md === 'undefined' || md === null) {
@@ -655,10 +655,10 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
 
   const u = md.digestLength
   const v = md.blockLength
-  const result = new forge.util.ByteBuffer()
+  const result = new ByteBuffer()
 
   /* Convert password to Unicode byte buffer + trailing 0-byte. */
-  const passBuf = new forge.util.ByteBuffer()
+  const passBuf = new ByteBuffer()
   if (password !== null && password !== undefined) {
     for (l = 0; l < password.length; l++) {
       passBuf.putInt16(password.charCodeAt(l))
@@ -672,7 +672,7 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
 
   /* 1. Construct a string, D (the "diversifier"), by concatenating
         v copies of ID. */
-  const D = new forge.util.ByteBuffer()
+  const D = new ByteBuffer()
   D.fillWithByte(id, v)
 
   /* 2. Concatenate copies of the salt together to create a string S of length
@@ -680,7 +680,7 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
         to create S).
         Note that if the salt is the empty string, then so is S. */
   const Slen = v * Math.ceil(s / v)
-  const S = new forge.util.ByteBuffer()
+  const S = new ByteBuffer()
   for (l = 0; l < Slen; l++) {
     S.putByte(salt.at(l % s))
   }
@@ -690,7 +690,7 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
         truncated to create P).
         Note that if the password is the empty string, then so is P. */
   const Plen = v * Math.ceil(p / v)
-  const P = new forge.util.ByteBuffer()
+  const P = new ByteBuffer()
   for (l = 0; l < Plen; l++) {
     P.putByte(passBuf.at(l % p))
   }
@@ -705,7 +705,7 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
   /* 6. For i=1, 2, ..., c, do the following: */
   for (let i = 1; i <= c; i++) {
     /* a) Set Ai=H^r(D||I). (l.e. the rth hash of D||I, H(H(H(...H(D||I)))) */
-    let buf = new forge.util.ByteBuffer()
+    let buf = new ByteBuffer()
     buf.putBytes(D.bytes())
     buf.putBytes(I.bytes())
     for (let round = 0; round < iter; round++) {
@@ -716,7 +716,7 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
 
     /* b) Concatenate copies of Ai to create a string B of length v bytes (the
           final copy of Ai may be truncated to create B). */
-    const B = new forge.util.ByteBuffer()
+    const B = new ByteBuffer()
     for (l = 0; l < v; l++) {
       B.putByte(buf.at(l % u))
     }
@@ -725,9 +725,9 @@ pki.pbe.generatePkcs12Key = function (password, salt, id, iter, n, md) {
           where k=ceil(s / v) + ceil(p / v), modify I by setting
           Ij=(Ij+B+1) mod 2v for each j.  */
     const k = Math.ceil(s / v) + Math.ceil(p / v)
-    const Inew = new forge.util.ByteBuffer()
+    const Inew = new ByteBuffer()
     for (j = 0; j < k; j++) {
-      const chunk = new forge.util.ByteBuffer(I.getBytes(v))
+      const chunk = new ByteBuffer(I.getBytes(v))
       let x = 0x1FF
       for (l = B.length() - 1; l >= 0; l--) {
         x = x >> 8
@@ -788,10 +788,11 @@ pki.pbe.getCipher = function (oid, params, password) {
  *
  * @return new cipher object instance.
  */
-pki.pbe.getCipherForPBES2 = function (oid, params, password) {
+function getCipherForPBES2(oid: string, params: any, password: string) {
   // get PBE params
   const capture = {}
   const errors = []
+
   if (!asn1.validate(params, PBES2AlgorithmsValidator, capture, errors)) {
     var error = new Error('Cannot read password-based-encryption algorithm '
       + 'parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')

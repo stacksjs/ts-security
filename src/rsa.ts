@@ -66,8 +66,8 @@ import type { Asn1Object } from './asn1'
 import { asn1 } from './asn1'
 import { BigInteger } from './jsbn'
 import { oids } from './oids'
-import { getBytes, random } from './random'
 import { encode_rsa_oaep } from './pkcs1'
+import { getBytes, random } from './random'
 import util, { createBuffer, isServer } from './utils'
 
 const _crypto = isServer ? require('node:crypto') : null
