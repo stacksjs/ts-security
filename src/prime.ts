@@ -14,7 +14,6 @@ import { estimateCores } from './utils'
 const GCD_30_DELTA = [6, 4, 2, 4, 2, 4, 6, 2]
 const THIRTY = new BigInteger(null)
 THIRTY.fromInt(30)
-const op_or = (x: number, y: number) => x | y
 
 interface WorkerMessageData {
   found: boolean
@@ -26,7 +25,7 @@ interface WorkerMessageData {
 type WorkerMessageEvent = MessageEvent<WorkerMessageData>
 
 interface PrimeOptions {
-  algorithm?: string | { name: string; options?: any }
+  algorithm?: string | { name: string, options?: any }
   prng?: {
     getBytesSync: (length: number) => string
   }

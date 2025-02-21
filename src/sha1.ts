@@ -43,8 +43,8 @@ export function create(): MessageDigest {
   // input buffer
   let _input = createBuffer()
 
-  // used for word storage
-  const _w: number[] = Array.from({ length: 80 }).fill(0)
+  // Fix array initialization with proper typing
+  const _w = Array.from({ length: 80 }).fill(0)
 
   // message digest object
   const md: MessageDigest = {

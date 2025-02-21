@@ -44,8 +44,8 @@
  * Copyright (c) 2013-2014 Digital Bazaar, Inc.
  */
 
+import type { ByteStringBuffer } from './utils'
 import { sha1 } from './sha1'
-import { ByteStringBuffer } from './utils'
 
 // Extended Error interface for PKCS1 specific errors
 interface PKCS1Error extends Error {

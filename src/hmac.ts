@@ -37,7 +37,7 @@ interface HMACModule {
  *
  * @return an HMAC object.
  */
-function create(): HMAC {
+export function create(): HMAC {
   // the hmac key to use
   let _key: ByteStringBuffer | null = null
 

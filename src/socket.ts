@@ -5,39 +5,106 @@
  *
  * Copyright (c) 2010-2013 Digital Bazaar, Inc.
  */
-const forge = require('./forge')
-require('./util')
 
-// define net namespace
-const net = module.exports = forge.net = forge.net || {}
+/// <reference lib="dom" />
 
-// map of flash ID to socket pool
-net.socketPools = {}
+import { decode64, encode64 } from './utils'
+
+interface Socket {
+  id: string
+  connected: (e: SocketEvent) => void
+  closed: (e: SocketEvent) => void
+  data: (e: SocketEvent) => void
+  error: (e: SocketEvent) => void
+  destroy: () => void
+  connect: (options: ConnectOptions) => void
+  close: () => void
+  isConnected: () => boolean
+  send: (bytes: string) => boolean
+  receive: (count: number) => string | null
+  bytesAvailable: () => number
+}
+
+interface SocketEvent {
+  id: string
+  type: string
+  bytesAvailable?: number
+}
+
+interface ConnectOptions {
+  host: string
+  port: number
+  policyPort?: number
+  policyUrl?: string
+}
+
+interface FlashApi {
+  init: (options: { marshallExceptions: boolean }) => void
+  cleanup: () => void
+  subscribe: (event: string, handler: string) => void
+  create: () => string
+  destroy: (id: string) => void
+  connect: (id: string, host: string, port: number, policyPort: number, policyUrl: string | null) => void
+  close: (id: string) => void
+  isConnected: (id: string) => boolean
+  send: (id: string, data: string) => boolean
+  receive: (id: string, count: number) => { rval: string | null }
+  getBytesAvailable: (id: string) => number
+}
+
+interface SocketPool {
+  id: string
+  flashApi: FlashApi
+  sockets: { [key: string]: Socket }
+  policyPort: number
+  policyUrl: string | null
+  handler: (e: SocketEvent) => void
+  destroy: () => void
+  createSocket: (options: SocketOptions) => Socket
+}
+
+interface SocketOptions {
+  connected?: (e: SocketEvent) => void
+  closed?: (e: SocketEvent) => void
+  data?: (e: SocketEvent) => void
+  error?: (e: SocketEvent) => void
+}
+
+export const net = {
+  socketPools: {} as { [key: string]: SocketPool },
+}
 
 /**
  * Creates a flash socket pool.
  *
  * @param options:
  *          flashId: the dom ID for the flash object element.
- *          policyPort: the default policy port for sockets, 0 to use the
- *            flash default.
- *          policyUrl: the default policy file URL for sockets (if provided
- *            used instead of a policy port).
+ *          policyPort: the default policy port for sockets, 0 to use the flash default.
+ *          policyUrl: the default policy file URL for sockets (if provided used instead of a policy port).
  *          msie: true if the browser is msie, false if not.
  *
  * @return the created socket pool.
  */
-net.createSocketPool = function (options) {
+export function createSocketPool(options: {
+  flashId: string
+  policyPort?: number
+  policyUrl?: string
+  msie?: boolean
+}): SocketPool {
   // set default
   options.msie = options.msie || false
 
   // initialize the flash interface
   const spId = options.flashId
-  const api = document.getElementById(spId)
+  const element = document.getElementById(spId)
+  if (!element) {
+    throw new Error(`Flash element with ID ${spId} not found`)
+  }
+  const api = element as unknown as FlashApi
   api.init({ marshallExceptions: !options.msie })
 
   // create socket pool entry
-  const sp = {
+  const sp: SocketPool = {
     // ID of the socket pool
     id: spId,
     // flash interface
@@ -48,15 +115,29 @@ net.createSocketPool = function (options) {
     policyPort: options.policyPort || 0,
     // default policy URL
     policyUrl: options.policyUrl || null,
+    // handler function will be set below
+    handler: (e: SocketEvent) => {},
+    // destroy function
+    destroy: () => {
+      delete net.socketPools[options.flashId]
+      for (const id in sp.sockets) {
+        sp.sockets[id].destroy()
+      }
+      sp.sockets = {}
+      api.cleanup()
+    },
+    // createSocket function
+    createSocket: (options: SocketOptions) => {
+      return createSocket({ ...options, flashId: spId })
+    },
   }
-  net.socketPools[spId] = sp
 
   // create event handler, subscribe to flash events
   if (options.msie === true) {
-    sp.handler = function (e) {
+    sp.handler = function (e: SocketEvent) {
       if (e.id in sp.sockets) {
         // get handler function
-        let f
+        let f: keyof Socket
         switch (e.type) {
           case 'connect':
             f = 'connected'
@@ -82,10 +163,10 @@ net.createSocketPool = function (options) {
     }
   }
   else {
-    sp.handler = function (e) {
+    sp.handler = function (e: SocketEvent) {
       if (e.id in sp.sockets) {
         // get handler function
-        let f
+        let f: keyof Socket
         switch (e.type) {
           case 'connect':
             f = 'connected'
@@ -104,149 +185,16 @@ net.createSocketPool = function (options) {
       }
     }
   }
+
+  // store socket pool
+  net.socketPools[spId] = sp
+
   const handler = `forge.net.socketPools['${spId}'].handler`
   api.subscribe('connect', handler)
   api.subscribe('close', handler)
   api.subscribe('socketData', handler)
   api.subscribe('ioError', handler)
   api.subscribe('securityError', handler)
-
-  /**
-   * Destroys a socket pool. The socket pool still needs to be cleaned
-   * up via net.cleanup().
-   */
-  sp.destroy = function () {
-    delete net.socketPools[options.flashId]
-    for (const id in sp.sockets) {
-      sp.sockets[id].destroy()
-    }
-    sp.sockets = {}
-    api.cleanup()
-  }
-
-  /**
-   * Creates a new socket.
-   *
-   * @param options:
-   *          connected: function(event) called when the socket connects.
-   *          closed: function(event) called when the socket closes.
-   *          data: function(event) called when socket data has arrived,
-   *            it can be read from the socket using receive().
-   *          error: function(event) called when a socket error occurs.
-   */
-  sp.createSocket = function (options) {
-    // default to empty options
-    options = options || {}
-
-    // create flash socket
-    const id = api.create()
-
-    // create javascript socket wrapper
-    const socket = {
-      id,
-      // set handlers
-      connected: options.connected || function (e) {},
-      closed: options.closed || function (e) {},
-      data: options.data || function (e) {},
-      error: options.error || function (e) {},
-    }
-
-    /**
-     * Destroys this socket.
-     */
-    socket.destroy = function () {
-      api.destroy(id)
-      delete sp.sockets[id]
-    }
-
-    /**
-     * Connects this socket.
-     *
-     * @param options:
-     *          host: the host to connect to.
-     *          port: the port to connect to.
-     *          policyPort: the policy port to use (if non-default), 0 to
-     *            use the flash default.
-     *          policyUrl: the policy file URL to use (instead of port).
-     */
-    socket.connect = function (options) {
-      // give precedence to policy URL over policy port
-      // if no policy URL and passed port isn't 0, use default port,
-      // otherwise use 0 for the port
-      const policyUrl = options.policyUrl || null
-      let policyPort = 0
-      if (policyUrl === null && options.policyPort !== 0) {
-        policyPort = options.policyPort || sp.policyPort
-      }
-      api.connect(id, options.host, options.port, policyPort, policyUrl)
-    }
-
-    /**
-     * Closes this socket.
-     */
-    socket.close = function () {
-      api.close(id)
-      socket.closed({
-        id: socket.id,
-        type: 'close',
-        bytesAvailable: 0,
-      })
-    }
-
-    /**
-     * Determines if the socket is connected or not.
-     *
-     * @return true if connected, false if not.
-     */
-    socket.isConnected = function () {
-      return api.isConnected(id)
-    }
-
-    /**
-     * Writes bytes to this socket.
-     *
-     * @param bytes the bytes (as a string) to write.
-     *
-     * @return true on success, false on failure.
-     */
-    socket.send = function (bytes) {
-      return api.send(id, forge.util.encode64(bytes))
-    }
-
-    /**
-     * Reads bytes from this socket (non-blocking). Fewer than the number
-     * of bytes requested may be read if enough bytes are not available.
-     *
-     * This method should be called from the data handler if there are
-     * enough bytes available. To see how many bytes are available, check
-     * the 'bytesAvailable' property on the event in the data handler or
-     * call the bytesAvailable() function on the socket. If the browser is
-     * msie, then the bytesAvailable() function should be used to avoid
-     * race conditions. Otherwise, using the property on the data handler's
-     * event may be quicker.
-     *
-     * @param count the maximum number of bytes to read.
-     *
-     * @return the bytes read (as a string) or null on error.
-     */
-    socket.receive = function (count) {
-      const rval = api.receive(id, count).rval
-      return (rval === null) ? null : forge.util.decode64(rval)
-    }
-
-    /**
-     * Gets the number of bytes available for receiving on the socket.
-     *
-     * @return the number of bytes available for receiving.
-     */
-    socket.bytesAvailable = function () {
-      return api.getBytesAvailable(id)
-    }
-
-    // store and return socket
-    sp.sockets[id] = socket
-    return socket
-  }
 
   return sp
 }
@@ -257,7 +205,7 @@ net.createSocketPool = function (options) {
  * @param options:
  *          flashId: the dom ID for the flash object element.
  */
-net.destroySocketPool = function (options) {
+function destroySocketPool(options: any) {
   if (options.flashId in net.socketPools) {
     const sp = net.socketPools[options.flashId]
     sp.destroy()
@@ -271,18 +219,73 @@ net.destroySocketPool = function (options) {
  *          flashId: the dom ID for the flash object element.
  *          connected: function(event) called when the socket connects.
  *          closed: function(event) called when the socket closes.
- *          data: function(event) called when socket data has arrived, it
- *            can be read from the socket using receive().
+ *          data: function(event) called when socket data has arrived,
+ *            it can be read from the socket using receive().
  *          error: function(event) called when a socket error occurs.
  *
  * @return the created socket.
  */
-net.createSocket = function (options) {
-  let socket = null
-  if (options.flashId in net.socketPools) {
-    // get related socket pool
-    const sp = net.socketPools[options.flashId]
-    socket = sp.createSocket(options)
+export function createSocket(options: SocketOptions & { flashId: string }): Socket {
+  if (!(options.flashId in net.socketPools)) {
+    throw new Error(`Socket pool with ID ${options.flashId} not found`)
   }
+
+  // get related socket pool
+  const sp = net.socketPools[options.flashId]
+  const api = sp.flashApi
+
+  // create flash socket
+  const id = api.create()
+
+  // create javascript socket wrapper
+  const socket: Socket = {
+    id,
+    // set handlers
+    connected: options.connected || function (e: SocketEvent) {},
+    closed: options.closed || function (e: SocketEvent) {},
+    data: options.data || function (e: SocketEvent) {},
+    error: options.error || function (e: SocketEvent) {},
+    destroy() {
+      api.destroy(id)
+      delete sp.sockets[id]
+    },
+    connect(options: ConnectOptions) {
+      // give precedence to policy URL over policy port
+      // if no policy URL and passed port isn't 0, use default port,
+      // otherwise use 0 for the port
+      const policyUrl = options.policyUrl || null
+      let policyPort = 0
+      if (policyUrl === null && options.policyPort !== 0) {
+        policyPort = options.policyPort || sp.policyPort
+      }
+      api.connect(id, options.host, options.port, policyPort, policyUrl)
+    },
+    close() {
+      api.close(id)
+      this.closed({
+        id: this.id,
+        type: 'close',
+        bytesAvailable: 0,
+      })
+    },
+    isConnected() {
+      return api.isConnected(id)
+    },
+    send(bytes: string) {
+      return api.send(id, encode64(bytes))
+    },
+    receive(count: number) {
+      const rval = api.receive(id, count).rval
+      return (rval === null) ? null : decode64(rval)
+    },
+    bytesAvailable() {
+      return api.getBytesAvailable(id)
+    },
+  }
+
+  // store and return socket
+  sp.sockets[id] = socket
   return socket
 }
+
+export default net

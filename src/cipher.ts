@@ -138,9 +138,9 @@ export class BlockCipher {
   private mode: AlgorithmMode
   private blockSize: number
   private _finish: boolean
-  private _input: any
-  private output: any
-  private _op: (input: any, output: any, finish: boolean) => boolean
+  private _input: ByteStringBuffer | null
+  public output: ByteStringBuffer | null
+  private _op: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
   private _decrypt: boolean
 
   constructor(options: CipherOptions) {
