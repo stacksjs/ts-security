@@ -133,35 +133,36 @@
  * The full OID (including ASN.1 tag and length of 6 bytes) is:
  * 0x06062A864886F70D
  */
-import { createBuffer, bytesToHex, decodeUtf8, ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from './utils'
 import { oids } from './oids'
+import { bytesToHex, createBuffer, decodeUtf8 } from './utils'
 
 interface ExtendedError extends Error {
-  available?: number;
-  remaining?: number;
-  requested?: number;
-  byteCount?: number;
-  integer?: number;
+  available?: number
+  remaining?: number
+  requested?: number
+  byteCount?: number
+  integer?: number
 }
 
 interface Asn1Object {
-  tagClass: number;
-  type: number;
-  constructed: boolean;
-  composed: boolean;
-  value: any;
-  bitStringContents?: string;
-  original?: Asn1Object;
+  tagClass: number
+  type: number
+  constructed: boolean
+  composed: boolean
+  value: any
+  bitStringContents?: string
+  original?: Asn1Object
 }
 
 interface CreateOptions {
-  bitStringContents?: string;
+  bitStringContents?: string
 }
 
 interface DerOptions {
-  strict?: boolean;
-  parseAllBytes?: boolean;
-  decodeBitStrings?: boolean;
+  strict?: boolean
+  parseAllBytes?: boolean
+  decodeBitStrings?: boolean
 }
 
 /**
@@ -309,9 +310,10 @@ export function equals(obj1: Asn1Object | any[] | string, obj2: Asn1Object | any
     if (obj1.length !== obj2.length)
       return false
 
-    for (let i = 0; i < obj1.length; ++i)
+    for (let i = 0; i < obj1.length; ++i) {
       if (!asn1.equals(obj1[i], obj2[i], options))
         return false
+    }
 
     return true
   }
@@ -1514,7 +1516,7 @@ export const asn1: Asn1 = {
   derToInteger,
   validate,
   prettyPrint,
-  toDer
+  toDer,
 } as const
 
 export default asn1

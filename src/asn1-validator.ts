@@ -36,7 +36,7 @@ export const privateKeyValidator: Asn1Validator = {
     type: Type.INTEGER,
     constructed: false,
     capture: 'privateKeyVersion',
-    value: []
+    value: [],
   }, {
     // privateKeyAlgorithm
     name: 'PrivateKeyInfo.privateKeyAlgorithm',
@@ -49,7 +49,7 @@ export const privateKeyValidator: Asn1Validator = {
       type: Type.OID,
       constructed: false,
       capture: 'privateKeyOid',
-      value: []
+      value: [],
     }],
   }, {
     // PrivateKey
@@ -58,7 +58,7 @@ export const privateKeyValidator: Asn1Validator = {
     type: Type.OCTETSTRING,
     constructed: false,
     capture: 'privateKey',
-    value: []
+    value: [],
   }],
 }
 
@@ -79,7 +79,7 @@ export const publicKeyValidator: Asn1Validator = {
       type: Type.OID,
       constructed: false,
       capture: 'publicKeyOid',
-      value: []
+      value: [],
     }],
   },
   // capture group for ed25519PublicKey
@@ -90,8 +90,8 @@ export const publicKeyValidator: Asn1Validator = {
     constructed: false,
     composed: true,
     captureBitStringValue: 'ed25519PublicKey',
-    value: []
-  }]
+    value: [],
+  }],
 }
 
 export const asn1Validator: ValidatorMap = {

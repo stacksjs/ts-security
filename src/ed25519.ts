@@ -9,12 +9,12 @@
  * https://github.com/dchest/tweetnacl-js
  */
 
-import { getBytesSync } from './random'
-import { ByteBuffer } from './utils'
 import { asn1 } from './asn1'
 import { asn1Validator } from './asn1-validator'
 import { oids } from './oids'
+import { getBytesSync } from './random'
 import { sha512 as sha } from './sha512'
+import { ByteBuffer, ByteStringBuffer } from './utils'
 
 const publicKeyValidator = asn1Validator.publicKeyValidator
 const privateKeyValidator = asn1Validator.privateKeyValidator
@@ -22,6 +22,10 @@ const privateKeyValidator = asn1Validator.privateKeyValidator
 const NativeBuffer = typeof Buffer === 'undefined' ? Uint8Array : Buffer
 
 type GF = Float64Array & { __gf?: never }
+type GFArray = GF[]
+type NumberArray = number[]
+type BufferSource = Buffer | Uint8Array
+type MessageSource = string | BufferSource | ByteStringBuffer | undefined
 
 function gf(init?: number[]): GF {
   const r = new Float64Array(16) as GF
@@ -42,16 +46,16 @@ interface Ed25519Constants {
 }
 
 interface Ed25519KeyPair {
-  publicKey: Buffer | Uint8Array
-  privateKey: Buffer | Uint8Array
+  publicKey: BufferSource
+  privateKey: BufferSource
 }
 
 interface Ed25519Options {
-  message?: string | Uint8Array | Buffer | typeof ByteBuffer
-  privateKey?: string | Uint8Array | Buffer | typeof ByteBuffer
-  publicKey?: string | Uint8Array | Buffer | typeof ByteBuffer
-  signature?: string | Uint8Array | Buffer | typeof ByteBuffer
-  seed?: string | Uint8Array | Buffer
+  message?: MessageSource
+  privateKey?: MessageSource
+  publicKey?: MessageSource
+  signature?: MessageSource
+  seed?: string | BufferSource
   md?: any
   encoding?: 'binary' | 'utf8'
 }
@@ -59,10 +63,10 @@ interface Ed25519Options {
 interface Ed25519 {
   constants: Ed25519Constants
   generateKeyPair: (options?: Ed25519Options) => Ed25519KeyPair
-  privateKeyFromAsn1: (obj: any) => { privateKeyBytes: Buffer | Uint8Array }
-  publicKeyFromAsn1: (obj: any) => Buffer | Uint8Array
-  publicKeyFromPrivateKey: (options: Ed25519Options) => Buffer | Uint8Array
-  sign: (options: Ed25519Options) => Buffer | Uint8Array
+  privateKeyFromAsn1: (obj: any) => { privateKeyBytes: BufferSource }
+  publicKeyFromAsn1: (obj: any) => BufferSource
+  publicKeyFromPrivateKey: (options: Ed25519Options) => BufferSource
+  sign: (options: Ed25519Options) => BufferSource
   verify: (options: Ed25519Options) => boolean
 }
 
@@ -121,7 +125,7 @@ ed25519.generateKeyPair = function (options) {
  * @returns {Buffer|Uint8Array} keyInfo.privateKeyBytes - 32 private key bytes.
  */
 ed25519.privateKeyFromAsn1 = function (obj: any) {
-  const capture = {} as { privateKeyOid?: string, privateKey?: string }
+  const capture = {} as { privateKeyOid?: string, privateKey?: ByteStringBuffer }
   const errors: any[] = []
   const valid = asn1.validate(obj, privateKeyValidator, capture, errors)
   if (!valid) {
@@ -135,10 +139,11 @@ ed25519.privateKeyFromAsn1 = function (obj: any) {
     throw new Error(`Invalid OID "${oid}"; OID must be "${ed25519Oid}".`)
   }
   const privateKey = capture.privateKey
-  const privateKeyBytes = messageToNativeBuffer({
-    message: asn1.fromDer(privateKey).value,
-    encoding: 'binary',
-  })
+  if (!privateKey) {
+    throw new Error('No private key found')
+  }
+  const derValue = asn1.fromDer(privateKey).value
+  const privateKeyBytes = toBufferSource(derValue instanceof ByteStringBuffer ? derValue : derValue)
   return { privateKeyBytes }
 }
 
@@ -225,19 +230,23 @@ ed25519.sign = function (options) {
   return sig
 }
 
-ed25519.verify = function (options) {
+export function verify(options: Ed25519Options): boolean {
   options = options || {}
+
   const msg = messageToNativeBuffer(options)
+
   if (options.signature === undefined) {
     throw new TypeError(
       '"options.signature" must be a node.js Buffer, a Uint8Array, a forge '
       + 'ByteBuffer, or a binary string.',
     )
   }
+
   const sig = messageToNativeBuffer({
     message: options.signature,
     encoding: 'binary',
   })
+
   if (sig.length !== ed25519.constants.SIGN_BYTE_LENGTH) {
     throw new TypeError(
       `"options.signature" must have a byte length of ${
@@ -264,15 +273,17 @@ ed25519.verify = function (options) {
   for (i = 0; i < ed25519.constants.SIGN_BYTE_LENGTH; ++i) {
     sm[i] = sig[i]
   }
+
   for (i = 0; i < msg.length; ++i) {
     sm[i + ed25519.constants.SIGN_BYTE_LENGTH] = msg[i]
   }
+
   return (crypto_sign_open(m, sm, sm.length, publicKey) >= 0)
 }
 
 function messageToNativeBuffer(options: Ed25519Options): Buffer | Uint8Array {
   let message = options.message
-  if (message instanceof Uint8Array || message instanceof NativeBuffer) {
+  if (message instanceof Uint8Array || message instanceof Buffer) {
     return message
   }
 
@@ -295,11 +306,12 @@ function messageToNativeBuffer(options: Ed25519Options): Buffer | Uint8Array {
     if (typeof Buffer !== 'undefined') {
       return Buffer.from(message, encoding as BufferEncoding)
     }
-    const buf = new ByteBuffer()
-    buf.putString(message)
-    message = buf
+    const bb = new ByteBuffer()
+    bb.putString(message)
+    message = bb
   }
-  else if (!(message instanceof ByteBuffer)) {
+
+  if (!(message instanceof ByteBuffer)) {
     throw new TypeError(
       '"options.message" must be a node.js Buffer, a Uint8Array, a forge '
       + 'ByteBuffer, or a string with "options.encoding" specifying its '
@@ -419,7 +431,6 @@ const L = new Float64Array([
   0,
   0,
   0,
-  0,
   0x10,
 ])
 const I = gf([
@@ -448,84 +459,98 @@ function sha512(msg: Buffer | Uint8Array, msgLen: number): Buffer | Uint8Array {
   buffer.putString(msgStr)
   md.update(buffer.toString(), 'binary')
   const hash = md.digest().getBytes()
-  if (typeof Buffer !== 'undefined') {
+
+  if (typeof Buffer !== 'undefined')
     return Buffer.from(hash, 'binary')
-  }
+
   const out = new NativeBuffer(ed25519.constants.HASH_BYTE_LENGTH)
-  for (let i = 0; i < 64; ++i) {
+
+  for (let i = 0; i < 64; ++i)
     out[i] = hash.charCodeAt(i)
-  }
+
   return out
 }
 
-function crypto_sign_keypair(
-  pk: Buffer | Uint8Array,
-  sk: Buffer | Uint8Array,
-): number {
+function crypto_sign_keypair(pk: BufferSource, sk: BufferSource): number {
   const p = [gf(), gf(), gf(), gf()]
   let i
 
   const d = sha512(sk, 32)
-  d[0] &= 248
-  d[31] &= 127
-  d[31] |= 64
+  const dArr = Array.from(d)
+  dArr[0] &= 248
+  dArr[31] &= 127
+  dArr[31] |= 64
 
-  scalarbase(p, d)
+  scalarbase(p, dArr)
   pack(pk, p)
 
   for (i = 0; i < 32; ++i) {
-    sk[i + 32] = pk[i]
+    if (sk instanceof Buffer) {
+      sk[i + 32] = pk[i]
+    }
+    else {
+      (sk as Uint8Array)[i + 32] = (pk as Uint8Array)[i]
+    }
   }
   return 0
 }
 
-// Note: difference from C - smlen returned, not passed as argument.
 function crypto_sign(
   sm: Buffer | Uint8Array,
   m: Buffer | Uint8Array,
   n: number,
   sk: Buffer | Uint8Array,
 ): number {
-  let i; let j; const x = new Float64Array(64)
+  let i, j
+  const x = new Float64Array(64)
   const p = [gf(), gf(), gf(), gf()]
 
   const d = sha512(sk, 32)
-  d[0] &= 248
-  d[31] &= 127
-  d[31] |= 64
+  const dArr = Array.from(d)
+  dArr[0] &= 248
+  dArr[31] &= 127
+  dArr[31] |= 64
 
   const smlen = n + 64
   for (i = 0; i < n; ++i) {
     sm[64 + i] = m[i]
   }
   for (i = 0; i < 32; ++i) {
-    sm[32 + i] = d[32 + i]
+    sm[32 + i] = dArr[32 + i]
   }
 
-  const r = sha512(sm.subarray(32), n + 32)
-  reduce(r)
-  scalarbase(p, r)
+  const r = sha512(new Uint8Array(sm.slice(32)), n + 32)
+  const rArr = Array.from(r)
+  reduce(arrayToBuffer(rArr))
+  scalarbase(p, rArr)
   pack(sm, p)
 
   for (i = 32; i < 64; ++i) {
     sm[i] = sk[i]
   }
   const h = sha512(sm, n + 64)
-  reduce(h)
+  const hArr = Array.from(h)
+  reduce(arrayToBuffer(hArr))
 
   for (i = 32; i < 64; ++i) {
     x[i] = 0
   }
   for (i = 0; i < 32; ++i) {
-    x[i] = r[i]
+    x[i] = rArr[i]
   }
   for (i = 0; i < 32; ++i) {
     for (j = 0; j < 32; j++) {
-      x[i + j] += h[i] * d[j]
+      x[i + j] += hArr[i] * dArr[j]
     }
   }
 
-  modL(sm.subarray(32), x)
+  const smArr = Array.from(sm.slice(32))
+  modL(smArr, x)
+
+  for (i = 0; i < 32; i++) {
+    sm[32 + i] = smArr[i]
+  }
+
   return smlen
 }
 
@@ -558,20 +583,20 @@ function crypto_sign_open(
   }
 
   const h = sha512(m, n)
-  reduce(h)
-  scalarmult(p, q, Array.from(h))
+  const hArr = Array.from(h)
+  reduce(arrayToBuffer(hArr))
+  scalarmult(p, q, hArr)
 
-  scalarbase(q, sm.subarray(32))
+  const smArr = Array.from(sm.slice(32))
+  scalarbase(q, smArr)
   add(p, q)
   pack(t, p)
 
   n -= 64
-
-  if (crypto_verify_32(sm, 0, t, 0)) {
+  if (crypto_verify_32(Array.from(sm), 0, Array.from(t), 0)) {
     for (i = 0; i < n; ++i) {
       m[i] = 0
     }
-
     return -1
   }
 
@@ -580,56 +605,69 @@ function crypto_sign_open(
   }
 
   mlen = n
-
   return mlen
 }
 
-function modL(r: number[], x: number[]) {
+function modL(r: number[] | Float64Array, x: number[] | Float64Array) {
   let carry, i, j, k
+  const xArr = Array.from(x)
+  const rArr = Array.from(r)
 
   for (i = 63; i >= 32; --i) {
     carry = 0
 
     for (j = i - 32, k = i - 12; j < k; ++j) {
-      x[j] += carry - 16 * x[i] * L[j - (i - 32)]
-      carry = (x[j] + 128) >> 8
-      x[j] -= carry * 256
+      xArr[j] += carry - 16 * xArr[i] * L[j - (i - 32)]
+      carry = (xArr[j] + 128) >> 8
+      xArr[j] -= carry * 256
     }
 
-    x[j] += carry
-    x[i] = 0
+    xArr[j] += carry
+    xArr[i] = 0
   }
 
   carry = 0
 
   for (j = 0; j < 32; ++j) {
-    x[j] += carry - (x[31] >> 4) * L[j]
-    carry = x[j] >> 8
-    x[j] &= 255
+    xArr[j] += carry - (xArr[31] >> 4) * L[j]
+    carry = xArr[j] >> 8
+    xArr[j] &= 255
   }
 
   for (j = 0; j < 32; ++j) {
-    x[j] -= carry * L[j]
+    xArr[j] -= carry * L[j]
   }
 
   for (i = 0; i < 32; ++i) {
-    x[i + 1] += x[i] >> 8
-    r[i] = x[i] & 255
+    xArr[i + 1] += xArr[i] >> 8
+    rArr[i] = xArr[i] & 255
+  }
+
+  // Copy back to r if it's a Buffer/Uint8Array
+  if (!Array.isArray(r)) {
+    for (i = 0; i < 32; i++) {
+      r[i] = rArr[i]
+    }
   }
 }
 
 function reduce(r: Buffer | Uint8Array) {
   const x = new Float64Array(64)
+  const rArr = Array.from(r)
 
   for (let i = 0; i < 64; ++i) {
     x[i] = r[i]
-    r[i] = 0
   }
 
-  modL(r, x)
+  modL(rArr, x)
+
+  // Copy back to r
+  for (let i = 0; i < r.length; ++i) {
+    r[i] = rArr[i]
+  }
 }
 
-function add(p: number[], q: number[]) {
+function add(p: GFArray, q: GFArray): void {
   const a = gf(); const b = gf(); const c = gf()
   const d = gf(); const e = gf(); const f = gf()
   const g = gf(); const h = gf(); const t = gf()
@@ -655,54 +693,76 @@ function add(p: number[], q: number[]) {
   M(p[3], e, h)
 }
 
-function cswap(p: number[], q: number[], b: number) {
+function cswap(p: GFArray, q: GFArray, b: number): void {
   for (let i = 0; i < 4; ++i) {
     sel25519(p[i], q[i], b)
   }
 }
 
-function pack(r: number[], p: number[]) {
+function pack(r: BufferSource | number[], p: GFArray): void {
   const tx = gf(); const ty = gf(); const zi = gf()
   inv25519(zi, p[2])
   M(tx, p[0], zi)
   M(ty, p[1], zi)
-  pack25519(r, ty)
-  r[31] ^= par25519(tx) << 7
+  const rArr = Array.isArray(r) ? r : Array.from(r)
+  pack25519(rArr, ty)
+  const txArr = gfToNumberArray(tx)
+  rArr[31] ^= par25519(txArr) << 7
+  if (!Array.isArray(r)) {
+    const buffer = r instanceof Buffer ? r : new Uint8Array(r)
+    for (let i = 0; i < rArr.length; i++) {
+      buffer[i] = rArr[i]
+    }
+  }
 }
 
-function pack25519(o: number[], n: number[]) {
-  let i, j, b
-  const m = gf(); const t = gf()
-  for (i = 0; i < 16; ++i) {
+function pack25519(o: BufferSource | number[], n: GF): void {
+  const m = gf()
+  const t = gf()
+  for (let i = 0; i < 16; i++) {
     t[i] = n[i]
   }
   car25519(t)
   car25519(t)
   car25519(t)
-  for (j = 0; j < 2; ++j) {
+  for (let j = 0; j < 2; j++) {
     m[0] = t[0] - 0xFFED
-    for (i = 1; i < 15; ++i) {
+    for (let i = 1; i < 15; i++) {
       m[i] = t[i] - 0xFFFF - ((m[i - 1] >> 16) & 1)
       m[i - 1] &= 0xFFFF
     }
     m[15] = t[15] - 0x7FFF - ((m[14] >> 16) & 1)
-    b = (m[15] >> 16) & 1
+    const b = (m[15] >> 16) & 1
     m[14] &= 0xFFFF
     sel25519(t, m, 1 - b)
   }
-  for (i = 0; i < 16; i++) {
-    o[2 * i] = t[i] & 0xFF
-    o[2 * i + 1] = t[i] >> 8
+
+  const oArr = Array.from(o instanceof Buffer ? o : new Uint8Array(o))
+  for (let i = 0; i < 16; i++) {
+    oArr[2 * i] = t[i] & 0xFF
+    oArr[2 * i + 1] = t[i] >> 8
+  }
+
+  if (!Array.isArray(o)) {
+    const buffer = o instanceof Buffer ? o : new Uint8Array(o)
+    for (let i = 0; i < oArr.length; i++) {
+      buffer[i] = oArr[i]
+    }
   }
 }
 
-function unpackneg(r: number[], p: number[]) {
-  const t = gf(); const chk = gf(); const num = gf()
-  const den = gf(); const den2 = gf(); const den4 = gf()
+function unpackneg(r: GFArray, p: BufferSource): number {
+  const pArr = Array.from(p)
+  const t = gf()
+  const chk = gf()
+  const num = gf()
+  const den = gf()
+  const den2 = gf()
+  const den4 = gf()
   const den6 = gf()
 
   set25519(r[2], gf1)
-  unpack25519(r[1], p)
+  unpack25519(r[1], pArr)
   S(num, r[1])
   M(den, num, D)
   Z(num, num, r[2])
@@ -714,7 +774,7 @@ function unpackneg(r: number[], p: number[]) {
   M(t, den6, num)
   M(t, t, den)
 
-  pow2523(t, t)
+  pow2523(t, Array.from(t))
   M(t, t, num)
   M(t, t, den)
   M(t, t, den)
@@ -734,53 +794,44 @@ function unpackneg(r: number[], p: number[]) {
     return -1
   }
 
-  if (par25519(r[0]) === (p[31] >> 7))
+  if (par25519(Array.from(r[0])) === (pArr[31] >> 7)) {
     Z(r[0], gf0, r[0])
+  }
 
   M(r[3], r[0], r[1])
 
   return 0
 }
 
-function unpack25519(o: number[], n: number[]) {
-  let i
-
-  for (i = 0; i < 16; ++i) {
+function unpack25519(o: GF, n: number[]): void {
+  for (let i = 0; i < 16; i++) {
     o[i] = n[2 * i] + (n[2 * i + 1] << 8)
   }
-
   o[15] &= 0x7FFF
 }
 
-function pow2523(o: number[], i: number[]) {
+function pow2523(o: GF, i: GF | number[]): void {
   const c = gf()
-
+  const input = Array.isArray(i) ? numberArrayToGF(i) : i
   let a
   for (a = 0; a < 16; ++a) {
-    c[a] = i[a]
+    c[a] = input[a]
   }
-
   for (a = 250; a >= 0; --a) {
     S(c, c)
-
     if (a !== 1) {
-      M(c, c, i)
+      M(c, c, input)
     }
   }
-
   for (a = 0; a < 16; ++a) {
     o[a] = c[a]
   }
 }
 
-function neq25519(a: number[], b: number[]) {
-  const c = new NativeBuffer(32)
-  const d = new NativeBuffer(32)
-
-  pack25519(c, a)
-  pack25519(d, b)
-
-  return crypto_verify_32(c, 0, d, 0)
+function neq25519(a: GF, b: GF): number {
+  const aBuffer = gfToBuffer(a)
+  const bBuffer = gfToBuffer(b)
+  return crypto_verify_32(Array.from(aBuffer), 0, Array.from(bBuffer), 0)
 }
 
 function crypto_verify_32(x: number[], xi: number, y: number[], yi: number) {
@@ -796,105 +847,58 @@ function vn(x: number[], xi: number, y: number[], yi: number, n: number) {
   return (1 & ((d - 1) >>> 8)) - 1
 }
 
-function par25519(a: number[]) {
+function par25519(a: number[] | GF) {
   const d = new NativeBuffer(32)
-  pack25519(d, a)
+  const aGF = Array.isArray(a) ? numberArrayToGF(a) : a
+  pack25519(d, aGF)
   return d[0] & 1
 }
 
-function scalarmult(p: number[], q: number[], s: number[]) {
-  let b, i
-
-  set25519(p[0], gf0)
-  set25519(p[1], gf1)
-  set25519(p[2], gf1)
-  set25519(p[3], gf0)
-
-  for (i = 255; i >= 0; --i) {
-    b = (s[(i / 8) | 0] >> (i & 7)) & 1
-    cswap(p, q, b)
-    add(q, p)
-    add(p, p)
-    cswap(p, q, b)
-  }
+// Helper functions for type conversion
+function gfToNumberArray(g: GF): number[] {
+  return Array.from(g)
 }
 
-function scalarbase(p: number[], s: number[]) {
-  const q = [gf(), gf(), gf(), gf()]
-
-  set25519(q[0], X)
-  set25519(q[1], Y)
-  set25519(q[2], gf1)
-  M(q[3], X, Y)
-  scalarmult(p, q, s)
+function numberArrayToGF(arr: number[]): GF {
+  const result = gf()
+  for (let i = 0; i < arr.length && i < 16; i++) {
+    result[i] = arr[i]
+  }
+  return result
 }
 
-function set25519(r: number[], a: number[]) {
-  let i
-  for (i = 0; i < 16; i++) {
-    r[i] = a[i] | 0
-  }
+function bufferToNumberArray(buffer: BufferSource): number[] {
+  return Array.from(buffer)
 }
 
-function inv25519(o: number[], i: number[]) {
-  const c = gf()
-  let a
-  for (a = 0; a < 16; ++a) {
-    c[a] = i[a]
-  }
+function toBufferSource(data: MessageSource): BufferSource {
+  if (!data)
+    throw new TypeError('Data is required')
 
-  for (a = 253; a >= 0; --a) {
-    S(c, c)
-    if (a !== 2 && a !== 4) {
-      M(c, c, i)
-    }
-  }
+  if (data instanceof Buffer || data instanceof Uint8Array)
+    return data
 
-  for (a = 0; a < 16; ++a) {
-    o[a] = c[a]
-  }
+  if (typeof data === 'string')
+    return Buffer.from(data, 'binary')
+
+  if (data instanceof ByteStringBuffer)
+    return Buffer.from(data.bytes(), 'binary')
+
+  throw new TypeError('Invalid data type')
 }
 
-function car25519(o: number[]) {
-  let i
-  let v
-  let c = 1
-
-  for (i = 0; i < 16; ++i) {
-    v = o[i] + c + 65535
-    c = Math.floor(v / 65536)
-    o[i] = v - c * 65536
-  }
-
-  o[0] += c - 1 + 37 * (c - 1)
-}
-
-function sel25519(p: number[], q: number[], b: number) {
-  let t
-  const c = ~(b - 1)
-
-  for (let i = 0; i < 16; ++i) {
-    t = c & (p[i] ^ q[i])
-    p[i] ^= t
-    q[i] ^= t
-  }
-}
-
-function A(o: number[], a: number[], b: number[]) {
+// Core GF operations
+function A(o: GF, a: GF, b: GF): void {
   for (let i = 0; i < 16; ++i)
     o[i] = a[i] + b[i]
 }
 
-function Z(o: number[], a: number[], b: number[]) {
+function Z(o: GF, a: GF, b: GF): void {
   for (let i = 0; i < 16; ++i)
     o[i] = a[i] - b[i]
 }
 
-function S(o: number[], a: number[]) {
-  M(o, a, a)
-}
-
-function M(o: number[], a: number[], b: number[]) {
+function M(o: GF, a: GF, b: GF): void {
   let v; let c
   let t0 = 0; let t1 = 0; let t2 = 0; let t3 = 0; let t4 = 0; let t5 = 0; let t6 = 0; let t7 = 0
   let t8 = 0; let t9 = 0; let t10 = 0; let t11 = 0; let t12 = 0; let t13 = 0; let t14 = 0; let t15 = 0
@@ -1085,8 +1089,8 @@ function M(o: number[], a: number[], b: number[]) {
   t20 += v * b11
   t21 += v * b12
   t22 += v * b13
-  t24 += v * b14
-  t25 += v * b15
+  t23 += v * b14
+  t24 += v * b15
   v = a[10]
   t10 += v * b0
   t11 += v * b1
@@ -1119,8 +1123,8 @@ function M(o: number[], a: number[], b: number[]) {
   t22 += v * b11
   t23 += v * b12
   t24 += v * b13
-  t26 += v * b14
-  t27 += v * b15
+  t25 += v * b14
+  t26 += v * b15
   v = a[12]
   t12 += v * b0
   t13 += v * b1
@@ -1263,4 +1267,97 @@ function M(o: number[], a: number[], b: number[]) {
   o[13] = t13
   o[14] = t14
   o[15] = t15
+}
+
+function S(o: GF, a: GF): void {
+  M(o, a, a)
+}
+
+function inv25519(o: GF, i: GF): void {
+  const c = gf()
+
+  let a
+  for (a = 0; a < 16; ++a)
+    c[a] = i[a]
+
+  for (a = 253; a >= 0; --a) {
+    S(c, c)
+
+    if (a !== 2 && a !== 4)
+      M(c, c, i)
+  }
+
+  for (a = 0; a < 16; ++a)
+    o[a] = c[a]
+}
+
+function set25519(o: GF, a: GF): void {
+  for (let i = 0; i < 16; i++)
+    o[i] = a[i]
+}
+
+function car25519(o: GF): void {
+  let c = 1
+
+  for (let i = 0; i < 16; ++i) {
+    const v = o[i] + c + 65535
+    c = Math.floor(v / 65536)
+    o[i] = v - c * 65536
+  }
+
+  o[0] += c - 1 + 37 * (c - 1)
+}
+
+function sel25519(p: GF, q: GF, b: number): void {
+  let t
+  const c = ~(b - 1)
+
+  for (let i = 0; i < 16; ++i) {
+    t = c & (p[i] ^ q[i])
+    p[i] ^= t
+    q[i] ^= t
+  }
+}
+
+function scalarmult(p: GFArray, q: GFArray, s: number[]): void {
+  set25519(p[0], gf0)
+  set25519(p[1], gf1)
+  set25519(p[2], gf1)
+  set25519(p[3], gf0)
+
+  for (let i = 255; i >= 0; --i) {
+    const b = (s[(i / 8) | 0] >> (i & 7)) & 1
+
+    cswap(p, q, b)
+    add(q, p)
+    add(p, p)
+    cswap(p, q, b)
+  }
+}
+
+function scalarbase(p: GFArray, s: number[]): void {
+  const q: GFArray = [gf(), gf(), gf(), gf()]
+
+  set25519(q[0], X)
+  set25519(q[1], Y)
+  set25519(q[2], gf1)
+  M(q[3], X, Y)
+  scalarmult(p, q, s)
+}
+
+// Add type conversion helpers
+function arrayToBuffer(arr: number[]): Buffer | Uint8Array {
+  return new NativeBuffer(arr)
+}
+
+function bufferToGF(buffer: BufferSource): GF {
+  const arr = Array.from(buffer instanceof Buffer ? buffer : new Uint8Array(buffer))
+
+  return numberArrayToGF(arr)
+}
+
+function gfToBuffer(g: GF): Buffer | Uint8Array {
+  const arr = gfToNumberArray(g)
+
+  return arrayToBuffer(arr)
 }
