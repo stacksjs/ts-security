@@ -25,7 +25,7 @@ import type { PemMessage, PemHeader, Pem } from './pem'
 import { aes } from './aes'
 import { asn1 } from './asn1'
 import { wrapRsaPrivateKey, privateKeyToAsn1, privateKeyFromAsn1 } from './rsa'
-import { createCipher as createCipherOriginal } from './cipher'
+import { createCipher, createCipher as createCipherOriginal, createDecipher } from './cipher'
 import { sha1 } from './sha1'
 import { des } from './des'
 import { oids } from './oids'
@@ -755,7 +755,8 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     if (!cipherFn) throw new Error('Cipher function is not defined')
     const iv = createBuffer(getBytesSync(ivLen))
     const cipher = cipherFn(toByteStringBuffer(dk))
-    cipher.start({ iv: createBuffer(iv) })
+    if (!iv) throw new Error('IV is required')
+    cipher.start({ iv: convertToString(iv) })
     cipher.update(asn1.toDer(obj))
     if (!cipher.finish())
       throw new Error('Failed to finish encryption')
@@ -801,9 +802,9 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     dkLen = 24
 
     const saltBytes = new ByteStringBuff(salt)
-    const dk = generatePkcs12Key(password, saltBytes.bytes(), 1, count, dkLen)
-    const iv = generatePkcs12Key(password, saltBytes.bytes(), 2, count, dkLen)
-    const cipher = des.createEncryptionCipher(dk, iv)
+    const dk = generatePkcs12Key(password, createBuffer(saltBytes.bytes()), 1, count, dkLen)
+    const iv = generatePkcs12Key(password, createBuffer(saltBytes.bytes()), 2, count, dkLen)
+    const cipher = des.createEncryptionCipher(convertToString(dk), convertToString(iv))
 
     cipher.update(asn1.toDer(obj))
     cipher.finish()
@@ -858,7 +859,7 @@ export function decryptPrivateKeyInfo(obj: any, password: string): any {
   let rval = null
 
   // get PBE params
-  const capture: { kdfOid?: string; encOid?: string; kdfSalt?: string; kdfIterationCount?: string; encIv?: string; encryptionOid?: string; encryptionParams?: any; encryptedData?: string; } = {}
+  const capture: CaptureObject = {}
   const errors: Error[] = []
 
   if (!asn1.validate(obj, encryptedPrivateKeyValidator, capture, errors)) {
@@ -965,7 +966,7 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
 
   // Legacy implementation...
   let algorithm: string
-  let iv: ByteStringBuffer
+  let initialIv: ByteStringBuffer
   let dkLen: number
   let cipherFn: CipherCreator
 
@@ -973,32 +974,32 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
     case 'aes128':
       algorithm = 'AES-128-CBC'
       dkLen = 16
-      iv = createBuffer(getBytesSync(16))
+      initialIv = createBuffer(getBytesSync(16))
       cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '128')
       break
     case 'aes192':
       algorithm = 'AES-192-CBC'
       dkLen = 24
-      iv = createBuffer(getBytesSync(16))
+      initialIv = createBuffer(getBytesSync(16))
       cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '192')
       break
     case 'aes256':
       algorithm = 'AES-256-CBC'
       dkLen = 32
-      iv = createBuffer(getBytesSync(16))
+      initialIv = createBuffer(getBytesSync(16))
       cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '256')
       break
     case '3des':
       algorithm = 'DES-EDE3-CBC'
       dkLen = 24
-      iv = createBuffer(getBytesSync(8))
-      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), iv.bytes())
+      initialIv = createBuffer(getBytesSync(8))
+      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
       break
     case 'des':
       algorithm = 'DES-CBC'
       dkLen = 8
-      iv = createBuffer(getBytesSync(8))
-      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), iv.bytes())
+      initialIv = createBuffer(getBytesSync(8))
+      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
       break
     default:
       const error: CustomError = new Error(
@@ -1008,10 +1009,11 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
       throw error
   }
 
-  const dk = opensslDeriveBytes(password, iv.bytes(), dkLen, sha1.create())
-  const iv = createBuffer(getBytesSync(16))
+  const dk = opensslDeriveBytes(password, initialIv.bytes(), dkLen, sha1.create())
+  const finalIv = createBuffer(getBytesSync(16))
   const cipher = cipherFn(createBuffer(dk))
-  cipher.start({ iv })
+  if (!finalIv) throw new Error('IV is required')
+  cipher.start({ iv: convertToString(finalIv) })
   cipher.update(asn1.toDer(privateKeyToAsn1(rsaKey)))
   if (!cipher.finish()) {
     throw new Error('Failed to finish encryption')
@@ -1028,7 +1030,7 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
     },
     dekInfo: {
       algorithm,
-      parameters: bytesToHex(iv.bytes()).toUpperCase()
+      parameters: bytesToHex(finalIv.bytes()).toUpperCase()
     },
     headers: [],
     body: cipher.output.getBytes(),
@@ -1074,11 +1076,12 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
       prf: DEFAULT_ENCRYPTION_PARAMS.prfAlgorithm
     })
 
-    validateKey(key, pbeAlgorithms[params.algorithm].keyLength)
-    validateIV(params.iv, pbeAlgorithms[params.algorithm].ivLength)
+    const algorithm = params.algorithm || 'aes128-CBC'
+    validateKey(key, pbeAlgorithms[algorithm].keyLength)
+    validateIV(params.iv, pbeAlgorithms[algorithm].ivLength)
 
     const decipher = createModernCipher(
-      pbeAlgorithms[params.algorithm].cipher,
+      pbeAlgorithms[algorithm].cipher,
       key
     )
 
@@ -1237,7 +1240,8 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   if (!cipherFn) throw new Error('Cipher function is not defined')
   const iv = capture.encIv
   const cipher = cipherFn(convertToString(dk))
-  cipher.start({ iv: createBuffer(iv) })
+  if (!iv) throw new Error('IV is required')
+  cipher.start({ iv: convertToString(iv) })
 
   return cipher
 }
@@ -1265,8 +1269,9 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
     throw error
   }
 
-  const salt = createBuffer(capture.salt)
-  const countBuffer = createBuffer(capture.iterations)
+  const validatedCapture = capture as CaptureObject
+  const salt = createBuffer(validatedCapture.salt)
+  const countBuffer = createBuffer(validatedCapture.iterations)
   const iterationCount = countBuffer.getInt(countBuffer.length() << 3)
 
   let dkLen, dIvLen, cipherFn
@@ -1274,7 +1279,11 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
     case oids['pbeWithSHAAnd3-KeyTripleDES-CBC']:
       dkLen = 24
       dIvLen = 8
-      cipherFn = des.startDecrypting
+      cipherFn = function (key: string, iv: string) {
+        const cipher = createCipher('3DES-CBC', key)
+        cipher.start({ iv })
+        return cipher
+      }
       break
 
     case oids['pbewithSHAAnd40BitRC2-CBC']:
@@ -1282,25 +1291,25 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
       dIvLen = 8
       cipherFn = function (key: string, iv: string) {
         const cipher = rc2.createDecryptionCipher(key, 40)
-        cipher.start(iv, null)
+        cipher.start({ iv })
         return cipher
       }
       break
 
     default:
-      var error = new Error('Cannot read PKCS #12 PBE data block. Unsupported OID.')
+      const error: CustomError = new Error('Cannot read PKCS #12 PBE data block. Unsupported OID.')
       error.oid = oid
       throw error
   }
 
   // get PRF message digest
-  const prfAlgorithm = capture.prfOid || 'hmacWithSHA1'
+  const prfAlgorithm = validatedCapture.prfOid || 'hmacWithSHA1'
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
   const key = generatePkcs12Key(password, salt, 1, iterationCount, dkLen, md)
   md.start()
   const iv = generatePkcs12Key(password, salt, 2, iterationCount, dIvLen, md)
 
-  return cipherFn(key, iv)
+  return cipherFn(convertToString(key), convertToString(iv))
 }
 
 /**
@@ -1354,6 +1363,7 @@ export function prfAlgorithmToMessageDigest(prfAlgorithm: string): MessageDigest
   switch (prfAlgorithm) {
     case 'hmacWithSHA224':
       factory = sha512
+      break
     case 'hmacWithSHA1':
     case 'hmacWithSHA256':
     case 'hmacWithSHA384':
