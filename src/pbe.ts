@@ -148,6 +148,131 @@ const pbeAlgorithms: PBEAlgorithmsMap = {
   'desCBC': { cipher: 'DES-CBC', keyLength: 8, ivLength: 8 }
 }
 
+// Constants for supported algorithms
+const SUPPORTED_KDF_OIDS = [
+  oids.pkcs5PBKDF2
+] as const
+
+const SUPPORTED_ENC_OIDS = Object.keys(pbeAlgorithms).map(key => oids[key as keyof typeof oids]) as string[]
+
+// Type definitions
+interface EncryptionParams {
+  kdfOid: string
+  encOid: string
+  salt: ByteStringBuffer
+  iterationCount: number
+  iv: ByteStringBuffer
+  encryptedData: ByteStringBuffer
+  algorithm?: string // Optional for backward compatibility
+}
+
+interface StringKeyValuePairs {
+  [key: string]: string | undefined
+}
+
+// Custom error types for OID validation
+class UnsupportedAlgorithmError extends Error {
+  constructor(
+    public readonly oid: string,
+    public readonly supportedOids: string[],
+    message: string
+  ) {
+    super(message)
+    this.name = 'UnsupportedAlgorithmError'
+  }
+}
+
+// Type for ASN.1 validation capture
+interface ASN1ValidationCapture {
+  kdfOid?: string
+  encOid?: string
+  salt?: string
+  iterationCount?: string
+  iv?: string
+  encryptedData?: string
+}
+
+// Helper function to safely extract string values
+function extractString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+// Helper function to convert ASN.1 object to validation capture
+function toValidationCapture(obj: unknown): ASN1ValidationCapture {
+  if (typeof obj !== 'object' || obj === null) {
+    return {}
+  }
+
+  const asObject = obj as Record<string, unknown>
+
+  return {
+    kdfOid: extractString(asObject.kdfOid),
+    encOid: extractString(asObject.encOid),
+    salt: extractString(asObject.salt),
+    iterationCount: extractString(asObject.iterationCount),
+    iv: extractString(asObject.iv),
+    encryptedData: extractString(asObject.encryptedData)
+  }
+}
+
+// Update extractEncryptionParams function
+function extractEncryptionParams(obj: unknown): EncryptionParams {
+  const capture = toValidationCapture(obj)
+
+  // Validate KDF OID
+  if (!capture.kdfOid) {
+    throw new Error('Missing required KDF OID')
+  }
+
+  const kdfOid = capture.kdfOid
+  if (!SUPPORTED_KDF_OIDS.includes(kdfOid)) {
+    throw new UnsupportedAlgorithmError(
+      kdfOid,
+      Array.from(SUPPORTED_KDF_OIDS),
+      `Unsupported KDF algorithm: ${kdfOid}`
+    )
+  }
+
+  // Validate encryption OID
+  if (!capture.encOid) {
+    throw new Error('Missing required encryption OID')
+  }
+
+  const encOid = capture.encOid
+  if (!SUPPORTED_ENC_OIDS.includes(encOid)) {
+    throw new UnsupportedAlgorithmError(
+      encOid,
+      SUPPORTED_ENC_OIDS,
+      `Unsupported encryption algorithm: ${encOid}`
+    )
+  }
+
+  // Extract and validate required parameters
+  const salt = capture.salt ? createBuffer(capture.salt) : undefined
+  const iterationCount = capture.iterationCount ? parseInt(capture.iterationCount, 10) : undefined
+  const iv = capture.iv ? createBuffer(capture.iv) : undefined
+  const encryptedData = capture.encryptedData ? createBuffer(capture.encryptedData) : undefined
+
+  if (!salt || !iterationCount || !iv || !encryptedData) {
+    throw new Error('Missing required encryption parameters')
+  }
+
+  // Find algorithm name from OID
+  const algorithm = Object.keys(pbeAlgorithms).find(key =>
+    oids[key as keyof typeof oids] === encOid
+  )
+
+  return {
+    kdfOid,
+    encOid,
+    salt,
+    iterationCount,
+    iv,
+    encryptedData,
+    algorithm
+  }
+}
+
 // Type for cipher creation functions
 interface CipherCreationOptions {
   key: string | ByteStringBuffer
@@ -348,131 +473,6 @@ export function generatePkcs12Key(
 
   result.truncate(result.length() - n)
   return result
-}
-
-// Type for ASN.1 validation capture
-interface ASN1ValidationCapture {
-  kdfOid: string
-  encOid: string
-  kdfSalt: string
-  kdfIterationCount: string
-  encIv: string
-  encryptedData: string
-}
-
-// Type for ASN.1 validation result
-interface ASN1ValidationResult {
-  capture: Partial<ASN1ValidationCapture>
-  errors: Error[]
-  validated: boolean
-}
-
-// Helper function to validate ASN.1 capture object
-function validateCapture(capture: any): asserts capture is ASN1ValidationCapture {
-  const requiredFields = [
-    'kdfOid',
-    'encOid',
-    'kdfSalt',
-    'kdfIterationCount',
-    'encIv',
-    'encryptedData'
-  ] as const
-
-  const missingFields = requiredFields.filter(field => !capture[field])
-  if (missingFields.length > 0) {
-    throw new PBEError(
-      'Missing required encryption parameters',
-      PBEErrorCode.INVALID_PARAMS,
-      { missingFields }
-    )
-  }
-}
-
-// Helper function to safely access object properties
-function getProperty<T extends object, K extends keyof T>(obj: T, key: K): T[K] {
-  if (!(key in obj)) {
-    throw new PBEError(
-      `Missing required property: ${String(key)}`,
-      PBEErrorCode.INVALID_PARAMS
-    )
-  }
-  return obj[key]
-}
-
-// Update extractEncryptionParams to use proper type assertions
-function extractEncryptionParams(obj: any): {
-  algorithm: string
-  salt: ByteStringBuffer
-  iterationCount: number
-  iv: ByteStringBuffer
-  encryptedData: ByteStringBuffer
-} {
-  const capture = {} as { [key: string]: string }
-  const errors: Error[] = []
-
-  const validated = asn1.validate(
-    obj,
-    encryptedPrivateKeyValidator,
-    capture,
-    errors
-  )
-
-  if (!validated) {
-    throw new PBEError(
-      'Invalid ASN.1 structure',
-      PBEErrorCode.INVALID_PARAMS,
-      { errors }
-    )
-  }
-
-  try {
-    validateCapture(capture)
-
-    const kdfOidValue = getProperty(capture, 'kdfOid')
-    const kdfOid = asn1.derToOid(kdfOidValue)
-    if (kdfOid !== oids.pkcs5PBKDF2) {
-      throw new PBEError(
-        'Unsupported key derivation function',
-        PBEErrorCode.UNSUPPORTED_ALGORITHM,
-        {
-          algorithm: kdfOid,
-          supported: ['pkcs5PBKDF2']
-        }
-      )
-    }
-
-    const encOidValue = getProperty(capture, 'encOid')
-    const encOid = asn1.derToOid(encOidValue)
-    const algorithm = Object.keys(pbeAlgorithms).find(key => oids[key] === encOid)
-
-    if (!algorithm) {
-      throw new PBEError(
-        'Unsupported encryption algorithm',
-        PBEErrorCode.UNSUPPORTED_ALGORITHM,
-        {
-          algorithm: encOid,
-          supported: Object.keys(pbeAlgorithms)
-        }
-      )
-    }
-
-    return {
-      algorithm,
-      salt: createBuffer(getProperty(capture, 'kdfSalt')),
-      iterationCount: parseInt(getProperty(capture, 'kdfIterationCount'), 10),
-      iv: createBuffer(getProperty(capture, 'encIv')),
-      encryptedData: createBuffer(getProperty(capture, 'encryptedData'))
-    }
-  } catch (e) {
-    if (e instanceof PBEError) {
-      throw e
-    }
-    throw new PBEError(
-      'Failed to parse encryption parameters',
-      PBEErrorCode.INVALID_PARAMS,
-      { error: e }
-    )
-  }
 }
 
 // Update the validator to properly type the capture object
@@ -1153,7 +1153,7 @@ export function getCipher(oid: string, params: any, password: string): BlockCiph
  */
 export function getCipherForPBES2(oid: string, params: any, password: string): BlockCipher {
   // get PBE params
-  const capture = {}
+  const capture: CaptureObject = {}
   const errors: Error[] = []
 
   if (!asn1.validate(params, PBES2AlgorithmsValidator, capture, errors)) {
@@ -1165,8 +1165,7 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   // check oids
   oid = asn1.derToOid(capture.kdfOid)
   if (oid !== oids.pkcs5PBKDF2) {
-    var error = new Error('Cannot read encrypted private key. '
-      + 'Unsupported key derivation function OID.')
+    const error: CustomError = new Error('Cannot read encrypted private key. Unsupported key derivation function OID.')
     error.oid = oid
     error.supportedOids = ['pkcs5PBKDF2']
     throw error
@@ -1177,7 +1176,7 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
     && oid !== oids['aes256-CBC']
     && oid !== oids['des-EDE3-CBC']
     && oid !== oids.desCBC) {
-    let error = new Error('Cannot read encrypted private key. Unsupported encryption scheme OID.')
+    const error: CustomError = new Error('Cannot read encrypted private key. Unsupported encryption scheme OID.')
     error.oid = oid
     error.supportedOids = [
       'aes128-CBC',
@@ -1191,8 +1190,8 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
 
   // set PBE params
   const salt = capture.kdfSalt
-  let count = createBuffer(capture.kdfIterationCount)
-  count = count.getInt(count.length() << 3)
+  const countBuffer = createBuffer(capture.kdfIterationCount)
+  const iterationCount = countBuffer.getInt(countBuffer.length() << 3)
   let dkLen
   let cipherFn
 
@@ -1224,7 +1223,7 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
   // decrypt private key using pbe with chosen PRF and AES/DES
-  const dk = pbkdf2(password, salt, count, dkLen, md, undefined)
+  const dk = pbkdf2(password, salt, iterationCount, dkLen, md, undefined)
   const iv = capture.encIv
   const cipher = cipherFn(dk.bytes())
   cipher.start({ iv: createBuffer(iv) })
@@ -1256,8 +1255,8 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
   }
 
   const salt = createBuffer(capture.salt)
-  let count = createBuffer(capture.iterations)
-  count = count.getInt(count.length() << 3)
+  const countBuffer = createBuffer(capture.iterations)
+  const iterationCount = countBuffer.getInt(countBuffer.length() << 3)
 
   let dkLen, dIvLen, cipherFn
   switch (oid) {
@@ -1270,7 +1269,7 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
     case oids['pbewithSHAAnd40BitRC2-CBC']:
       dkLen = 5
       dIvLen = 8
-      cipherFn = function (key, iv) {
+      cipherFn = function (key: string, iv: string) {
         const cipher = rc2.createDecryptionCipher(key, 40)
         cipher.start(iv, null)
         return cipher
@@ -1286,9 +1285,9 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
   // get PRF message digest
   const prfAlgorithm = capture.prfOid
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
-  const key = generatePkcs12Key(password, salt, 1, count, dkLen, md)
+  const key = generatePkcs12Key(password, salt, 1, iterationCount, dkLen, md)
   md.start()
-  const iv = generatePkcs12Key(password, salt, 2, count, dIvLen, md)
+  const iv = generatePkcs12Key(password, salt, 2, iterationCount, dIvLen, md)
 
   return cipherFn(key, iv)
 }
@@ -1327,30 +1326,15 @@ export function hash(md: MessageDigest, bytes: string): string {
   return md.start().update(bytes).digest().getBytes()
 }
 
-export function prfOidToMessageDigest(prfOid: string): MessageDigest {
-  // get PRF algorithm, default to SHA-1
-  let prfAlgorithm
-
-  if (!prfOid) {
-    prfAlgorithm = 'hmacWithSHA1'
+class AlgorithmError extends Error {
+  constructor(
+    public readonly algorithm: string,
+    public readonly supported: string[],
+    message: string
+  ) {
+    super(message)
+    this.name = 'AlgorithmError'
   }
-  else {
-    prfAlgorithm = oids[asn1.derToOid(prfOid)]
-    if (!prfAlgorithm) {
-      const error = new Error('Unsupported PRF OID.')
-      error.oid = prfOid
-      error.supported = [
-        'hmacWithSHA1',
-        'hmacWithSHA224',
-        'hmacWithSHA256',
-        'hmacWithSHA384',
-        'hmacWithSHA512',
-      ]
-      throw error
-    }
-  }
-
-  return prfAlgorithmToMessageDigest(prfAlgorithm)
 }
 
 export function prfAlgorithmToMessageDigest(prfAlgorithm: string): MessageDigest {
@@ -1366,22 +1350,17 @@ export function prfAlgorithmToMessageDigest(prfAlgorithm: string): MessageDigest
       prfAlgorithm = prfAlgorithm.substr(8).toLowerCase()
       break
     default:
-      var error = new Error('Unsupported PRF algorithm.')
-      error.algorithm = prfAlgorithm
-      error.supported = [
-        'hmacWithSHA1',
-        'hmacWithSHA224',
-        'hmacWithSHA256',
-        'hmacWithSHA384',
-        'hmacWithSHA512',
-      ]
-      throw error
+      throw new AlgorithmError(
+        prfAlgorithm,
+        ['hmacWithSHA1', 'hmacWithSHA224', 'hmacWithSHA256', 'hmacWithSHA384', 'hmacWithSHA512'],
+        'Unsupported PRF algorithm.'
+      )
   }
 
   if (!factory || !(prfAlgorithm in factory))
     throw new Error(`Unknown hash algorithm: ${prfAlgorithm}`)
 
-  return factory[prfAlgorithm].create()
+  return ((factory as unknown) as Record<string, HashFunction>)[prfAlgorithm].create()
 }
 
 export function createPbkdf2Params(salt: string, countBytes: ByteStringBuffer, dkLen: number, prfAlgorithm: string): Asn1Object {
