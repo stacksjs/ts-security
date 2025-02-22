@@ -5,8 +5,13 @@
  * @author Chris Breuer
  */
 
-import { md } from './md'
+import { mgf1 } from './mgf1'
+import { sha1 } from './algorithms/hash/sha1'
 
-export const mgf = {
-  mgf1: md.sha1.create().update('sha1').digest(),
+export interface MGF {
+  mgf1: (seed: string, maskLen: number) => string
+}
+
+export const mgf: MGF = {
+  mgf1: (seed: string, maskLen: number) => mgf1.create(sha1.create()).generate(seed, maskLen)
 }

@@ -6,12 +6,12 @@
  * @author Chris Breuer
  */
 
-import { ByteBuffer } from './utils'
+import { ByteBuffer, ByteStringBuffer } from './utils'
 
 interface MessageDigest {
   start: () => void
-  update: (data: string) => void
-  digest: () => string
+  update: (data: string | ByteStringBuffer) => void
+  digest: () => ByteStringBuffer
   digestLength: number
 }
 
@@ -44,7 +44,7 @@ export function create(md: MessageDigest) {
       // b. Concatenate the hash of the seed mgfSeed and C to the octet string T:
       md.start()
       md.update(seed + c.getBytes())
-      t.putBuffer(md.digest())
+      t.putBuffer(new ByteBuffer(md.digest().getBytes()))
     }
 
     // output the leading maskLen octets of T as the octet string mask
@@ -54,8 +54,8 @@ export function create(md: MessageDigest) {
   }
 
   return {
-    generate,
-  }
+    generate: generate
+  } as { generate: (seed: string, maskLen: number) => string }
 }
 
 export interface MGF1 {
