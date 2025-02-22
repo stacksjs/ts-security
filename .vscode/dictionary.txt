@@ -41,6 +41,7 @@ ltrim
 maxline
 Millis
 mkcert
+OCTETSTRING
 oids
 opadding
 openweb
@@ -48,6 +49,7 @@ outdir
 outfile
 pausable
 pbegin
+PBES
 pkgx
 Postcardware
 postcompile
@@ -58,6 +60,7 @@ scalarbase
 scalarmult
 shikijs
 shoutout
+Siegl
 socio
 Solana
 sponsorware

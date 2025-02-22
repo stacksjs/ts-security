@@ -146,9 +146,8 @@ export function spawnPrng(): PRNG {
     },
 
     generate(count: number, callback?: (err: Error | null, bytes: string) => void): string {
-      if (count <= 0) {
+      if (count <= 0)
         return ''
-      }
 
       // Reseed if necessary (every 100ms or if enough entropy collected)
       const now = +new Date()
@@ -170,31 +169,29 @@ export function spawnPrng(): PRNG {
       }
 
       // Truncate to the exact length requested
-      if (bytes.length > count) {
+      if (bytes.length > count)
         bytes = bytes.substr(0, count)
-      }
 
       // Handle callback if provided
-      if (callback) {
+      if (callback)
         callback(null, bytes)
-      }
 
       return bytes
     },
 
     collect(bytes: string): void {
-      if (!bytes) {
+      if (!bytes)
         return
-      }
+
       entropyPool.putBytes(bytes)
       collected += bytes.length
     },
 
     collectInt(num: number, bits: number): void {
       const bytes = []
-      for (let i = 0; i < bits; i += 8) {
+      for (let i = 0; i < bits; i += 8)
         bytes.push((num >> i) & 0xFF)
-      }
+
       this.collect(String.fromCharCode.apply(null, bytes))
     },
   }
