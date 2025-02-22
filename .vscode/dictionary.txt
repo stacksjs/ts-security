@@ -10,6 +10,7 @@ bunx
 certutil
 changelogen
 changelogithub
+codebook
 codecov
 commitlint
 commitlintrc

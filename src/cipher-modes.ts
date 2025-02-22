@@ -75,7 +75,11 @@ export abstract class BaseCipherMode implements CipherMode {
   abstract decrypt(input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean
 }
 
-/** Electronic codebook (ECB) (Don't use this; it's not secure) */
+/**
+ * Electronic codebook (ECB)
+ *
+ * Unless you have a very good reason, don't use this; it's not secure.
+ */
 export class ECB extends BaseCipherMode {
   constructor(options: Partial<CipherModeOptions> = {}) {
     super(options)
@@ -159,7 +163,9 @@ export class ECB extends BaseCipherMode {
   }
 }
 
-/** Cipher-block Chaining (CBC) */
+/**
+ * Cipher-block Chaining (CBC)
+ */
 export class CBC extends BaseCipherMode {
   _prev?: number[]
   _iv?: number[]
@@ -266,7 +272,9 @@ export class CBC extends BaseCipherMode {
   }
 }
 
-/** Cipher Feedback (CFB) */
+/**
+ * Cipher Feedback (CFB)
+ */
 export class CFB extends BaseCipherMode {
   _partialBlock: number[]
   _partialOutput: ByteStringBuffer
@@ -308,6 +316,7 @@ export class CFB extends BaseCipherMode {
         this._inBlock[i] = input.getInt32() ^ this._outBlock[i]
         output.putInt32(this._inBlock[i])
       }
+
       return false
     }
 
@@ -337,21 +346,21 @@ export class CFB extends BaseCipherMode {
     }
     else {
       // block complete, update input block
-      for (let i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i)
         this._inBlock[i] = this._partialBlock[i]
-      }
     }
 
     // skip any previous partial bytes
-    if (this._partialBytes > 0) {
+    if (this._partialBytes > 0)
       this._partialOutput.getBytes(this._partialBytes)
-    }
+
 
     if (partialBytes > 0 && !finish) {
       output.putBytes(this._partialOutput.getBytes(
         partialBytes - this._partialBytes,
       ))
       this._partialBytes = partialBytes
+
       return false
     }
 
@@ -381,9 +390,9 @@ export class OFB extends BaseCipherMode {
   }
 
   start(options: Partial<CipherModeOptions>): void {
-    if (!('iv' in options)) {
+    if (!('iv' in options))
       throw new Error('Invalid IV parameter.')
-    }
+
     // use IV as first input
     this._inBlock = transformIV(options.iv || null, this.blockSize)
     this._partialBytes = 0
@@ -392,9 +401,8 @@ export class OFB extends BaseCipherMode {
   encrypt(input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
     // not enough input to encrypt
     const inputLength = input.length()
-    if (inputLength === 0) {
+    if (inputLength === 0)
       return true
-    }
 
     // encrypt block (OFB always uses encryption mode)
     this.cipher.encrypt(this._inBlock, this._outBlock)
@@ -406,46 +414,43 @@ export class OFB extends BaseCipherMode {
         output.putInt32(input.getInt32() ^ this._outBlock[i])
         this._inBlock[i] = this._outBlock[i]
       }
+
       return false
     }
 
     // handle partial block
     let partialBytes = (this.blockSize - inputLength) % this.blockSize
-    if (partialBytes > 0) {
+    if (partialBytes > 0)
       partialBytes = this.blockSize - partialBytes
-    }
 
     // Save current input values
-    for (let i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i)
       this._lastBlock[i] = input.getInt32()
-    }
 
     // XOR input with output
     this._partialOutput.clear()
-    for (let i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i)
       this._partialOutput.putInt32(this._lastBlock[i] ^ this._outBlock[i])
-    }
 
     if (partialBytes > 0) {
       // block still incomplete, no need to update input block
     }
     else {
       // block complete, update input block
-      for (let i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i)
         this._inBlock[i] = this._outBlock[i]
-      }
     }
 
     // skip any previous partial bytes
-    if (this._partialBytes > 0) {
+    if (this._partialBytes > 0)
       this._partialOutput.getBytes(this._partialBytes)
-    }
 
     if (partialBytes > 0 && !finish) {
       output.putBytes(this._partialOutput.getBytes(
         partialBytes - this._partialBytes,
       ))
       this._partialBytes = partialBytes
+
       return false
     }
 
@@ -476,9 +481,9 @@ export class CTR extends BaseCipherMode {
   }
 
   start(options: Partial<CipherModeOptions>): void {
-    if (!('iv' in options)) {
+    if (!('iv' in options))
       throw new Error('Invalid IV parameter.')
-    }
+
     // use IV as first input
     this._inBlock = transformIV(options.iv || null, this.blockSize)
     this._partialBytes = 0
@@ -487,9 +492,8 @@ export class CTR extends BaseCipherMode {
   encrypt(input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
     // not enough input to encrypt
     const inputLength = input.length()
-    if (inputLength === 0) {
+    if (inputLength === 0)
       return true
-    }
 
     // encrypt block (CTR always uses encryption mode)
     this.cipher.encrypt(this._inBlock, this._outBlock)
@@ -497,38 +501,34 @@ export class CTR extends BaseCipherMode {
     // handle full block
     if (this._partialBytes === 0 && inputLength >= this.blockSize) {
       // XOR input with output
-      for (let i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i)
         output.putInt32(input.getInt32() ^ this._outBlock[i])
-      }
     }
     else {
       // handle partial block
       let partialBytes = (this.blockSize - inputLength) % this.blockSize
-      if (partialBytes > 0) {
+      if (partialBytes > 0)
         partialBytes = this.blockSize - partialBytes
-      }
 
       // Save current input values
-      for (let i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i)
         this._lastBlock[i] = input.getInt32()
-      }
 
       // XOR input with output
       this._partialOutput.clear()
-      for (let i = 0; i < this._ints; ++i) {
+      for (let i = 0; i < this._ints; ++i)
         this._partialOutput.putInt32(this._lastBlock[i] ^ this._outBlock[i])
-      }
 
       // skip any previous partial bytes
-      if (this._partialBytes > 0) {
+      if (this._partialBytes > 0)
         this._partialOutput.getBytes(this._partialBytes)
-      }
 
       if (partialBytes > 0 && !finish) {
         output.putBytes(this._partialOutput.getBytes(
           partialBytes - this._partialBytes,
         ))
         this._partialBytes = partialBytes
+
         return false
       }
 
@@ -587,9 +587,8 @@ export class GCM extends BaseCipherMode {
   }
 
   start(options: Partial<CipherModeOptions>): void {
-    if (!('iv' in options)) {
+    if (!('iv' in options))
       throw new Error('Invalid IV parameter.')
-    }
 
     // ensure IV is a byte buffer
     const iv = createBuffer(options.iv ? String(options.iv) : '')
@@ -599,26 +598,22 @@ export class GCM extends BaseCipherMode {
 
     // default additional data is none
     let additionalData: ByteStringBuffer
-    if ('additionalData' in options && options.additionalData) {
+    if ('additionalData' in options && options.additionalData)
       additionalData = createBuffer(String(options.additionalData))
-    }
-    else {
+    else
       additionalData = createBuffer()
-    }
 
     // default tag length is 128 bits
-    if ('tagLength' in options) {
+    if ('tagLength' in options)
       this._tagLength = options.tagLength || 128
-    }
 
     // if tag is given, ensure tag matches tag length
     this._tag = undefined
     if (options.decrypt && options.tag) {
       // save tag to check later
       this._tag = createBuffer(options.tag).getBytes()
-      if (this._tag.length !== (this._tagLength / 8)) {
+      if (this._tag.length !== (this._tagLength / 8))
         throw new Error('Authentication tag does not match tag length.')
-      }
     }
 
     // generate hash subkey
@@ -648,6 +643,7 @@ export class GCM extends BaseCipherMode {
       this._j0[1] = 0
       this._j0[2] = 0
       this._j0[3] = 0
+
       while (iv.length() > 0) {
         this._j0 = this.ghash(
           this._hashSubkey,
@@ -655,6 +651,7 @@ export class GCM extends BaseCipherMode {
           [iv.getInt32(), iv.getInt32(), iv.getInt32(), iv.getInt32()],
         )
       }
+
       this._j0 = this.ghash(
         this._hashSubkey,
         this._j0,
@@ -672,9 +669,9 @@ export class GCM extends BaseCipherMode {
     this._aDataLength = from64To32(additionalData.length() * 8)
     // pad additional data to 128 bit (16 byte) block size
     const overflow = additionalData.length() % this.blockSize
-    if (overflow) {
+    if (overflow)
       additionalData.fillWithByte(0, this.blockSize - overflow)
-    }
+
     this._s = [0, 0, 0, 0]
     while (additionalData.length() > 0) {
       this._s = this.ghash(this._hashSubkey, this._s, [
@@ -689,9 +686,8 @@ export class GCM extends BaseCipherMode {
   encrypt(input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
     // not enough input to encrypt
     const inputLength = input.length()
-    if (inputLength === 0) {
+    if (inputLength === 0)
       return true
-    }
 
     // encrypt block
     this.cipher.encrypt(this._inBlock, this._outBlock)
@@ -703,14 +699,14 @@ export class GCM extends BaseCipherMode {
         this._outBlock[i] ^= input.getInt32()
         output.putInt32(this._outBlock[i])
       }
+
       this._cipherLength += this.blockSize
     }
     else {
       // handle partial block
       let partialBytes = (this.blockSize - inputLength) % this.blockSize
-      if (partialBytes > 0) {
+      if (partialBytes > 0)
         partialBytes = this.blockSize - partialBytes
-      }
 
       // XOR input with output
       this._partialOutput.clear()
@@ -743,15 +739,15 @@ export class GCM extends BaseCipherMode {
       }
 
       // skip any previous partial bytes
-      if (this._partialBytes > 0) {
+      if (this._partialBytes > 0)
         this._partialOutput.getBytes(this._partialBytes)
-      }
 
       if (partialBytes > 0 && !finish) {
         output.putBytes(this._partialOutput.getBytes(
           partialBytes - this._partialBytes,
         ))
         this._partialBytes = partialBytes
+
         return false
       }
 
@@ -773,9 +769,8 @@ export class GCM extends BaseCipherMode {
   decrypt(input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean): boolean {
     // not enough input to decrypt
     const inputLength = input.length()
-    if (inputLength < this.blockSize && !(finish && inputLength > 0)) {
+    if (inputLength < this.blockSize && !(finish && inputLength > 0))
       return true
-    }
 
     // encrypt block (GCM always uses encryption mode)
     this.cipher.encrypt(this._inBlock, this._outBlock)
@@ -791,17 +786,14 @@ export class GCM extends BaseCipherMode {
     this._s = this.ghash(this._hashSubkey, this._s, this._hashBlock)
 
     // XOR hash input with output
-    for (let i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i)
       output.putInt32(this._outBlock[i] ^ this._hashBlock[i])
-    }
 
     // increment cipher data length
-    if (inputLength < this.blockSize) {
+    if (inputLength < this.blockSize)
       this._cipherLength += inputLength % this.blockSize
-    }
-    else {
+    else
       this._cipherLength += this.blockSize
-    }
 
     return false
   }
@@ -810,9 +802,8 @@ export class GCM extends BaseCipherMode {
     let rval = true
 
     // handle overflow
-    if (options.decrypt && options.overflow) {
+    if (options.decrypt && options.overflow)
       output.truncate(this.blockSize - options.overflow)
-    }
 
     // handle authentication tag
     this.tag = createBuffer()
@@ -826,17 +817,15 @@ export class GCM extends BaseCipherMode {
     // do GCTR(J_0, S)
     const tag = new Array(this._ints)
     this.cipher.encrypt(this._j0!, tag)
-    for (let i = 0; i < this._ints; ++i) {
+    for (let i = 0; i < this._ints; ++i)
       this.tag.putInt32(this._s[i] ^ tag[i])
-    }
 
     // trim tag to length
     this.tag.truncate(this.tag.length() % (this._tagLength / 8))
 
     // check authentication tag
-    if (options.decrypt && this.tag.bytes() !== this._tag) {
+    if (options.decrypt && this.tag.bytes() !== this._tag)
       rval = false
-    }
 
     return rval
   }
@@ -900,18 +889,17 @@ export class GCM extends BaseCipherMode {
     // starting with the rightmost integer, shift each integer to the right
     // one bit, pulling in the bit from the integer to the left as its top
     // most bit (do this for the last 3 integers)
-    for (let i = 3; i > 0; --i) {
+    for (let i = 3; i > 0; --i)
       out[i] = (x[i] >>> 1) | ((x[i - 1] & 1) << 31)
-    }
+
     // shift the first integer normally
     out[0] = x[0] >>> 1
 
     // if lsb was not set, then polynomial had a degree of 127 and doesn't
     // need to divided; otherwise, XOR with R to find the remainder; we only
     // need to XOR the first integer since R technically ends w/120 zero bits
-    if (lsb) {
+    if (lsb)
       out[0] ^= this._R
-    }
   }
 
   tableMultiply(x: number[]): number[] {
@@ -926,6 +914,7 @@ export class GCM extends BaseCipherMode {
       z[2] ^= ah[2]
       z[3] ^= ah[3]
     }
+
     return z
   }
 
@@ -972,6 +961,7 @@ export class GCM extends BaseCipherMode {
     const perInt = 4 * multiplier
     const size = 16 * multiplier
     const m = new Array(size)
+
     for (let i = 0; i < size; ++i) {
       const tmp = [0, 0, 0, 0]
       const idx = (i / perInt) | 0
@@ -979,6 +969,7 @@ export class GCM extends BaseCipherMode {
       tmp[idx] = (1 << (bits - 1)) << shft
       m[i] = this.generateSubHashTable(this.multiply(tmp, h), bits)
     }
+
     return m
   }
 
@@ -998,16 +989,19 @@ export class GCM extends BaseCipherMode {
     const m = new Array(size)
     m[half] = mid.slice(0)
     let i = half >>> 1
+
     while (i > 0) {
       // raise m0[2 * i] and store in m0[i]
       this.pow(m[2 * i], m[i] = [])
       i >>= 1
     }
+
     i = 2
     while (i < half) {
       for (let j = 1; j < i; ++j) {
         const m_i = m[i]
         const m_j = m[j]
+
         m[i + j] = [
           m_i[0] ^ m_j[0],
           m_i[1] ^ m_j[1],
@@ -1015,8 +1009,10 @@ export class GCM extends BaseCipherMode {
           m_i[3] ^ m_j[3],
         ]
       }
+
       i *= 2
     }
+
     m[0] = [0, 0, 0, 0]
     /* Note: We could avoid storing these by doing composition during multiply
     calculate top half using composition by speed is preferred. */
@@ -1024,6 +1020,7 @@ export class GCM extends BaseCipherMode {
       const c = m[i ^ half]
       m[i] = [mid[0] ^ c[0], mid[1] ^ c[1], mid[2] ^ c[2], mid[3] ^ c[3]]
     }
+
     return m
   }
 }
@@ -1040,9 +1037,8 @@ export const modes: Record<string, (options?: Partial<CipherModeOptions>) => Cip
 
 /** Utility functions */
 function transformIV(iv: string | number[] | ByteStringBuffer | null, blockSize: number): number[] {
-  if (!iv) {
+  if (!iv)
     throw new Error('IV parameter is required')
-  }
 
   let buffer: ByteStringBuffer
   if (typeof iv === 'string') {
@@ -1063,9 +1059,8 @@ function transformIV(iv: string | number[] | ByteStringBuffer | null, blockSize:
   // convert byte buffer into 32-bit integer array
   const ints: number[] = []
   const blocks = blockSize / 4
-  for (let i = 0; i < blocks; ++i) {
+  for (let i = 0; i < blocks; ++i)
     ints.push(buffer.getInt32())
-  }
 
   if (buffer.length() < blockSize) {
     throw new Error(

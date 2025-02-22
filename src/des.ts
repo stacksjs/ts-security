@@ -30,7 +30,7 @@
  * Copyright (c) 2012-2014 Digital Bazaar, Inc.
  */
 
-import type { Algorithm } from './cipher'
+import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode, CipherModeOptions } from './cipher-modes'
 import { createCipher, registerAlgorithm as registerAlgo } from './cipher'
 import { modes } from './cipher-modes'
@@ -337,13 +337,25 @@ function _updateBlock(keys: number[], input: ByteStringBuffer, output: ByteStrin
 export interface DES {
   Algorithm: typeof DESAlgorithm
   createCipher: typeof createCipher
+  createEncryptionCipher: typeof createEncryptionCipher
+  createDecryptionCipher: typeof createDecryptionCipher
   createKeys: typeof _createKeys
   updateBlock: typeof _updateBlock
+}
+
+export function createEncryptionCipher(key: string, bits: string | Buffer): BlockCipher {
+  return createCipher(key, bits)
+}
+
+function createDecryptionCipher(key: string, bits: string | Buffer): BlockCipher {
+  return createCipher(key, bits)
 }
 
 export const des: DES = {
   Algorithm: DESAlgorithm,
   createCipher,
+  createEncryptionCipher,
+  createDecryptionCipher,
   createKeys: _createKeys,
   updateBlock: _updateBlock,
 }

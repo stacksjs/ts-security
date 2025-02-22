@@ -146,12 +146,12 @@ interface ExtendedError extends Error {
 }
 
 export interface Asn1Object {
-  name: string
+  name?: string
   tagClass: number
   type: number
   constructed: boolean
   composed?: boolean
-  captureAsn1: string
+  captureAsn1?: string
   value: any
   bitStringContents?: string
   original?: Asn1Object
@@ -212,9 +212,8 @@ export const Type = {
  * @param type the data type (tag number) for the object.
  * @param constructed true if the asn1 object is in constructed form.
  * @param value the value for the object, if it is not constructed.
- * @param [options] the options to use:
- *          [bitStringContents] the plain BIT STRING content including padding
- *            byte.
+ * @param options the options to use:
+ * @param options.bitStringContents the plain BIT STRING content including padding byte.
  *
  * @return the asn1 object.
  */

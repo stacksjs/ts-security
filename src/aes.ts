@@ -849,7 +849,13 @@ function createDecryptionCipher(key: string, bits: string | Buffer): BlockCipher
   return createCipher(key, bits)
 }
 
-export const aes = {
+export interface AES {
+  createEncryptionCipher: typeof createEncryptionCipher
+  createDecryptionCipher: typeof createDecryptionCipher
+  registerAESAlgorithm: typeof registerAESAlgorithm
+}
+
+export const aes: AES = {
   createEncryptionCipher,
   createDecryptionCipher,
   registerAESAlgorithm,
