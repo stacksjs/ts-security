@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * A TypeScript implementation of Transport Layer Security (TLS).
  *

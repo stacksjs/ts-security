@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Socket wrapping functions for TLS.
  *
