@@ -110,6 +110,7 @@ interface CaptureObject {
   encIv?: string
   salt?: string
   iterations?: string
+  keyLength?: string
 }
 
 interface CipherOptions {
@@ -164,16 +165,34 @@ function toByteStringBuffer(input: string | Buffer | ByteStringBuffer): ByteStri
   return createBuffer(input.toString('binary'))
 }
 
-function createAESCipher(key: string | ByteStringBuffer, bits: string): BlockCipher {
-  return aes.createEncryptionCipher(convertToString(key), bits)
+function createAESCipher(key: ByteStringBuffer | string, bits: string): BlockCipher {
+  const keyStr = typeof key === 'string' ? key : key.toString()
+  return aes.createEncryptionCipher(keyStr, bits)
 }
 
-function createDESCipher(key: string | ByteStringBuffer, iv: ByteStringBuffer): BlockCipher {
-  return des.createEncryptionCipher(convertToString(key), iv.bytes())
+function createDESCipher(key: ByteStringBuffer | string, iv: ByteStringBuffer): BlockCipher {
+  const keyStr = typeof key === 'string' ? key : key.toString()
+  return des.createEncryptionCipher(keyStr, iv.bytes())
 }
 
-// validator for an EncryptedPrivateKeyInfo structure
-// Note: Currently only works w/algorithm params
+// Type for ASN.1 validation capture
+interface ASN1ValidationCapture {
+  kdfOid: string
+  encOid: string
+  kdfSalt: string
+  kdfIterationCount: string
+  encIv: string
+  encryptedData: string
+}
+
+// Type for ASN.1 validation result
+interface ASN1ValidationResult {
+  capture: Partial<ASN1ValidationCapture>
+  errors: Error[]
+  validated: boolean
+}
+
+// Update the validator to properly type the capture object
 const encryptedPrivateKeyValidator = {
   name: 'EncryptedPrivateKeyInfo',
   tagClass: asn1.Class.UNIVERSAL,
@@ -189,23 +208,52 @@ const encryptedPrivateKeyValidator = {
       tagClass: asn1.Class.UNIVERSAL,
       type: asn1.Type.OID,
       constructed: false,
-      capture: 'encryptionOid',
+      capture: 'kdfOid',
     }, {
       name: 'AlgorithmIdentifier.parameters',
       tagClass: asn1.Class.UNIVERSAL,
       type: asn1.Type.SEQUENCE,
       constructed: true,
-      captureAsn1: 'encryptionParams',
+      value: [{
+        name: 'PBKDF2-params.salt',
+        tagClass: asn1.Class.UNIVERSAL,
+        type: asn1.Type.OCTETSTRING,
+        constructed: false,
+        capture: 'kdfSalt',
+      }, {
+        name: 'PBKDF2-params.iterationCount',
+        tagClass: asn1.Class.UNIVERSAL,
+        type: asn1.Type.INTEGER,
+        constructed: false,
+        capture: 'kdfIterationCount',
+      }],
     }],
   }, {
-    // encryptedData
+    name: 'EncryptedPrivateKeyInfo.encryptionScheme',
+    tagClass: asn1.Class.UNIVERSAL,
+    type: asn1.Type.SEQUENCE,
+    constructed: true,
+    value: [{
+      name: 'AlgorithmIdentifier.algorithm',
+      tagClass: asn1.Class.UNIVERSAL,
+      type: asn1.Type.OID,
+      constructed: false,
+      capture: 'encOid',
+    }, {
+      name: 'AlgorithmIdentifier.parameters',
+      tagClass: asn1.Class.UNIVERSAL,
+      type: asn1.Type.OCTETSTRING,
+      constructed: false,
+      capture: 'encIv',
+    }],
+  }, {
     name: 'EncryptedPrivateKeyInfo.encryptedData',
     tagClass: asn1.Class.UNIVERSAL,
     type: asn1.Type.OCTETSTRING,
     constructed: false,
     capture: 'encryptedData',
   }],
-}
+} as const
 
 // validator for a PBES2Algorithms structure
 // Note: Currently only works w/PBKDF2 + AES encryption schemes
@@ -740,7 +788,7 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
     validateKey(key, pbeAlgorithms[params.algorithm].keyLength)
     validateIV(params.iv, pbeAlgorithms[params.algorithm].ivLength)
 
-    const decipher = createCipher(
+    const decipher = createModernCipher(
       pbeAlgorithms[params.algorithm].cipher,
       key
     )
@@ -1185,62 +1233,11 @@ export function createPbkdf2Params(salt: string, countBytes: ByteStringBuffer, d
   return params
 }
 
-// Type definitions
-interface CaptureObject {
-  kdfOid?: string;
-  encOid?: string;
-  kdfSalt?: string;
-  kdfIterationCount?: string;
-  encIv?: string;
-  encryptedData?: string;
-  salt?: string;
-  iterations?: string;
-  prfOid?: string;
-}
-
-interface CipherOptions {
-  iv: ByteStringBuffer;
-  key?: ByteStringBuffer;
-  output?: ByteStringBuffer;
-  decrypt?: boolean;
-}
-
-interface PBECipherInfo {
-  cipher: string;
-  keyLength: number;
-  ivLength: number;
-}
-
-interface PBEAlgorithms {
-  [key: string]: PBECipherInfo;
-}
-
-interface SHA512API {
-  [key: string]: MessageDigest;
-}
-
-// Convert string to ByteStringBuffer and vice versa
-function stringToBuffer(str: string): ByteStringBuffer {
-  return createBuffer(str);
-}
-
-function bufferToString(buf: ByteStringBuffer): string {
-  return buf.toString();
-}
-
-// Fix type issues in createCipher function
-function createCipher(algorithm: string, key: ByteStringBuffer | string): BlockCipher {
-  const keyBuffer = typeof key === 'string' ? stringToBuffer(key) : key;
-  switch (algorithm) {
-    case 'AES-CBC':
-      return aes.createEncryptionCipher(keyBuffer.toString(), '128');
-    case '3DES-CBC':
-      return des.createEncryptionCipher(keyBuffer.toString(), createBuffer(getBytesSync(8)));
-    case 'DES-CBC':
-      return des.createEncryptionCipher(keyBuffer.toString(), createBuffer(getBytesSync(8)));
-    default:
-      throw new Error(`Unsupported cipher algorithm: ${algorithm}`);
-  }
+// Custom error types for better type safety
+interface PBEErrorDetails {
+  algorithm?: string
+  supported?: string[]
+  errors?: Error[]
 }
 
 function validateKey(key: ByteStringBuffer, expectedLength: number): void {
@@ -1299,48 +1296,206 @@ function asn1ToPrivateKey(obj: Asn1Object): any {
   return privateKeyFromAsn1(obj);
 }
 
+// Update extractEncryptionParams to use proper type assertions
 function extractEncryptionParams(obj: any): {
-  algorithm: string;
-  salt: ByteStringBuffer;
-  iterationCount: number;
-  iv: ByteStringBuffer;
-  encryptedData: ByteStringBuffer;
+  algorithm: string
+  salt: ByteStringBuffer
+  iterationCount: number
+  iv: ByteStringBuffer
+  encryptedData: ByteStringBuffer
 } {
-  const capture: CaptureObject = {};
-  const errors: Error[] = [];
+  const capture = {} as Record<string, string>
+  const errors: Error[] = []
 
-  if (!asn1.validate(obj, encryptedPrivateKeyValidator, capture, errors)) {
+  const validated = asn1.validate(
+    obj,
+    encryptedPrivateKeyValidator,
+    capture,
+    errors
+  )
+
+  if (!validated) {
     throw new PBEError(
       'Invalid ASN.1 structure',
       PBEErrorCode.INVALID_PARAMS,
       { errors }
-    );
+    )
   }
 
-  if (!capture.encOid) {
-    throw new Error('Missing encryption algorithm identifier');
-  }
+  try {
+    // Validate all required fields are present
+    const requiredFields = [
+      'kdfOid',
+      'encOid',
+      'kdfSalt',
+      'kdfIterationCount',
+      'encIv',
+      'encryptedData'
+    ] as const
 
-  const encOid = asn1.derToOid(capture.encOid);
-  const algorithm = Object.keys(oids).find(key => oids[key] === encOid);
+    const missingFields = requiredFields.filter(field => !capture[field])
+    if (missingFields.length > 0) {
+      throw new PBEError(
+        'Missing required encryption parameters',
+        PBEErrorCode.INVALID_PARAMS,
+        { missingFields }
+      )
+    }
 
-  if (!algorithm || !pbeAlgorithms[algorithm]) {
+    const kdfOid = asn1.derToOid(capture['kdfOid'])
+    if (kdfOid !== oids.pkcs5PBKDF2) {
+      throw new PBEError(
+        'Unsupported key derivation function',
+        PBEErrorCode.UNSUPPORTED_ALGORITHM,
+        {
+          algorithm: kdfOid,
+          supported: ['pkcs5PBKDF2']
+        }
+      )
+    }
+
+    const encOid = asn1.derToOid(capture['encOid'])
+    const algorithm = Object.keys(pbeAlgorithms).find(key => oids[key] === encOid)
+
+    if (!algorithm) {
+      throw new PBEError(
+        'Unsupported encryption algorithm',
+        PBEErrorCode.UNSUPPORTED_ALGORITHM,
+        {
+          algorithm: encOid,
+          supported: Object.keys(pbeAlgorithms)
+        }
+      )
+    }
+
+    return {
+      algorithm,
+      salt: createBuffer(capture['kdfSalt']),
+      iterationCount: parseInt(capture['kdfIterationCount'], 10),
+      iv: createBuffer(capture['encIv']),
+      encryptedData: createBuffer(capture['encryptedData'])
+    }
+  } catch (e) {
+    if (e instanceof PBEError) {
+      throw e
+    }
     throw new PBEError(
-      'Unsupported encryption algorithm',
-      PBEErrorCode.UNSUPPORTED_ALGORITHM,
-      { algorithm: encOid }
-    );
+      'Failed to parse encryption parameters',
+      PBEErrorCode.INVALID_PARAMS,
+      { error: e }
+    )
+  }
+}
+
+// Legacy decryption function
+function decryptRsaPrivateKeyLegacy(pemKey: string, password: string): any {
+  const msg = pem.decode(pemKey)[0]
+
+  if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
+    throw new PBEError(
+      'Invalid PEM format: not a legacy private key',
+      PBEErrorCode.INVALID_PARAMS
+    )
   }
 
-  if (!capture.kdfSalt || !capture.kdfIterationCount || !capture.encIv || !capture.encryptedData) {
-    throw new Error('Missing required encryption parameters');
+  if (!msg.procType || msg.procType.type !== 'ENCRYPTED') {
+    throw new PBEError(
+      'Invalid PEM format: not encrypted',
+      PBEErrorCode.INVALID_PARAMS
+    )
   }
 
-  return {
-    algorithm,
-    salt: createBuffer(capture.kdfSalt),
-    iterationCount: parseInt(capture.kdfIterationCount, 10),
-    iv: createBuffer(capture.encIv),
-    encryptedData: createBuffer(capture.encryptedData)
-  };
+  const { algorithm, parameters } = msg.dekInfo || {}
+  if (!algorithm || !parameters) {
+    throw new PBEError(
+      'Invalid PEM format: missing encryption parameters',
+      PBEErrorCode.INVALID_PARAMS
+    )
+  }
+
+  const iv = hexToBytes(parameters)
+  const dk = opensslDeriveBytes(password, iv.substr(0, 8), getDkLen(algorithm), sha1.create())
+  const cipher = createLegacyDecipher(algorithm, dk)
+
+  cipher.start({ iv: createBuffer(iv) })
+  cipher.update(createBuffer(msg.body))
+
+  if (!cipher.finish()) {
+    throw new PBEError(
+      'Failed to decrypt private key',
+      PBEErrorCode.DECRYPTION_FAILED
+    )
+  }
+
+  return privateKeyFromAsn1(asn1.fromDer(cipher.output?.getBytes() || ''))
+}
+
+function getDkLen(algorithm: string): number {
+  switch (algorithm) {
+    case 'DES-CBC': return 8
+    case 'DES-EDE3-CBC': return 24
+    case 'AES-128-CBC': return 16
+    case 'AES-192-CBC': return 24
+    case 'AES-256-CBC': return 32
+    case 'RC2-40-CBC': return 5
+    case 'RC2-64-CBC': return 8
+    case 'RC2-128-CBC': return 16
+    default:
+      throw new PBEError(
+        `Unsupported encryption algorithm: ${algorithm}`,
+        PBEErrorCode.UNSUPPORTED_ALGORITHM
+      )
+  }
+}
+
+function createLegacyDecipher(algorithm: string, key: string): BlockCipher {
+  switch (algorithm) {
+    case 'DES-CBC':
+      return des.createDecryptionCipher(key)
+    case 'DES-EDE3-CBC':
+      return des.createDecryptionCipher(key)
+    case 'AES-128-CBC':
+      return aes.createDecryptionCipher(key)
+    case 'AES-192-CBC':
+      return aes.createDecryptionCipher(key)
+    case 'AES-256-CBC':
+      return aes.createDecryptionCipher(key)
+    case 'RC2-40-CBC':
+      return rc2.createDecryptionCipher(key, 40)
+    case 'RC2-64-CBC':
+      return rc2.createDecryptionCipher(key, 64)
+    case 'RC2-128-CBC':
+      return rc2.createDecryptionCipher(key, 128)
+    default:
+      throw new PBEError(
+        `Unsupported encryption algorithm: ${algorithm}`,
+        PBEErrorCode.UNSUPPORTED_ALGORITHM
+      )
+  }
+}
+
+// Utility functions
+function stringToBuffer(str: string): ByteStringBuffer {
+  return createBuffer(str)
+}
+
+function bufferToString(buf: ByteStringBuffer): string {
+  return buf.toString()
+}
+
+function createModernCipher(algorithm: string, key: ByteStringBuffer | string): BlockCipher {
+  const keyBuffer = typeof key === 'string' ? stringToBuffer(key) : key
+  switch (algorithm) {
+    case 'AES-CBC':
+      return aes.createEncryptionCipher(keyBuffer.toString(), '128')
+    case '3DES-CBC':
+      return des.createEncryptionCipher(keyBuffer.toString(), createBuffer(getBytesSync(8)))
+    case 'DES-CBC':
+      return des.createEncryptionCipher(keyBuffer.toString(), createBuffer(getBytesSync(8)))
+    default:
+      throw new PBEError(
+        `Unsupported cipher algorithm: ${algorithm}`,
+        PBEErrorCode.UNSUPPORTED_ALGORITHM
+      )
+  }
 }
