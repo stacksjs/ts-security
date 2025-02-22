@@ -46,13 +46,16 @@ export enum PBEErrorCode {
 
 // Custom error class
 export class PBEError extends Error {
+  public readonly details: Record<string, unknown> | undefined
+
   constructor(
     message: string,
-    public code: PBEErrorCode,
-    public details?: Record<string, unknown>
+    public readonly code: PBEErrorCode,
+    details?: Record<string, unknown>
   ) {
     super(message)
     this.name = 'PBEError'
+    this.details = details
   }
 }
 
@@ -749,7 +752,7 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     const saltBuffer = toNodeBuffer(salt)
     const dk = pbkdf2(password, saltBuffer, count, dkLen, md, undefined)
     if (!dk) throw new Error('Failed to generate derived key')
-
+    if (!cipherFn) throw new Error('Cipher function is not defined')
     const iv = createBuffer(getBytesSync(ivLen))
     const cipher = cipherFn(toByteStringBuffer(dk))
     cipher.start({ iv: createBuffer(iv) })
@@ -1231,6 +1234,7 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   const saltBuffer = toNodeBuffer(salt)
   const dk = pbkdf2(password, saltBuffer, iterationCount, dkLen, md, undefined)
   if (!dk) throw new Error('Failed to generate derived key')
+  if (!cipherFn) throw new Error('Cipher function is not defined')
   const iv = capture.encIv
   const cipher = cipherFn(convertToString(dk))
   cipher.start({ iv: createBuffer(iv) })
