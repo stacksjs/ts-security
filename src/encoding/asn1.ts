@@ -174,6 +174,9 @@ export const Class = {
   APPLICATION: 0x40,
   CONTEXT_SPECIFIC: 0x80,
   PRIVATE: 0xC0,
+  SEQUENCE: 0x10,
+  SET: 0x11,
+  INTEGER: 0x02,
 } as const
 
 /**

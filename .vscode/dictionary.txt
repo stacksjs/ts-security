@@ -65,6 +65,7 @@ primeinc
 quickfix
 rootca
 RSAES
+rsapss
 scalarbase
 scalarmult
 shikijs

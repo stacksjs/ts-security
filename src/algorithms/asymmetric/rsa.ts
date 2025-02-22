@@ -2213,6 +2213,7 @@ export interface RSA {
   privateKeyFromPem: typeof privateKeyFromPem
   privateKeyToPem: typeof privateKeyToPem
   privateKeyInfoToPem: typeof privateKeyInfoToPem
+  publicKeyValidator: typeof publicKeyValidator
 }
 
 export const rsa: RSA = {
