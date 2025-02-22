@@ -368,7 +368,7 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
 
     const iv = createBuffer(getBytesSync(ivLen))
     const cipher = cipherFn(toByteStringBuffer(dk))
-    cipher.start({ iv })
+    cipher.start({ iv: createBuffer(iv) })
     cipher.update(asn1.toDer(obj))
     if (!cipher.finish())
       throw new Error('Failed to finish encryption')
@@ -413,9 +413,9 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     // Do PKCS12 PBE
     dkLen = 24
 
-    const saltBytes = new ByteBuffer(salt)
-    const dk = generatePkcs12Key(password, saltBytes, 1, count, dkLen)
-    const iv = generatePkcs12Key(password, saltBytes, 2, count, dkLen)
+    const saltBytes = new ByteStringBuff(salt)
+    const dk = generatePkcs12Key(password, saltBytes.bytes(), 1, count, dkLen)
+    const iv = generatePkcs12Key(password, saltBytes.bytes(), 2, count, dkLen)
     const cipher = des.createEncryptionCipher(dk, iv)
 
     cipher.update(asn1.toDer(obj))
@@ -431,7 +431,7 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
         // pkcs-12PbeParams
         asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
         // salt
-          asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OCTETSTRING, false, salt),
+          asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OCTETSTRING, false, saltBytes.bytes()),
           // iteration count
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, countBytes.getBytes()),
         ]),
@@ -471,7 +471,7 @@ export function decryptPrivateKeyInfo(obj: any, password: string): any {
   let rval = null
 
   // get PBE params
-  const capture: CaptureObject = {}
+  const capture: { kdfOid?: string; encOid?: string; kdfSalt?: string; kdfIterationCount?: string; encIv?: string; encryptionOid?: string; encryptionParams?: any; encryptedData?: string; } = {}
   const errors: Error[] = []
 
   if (!asn1.validate(obj, encryptedPrivateKeyValidator, capture, errors)) {
@@ -491,7 +491,7 @@ export function decryptPrivateKeyInfo(obj: any, password: string): any {
 
   cipher.update(encrypted)
   if (cipher.finish() && cipher.output) {
-    rval = asn1.fromDer(cipher.output.getBytes())
+    rval = asn1.fromDer(cipher.output.getBytes() || '')
   }
 
   return rval
@@ -665,7 +665,7 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
 
   if (msg.type !== 'ENCRYPTED PRIVATE KEY' && msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
     const error: CustomError = new Error('Could not convert private key from PEM; PEM header type is not "ENCRYPTED PRIVATE KEY", "PRIVATE KEY", or "RSA PRIVATE KEY".')
-    error.headerType = error
+    error.headerType = msg.type
     throw error
   }
 
@@ -712,7 +712,7 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
         }
         break
       default:
-        var error = new Error(`Could not decrypt private key; unsupported encryption algorithm "${msg.dekInfo?.algorithm}".`)
+        const error: CustomError = new Error(`Could not decrypt private key; unsupported encryption algorithm "${msg.dekInfo?.algorithm}".`)
         error.algorithm = msg.dekInfo?.algorithm
         throw error
     }
@@ -760,24 +760,21 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
  */
 export function generatePkcs12Key(
   password: string,
-  salt: typeof ByteBuffer,
+  salt: ByteStringBuffer,
   id: number,
   iter: number,
   n: number,
   md?: MessageDigest
-): typeof ByteBuffer {
+): ByteStringBuffer {
   if (!md) {
-    if (!('sha1' in md))
-      throw new Error('"sha1" hash algorithm unavailable.')
-
     md = sha1.create()
   }
 
   const u = md.digestLength
   const v = md.blockLength
-  const result = new ByteBuffer()
+  const result = new ByteStringBuff()
 
-  const passBuf = new ByteBuffer()
+  const passBuf = new ByteStringBuff()
   if (password) {
     for (let l = 0; l < password.length; l++)
       passBuf.putInt16(password.charCodeAt(l))
@@ -788,17 +785,17 @@ export function generatePkcs12Key(
   const p = passBuf.length()
   const s = salt.length()
 
-  const D = new ByteBuffer()
+  const D = new ByteStringBuff()
   D.fillWithByte(id, v)
 
   const Slen = v * Math.ceil(s / v)
-  const S = new ByteBuffer()
+  const S = new ByteStringBuff()
 
   for (let l = 0; l < Slen; l++)
     S.putByte(salt.at(l % s))
 
   const Plen = v * Math.ceil(p / v)
-  const P = new ByteBuffer()
+  const P = new ByteStringBuff()
 
   for (let l = 0; l < Plen; l++)
     P.putByte(passBuf.at(l % p))
@@ -809,7 +806,7 @@ export function generatePkcs12Key(
   const c = Math.ceil(n / u)
 
   for (let i = 1; i <= c; i++) {
-    let buf = new ByteBuffer()
+    let buf = new ByteStringBuff()
     buf.putBytes(D.bytes())
     buf.putBytes(I.bytes())
 
@@ -819,14 +816,14 @@ export function generatePkcs12Key(
       buf = md.digest()
     }
 
-    const B = new ByteBuffer()
+    const B = new ByteStringBuff()
     for (let l = 0; l < v; l++)
       B.putByte(buf.at(l % u))
 
     const k = Math.ceil(s / v) + Math.ceil(p / v)
-    const Inew = new ByteBuffer()
+    const Inew = new ByteStringBuff()
     for (let j = 0; j < k; j++) {
-      const chunk = new ByteBuffer(I.getBytes(v))
+      const chunk = new ByteStringBuff(I.getBytes(v))
       let x = 0x1FF
 
       for (let l = B.length() - 1; l >= 0; l--) {
@@ -867,13 +864,9 @@ export function getCipher(oid: string, params: any, password: string): BlockCiph
       return getCipherForPKCS12PBE(oid, params, password)
 
     default:
-      let error = new Error('Cannot read encrypted PBE data block. Unsupported OID.')
+      const error: CustomError = new Error('Cannot read encrypted PBE data block. Unsupported OID.')
       error.oid = oid
-      error.supportedOids = [
-        'pkcs5PBES2',
-        'pbeWithSHAAnd3-KeyTripleDES-CBC',
-        'pbewithSHAAnd40BitRC2-CBC',
-      ]
+      error.supportedOids = ['pkcs5PBES2', 'pbeWithSHAAnd3-KeyTripleDES-CBC', 'pbewithSHAAnd40BitRC2-CBC']
       throw error
   }
 }
@@ -893,10 +886,10 @@ export function getCipher(oid: string, params: any, password: string): BlockCiph
 export function getCipherForPBES2(oid: string, params: any, password: string): BlockCipher {
   // get PBE params
   const capture = {}
-  const errors = []
+  const errors: Error[] = []
 
   if (!asn1.validate(params, PBES2AlgorithmsValidator, capture, errors)) {
-    let error = new Error('Cannot read password-based-encryption algorithm parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')
+    const error: CustomError = new Error('Cannot read password-based-encryption algorithm parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')
     error.errors = errors
     throw error
   }
@@ -916,8 +909,7 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
     && oid !== oids['aes256-CBC']
     && oid !== oids['des-EDE3-CBC']
     && oid !== oids.desCBC) {
-    var error = new Error('Cannot read encrypted private key. '
-      + 'Unsupported encryption scheme OID.')
+    let error = new Error('Cannot read encrypted private key. Unsupported encryption scheme OID.')
     error.oid = oid
     error.supportedOids = [
       'aes128-CBC',
@@ -966,8 +958,8 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   // decrypt private key using pbe with chosen PRF and AES/DES
   const dk = pbkdf2(password, salt, count, dkLen, md)
   const iv = capture.encIv
-  const cipher = cipherFn(dk)
-  cipher.start(iv)
+  const cipher = cipherFn(dk.bytes())
+  cipher.start({ iv: createBuffer(iv) })
 
   return cipher
 }
@@ -987,10 +979,10 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
 export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password: string): BlockCipher {
   // get PBE params
   const capture = {}
-  const errors = []
+  const errors: Error[] = []
 
   if (!asn1.validate(params, pkcs12PbeParamsValidator, capture, errors)) {
-    var error = new Error('Cannot read password-based-encryption algorithm parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')
+    const error: CustomError = new Error('Cannot read password-based-encryption algorithm parameters. ASN.1 object is not a supported EncryptedPrivateKeyInfo.')
     error.errors = errors
     throw error
   }
