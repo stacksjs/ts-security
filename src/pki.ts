@@ -7,7 +7,7 @@
  * Copyright (c) 2010-2013 Digital Bazaar, Inc.
  */
 import { asn1 } from './asn1'
-import { pem } from './pem'
+import { pem, PemMessage } from './pem'
 import { privateKeyFromAsn1, privateKeyToAsn1 } from './rsa'
 
 /**
@@ -17,7 +17,7 @@ import { privateKeyFromAsn1, privateKeyToAsn1 } from './rsa'
  *
  * @return the private key.
  */
-export function privateKeyFromPem(pem: string): any {
+export function privateKeyFromPem(pem: PemMessage): any {
   const msg = pem.decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
@@ -71,3 +71,17 @@ export function privateKeyInfoToPem(pki: any, maxline: number): string {
 
   return pem.encode(msg, { maxline })
 }
+
+interface Pki {
+  privateKeyFromPem: typeof privateKeyFromPem
+  privateKeyToPem: typeof privateKeyToPem
+  privateKeyInfoToPem: typeof privateKeyInfoToPem
+}
+
+export const pki: Pki = {
+  privateKeyFromPem,
+  privateKeyToPem,
+  privateKeyInfoToPem,
+}
+
+export default pki

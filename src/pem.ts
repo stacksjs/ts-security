@@ -28,22 +28,22 @@
  */
 import { decode64, encode64 } from './utils'
 
-interface ProcType {
+export interface ProcType {
   version: string
   type: string
 }
 
-interface DekInfo {
+export interface DekInfo {
   algorithm: string
   parameters: string | null
 }
 
-interface PemHeader {
+export interface PemHeader {
   name: string
   values: string[]
 }
 
-interface PemMessage {
+export interface PemMessage {
   type: string
   procType: ProcType | null
   contentDomain: string | null
@@ -52,7 +52,7 @@ interface PemMessage {
   body: string
 }
 
-interface PemOptions {
+export interface PemOptions {
   maxline?: number
 }
 
@@ -271,3 +271,5 @@ export const pem: Pem = {
   encode,
   decode,
 }
+
+export default pem
