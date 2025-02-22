@@ -107,48 +107,63 @@
  *   signature          BIT STRING
  * }
  */
-const forge = require('./forge')
-require('./aes')
-require('./asn1')
-require('./des')
-require('./md')
-require('./mgf')
-require('./oids')
-require('./pem')
-require('./pss')
-require('./rsa')
-require('./util')
 
-// shortcut for asn.1 API
-const asn1 = forge.asn1
+import type { MessageDigest } from './algorithms/hash/sha1'
+import type { Asn1Object } from './encoding/asn1'
+import { asn1 } from './encoding/asn1'
+import { md } from './md'
+import { oids } from './oids'
+import { pki } from './pki'
 
-/* Public Key Infrastructure (PKI) implementation. */
-const pki = module.exports = forge.pki = forge.pki || {}
-const oids = pki.oids
+interface CaptureObject {
+  [key: string]: any
+}
+
+interface SignatureParameters {
+  hash?: {
+    algorithmOid: string
+  }
+  mgf?: {
+    algorithmOid: string
+    hash: {
+      algorithmOid: string
+    }
+  }
+  saltLength?: number
+  trailerField?: number
+}
 
 // short name OID mappings
-const _shortNames = {}
-_shortNames.CN = oids.commonName
-_shortNames.commonName = 'CN'
-_shortNames.C = oids.countryName
-_shortNames.countryName = 'C'
-_shortNames.L = oids.localityName
-_shortNames.localityName = 'L'
-_shortNames.ST = oids.stateOrProvinceName
-_shortNames.stateOrProvinceName = 'ST'
-_shortNames.O = oids.organizationName
-_shortNames.organizationName = 'O'
-_shortNames.OU = oids.organizationalUnitName
-_shortNames.organizationalUnitName = 'OU'
-_shortNames.E = oids.emailAddress
-_shortNames.emailAddress = 'E'
+const _shortNames = {
+  CN: oids.commonName,
+  commonName: 'CN',
+  C: oids.countryName,
+  countryName: 'C',
+  L: oids.localityName,
+  localityName: 'L',
+  ST: oids.stateOrProvinceName,
+  stateOrProvinceName: 'ST',
+  O: oids.organizationName,
+  organizationName: 'O',
+  OU: oids.organizationalUnitName,
+  organizationalUnitName: 'OU',
+  E: oids.emailAddress,
+  emailAddress: 'E',
+} as const
+
+type CustomError = Error & {
+  errors?: any[]
+  signatureOid?: string
+  oid?: string
+  name?: string
+}
 
 // validator for an SubjectPublicKeyInfo structure
 // Note: Currently only works with an RSA public key
-const publicKeyValidator = forge.pki.rsa.publicKeyValidator
+const publicKeyValidator = pki.rsa.publicKeyValidator
 
 // validator for an X.509v3 certificate
-const x509CertificateValidator = {
+export const x509CertificateValidator = {
   name: 'Certificate',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -320,7 +335,7 @@ const x509CertificateValidator = {
   }],
 }
 
-const rsassaPssParameterValidator = {
+export const rsassaPssParameterValidator: Asn1Object = {
   name: 'rsapss',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -385,7 +400,7 @@ const rsassaPssParameterValidator = {
     value: [{
       name: 'rsapss.saltLength.saltLength',
       tagClass: asn1.Class.UNIVERSAL,
-      type: asn1.Class.INTEGER,
+      type: asn1.Type.INTEGER,
       constructed: false,
       capture: 'saltLength',
     }],
@@ -397,7 +412,7 @@ const rsassaPssParameterValidator = {
     value: [{
       name: 'rsapss.trailer.trailer',
       tagClass: asn1.Class.UNIVERSAL,
-      type: asn1.Class.INTEGER,
+      type: asn1.Type.INTEGER,
       constructed: false,
       capture: 'trailer',
     }],
@@ -405,7 +420,7 @@ const rsassaPssParameterValidator = {
 }
 
 // validator for a CertificationRequestInfo structure
-const certificationRequestInfoValidator = {
+export const certificationRequestInfoValidator: Asn1Object = {
   name: 'CertificationRequestInfo',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -454,7 +469,7 @@ const certificationRequestInfoValidator = {
 }
 
 // validator for a CertificationRequest structure
-const certificationRequestValidator = {
+export const certificationRequestValidator: Asn1Object = {
   name: 'CertificationRequest',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -493,6 +508,15 @@ const certificationRequestValidator = {
   ],
 }
 
+export interface RDNAttribute {
+  type: string
+  value: any
+  valueTagClass: number
+  name?: string
+  shortName?: string
+  extensions?: any[]
+}
+
 /**
  * Converts an RDNSequence of ASN.1 DER-encoded RelativeDistinguishedName
  * sets into an array with objects that have type and value properties.
@@ -500,8 +524,8 @@ const certificationRequestValidator = {
  * @param rdn the RDNSequence to convert.
  * @param md a message digest to append type and value to if provided.
  */
-pki.RDNAttributesAsArray = function (rdn, md) {
-  const rval = []
+export function RDNAttributesAsArray(rdn: Asn1Object, md: MessageDigest): RDNAttribute[] {
+  const rval: RDNAttribute[] = []
 
   // each value in 'rdn' in is a SET of RelativeDistinguishedName
   let set, attr, obj
@@ -513,7 +537,7 @@ pki.RDNAttributesAsArray = function (rdn, md) {
     // containing first a type (an OID) and second a value (defined by
     // the OID)
     for (let i = 0; i < set.value.length; ++i) {
-      obj = {}
+      const obj: RDNAttribute = {} as RDNAttribute
       attr = set.value[i]
       obj.type = asn1.derToOid(attr.value[0].value)
       obj.value = attr.value[1].value
@@ -542,20 +566,16 @@ pki.RDNAttributesAsArray = function (rdn, md) {
  *
  * @param attributes the CRIAttributes to convert.
  */
-pki.CRIAttributesAsArray = function (attributes) {
-  const rval = []
+export function CRIAttributesAsArray(attributes: any): RDNAttribute[] {
+  const rval: RDNAttribute[] = []
 
   // each value in 'attributes' in is a SEQUENCE with an OID and a SET
-  for (let si = 0; si < attributes.length; ++si) {
-    // get the attribute sequence
-    const seq = attributes[si]
+  for (let i = 0; i < attributes.length; ++i) {
+    const values = attributes[i].value[1].value
+    const type = asn1.derToOid(attributes[i].value[0].value)
 
-    // each value in the SEQUENCE containing first a type (an OID) and
-    // second a set of values (defined by the OID)
-    const type = asn1.derToOid(seq.value[0].value)
-    const values = seq.value[1].value
     for (let vi = 0; vi < values.length; ++vi) {
-      const obj = {}
+      const obj: RDNAttribute = {} as RDNAttribute
       obj.type = type
       obj.value = values[vi].value
       obj.valueTagClass = values[vi].type
@@ -570,7 +590,7 @@ pki.CRIAttributesAsArray = function (attributes) {
       if (obj.type === oids.extensionRequest) {
         obj.extensions = []
         for (let ei = 0; ei < obj.value.length; ++ei) {
-          obj.extensions.push(pki.certificateExtensionFromAsn1(obj.value[ei]))
+          obj.extensions.push(certificateExtensionFromAsn1(obj.value[ei]))
         }
       }
       rval.push(obj)
@@ -585,39 +605,36 @@ pki.CRIAttributesAsArray = function (attributes) {
  *
  * @param obj the issuer or subject object.
  * @param options a short name string or an object with:
- *          shortName the short name for the attribute.
- *          name the name for the attribute.
- *          type the type for the attribute.
+ * @param options.shortName the short name for the attribute.
+ * @param options.name the name for the attribute.
+ * @param options.type the type for the attribute.
  *
  * @return the attribute.
  */
-function _getAttribute(obj, options) {
-  if (typeof options === 'string') {
+export function getAttribute(obj: any, options: any): RDNAttribute | null {
+  if (typeof options === 'string')
     options = { shortName: options }
-  }
 
   let rval = null
   let attr
+
   for (let i = 0; rval === null && i < obj.attributes.length; ++i) {
     attr = obj.attributes[i]
-    if (options.type && options.type === attr.type) {
+    if (options.type && options.type === attr.type)
       rval = attr
-    }
-    else if (options.name && options.name === attr.name) {
+    else if (options.name && options.name === attr.name)
       rval = attr
-    }
-    else if (options.shortName && options.shortName === attr.shortName) {
+    else if (options.shortName && options.shortName === attr.shortName)
       rval = attr
-    }
   }
+
   return rval
 }
 
 /**
  * Converts signature parameters from ASN.1 structure.
  *
- * Currently only RSASSA-PSS supported.  The PKCS#1 v1.5 signature scheme had
- * no parameters.
+ * Currently only RSASSA-PSS supported.  The PKCS#1 v1.5 signature scheme had no parameters.
  *
  * RSASSA-PSS-params  ::=  SEQUENCE  {
  *   hashAlgorithm      [0] HashAlgorithm DEFAULT
@@ -642,12 +659,11 @@ function _getAttribute(obj, options) {
  * @param fillDefaults Whether to use return default values where omitted
  * @return signature parameter object
  */
-function _readSignatureParameters(oid, obj, fillDefaults) {
-  let params = {}
+export function readSignatureParameters(oid: string, obj: any, fillDefaults: boolean): SignatureParameters {
+  let params: SignatureParameters = {}
 
-  if (oid !== oids['RSASSA-PSS']) {
+  if (oid !== oids['RSASSA-PSS'])
     return params
-  }
 
   if (fillDefaults) {
     params = {
@@ -664,10 +680,11 @@ function _readSignatureParameters(oid, obj, fillDefaults) {
     }
   }
 
-  const capture = {}
-  const errors = []
+  const capture: CaptureObject = {}
+  const errors: any[] = []
+
   if (!asn1.validate(obj, rsassaPssParameterValidator, capture, errors)) {
-    const error = new Error('Cannot read RSASSA-PSS parameter block.')
+    const error: CustomError = new Error('Cannot read RSASSA-PSS parameter block.')
     error.errors = errors
     throw error
   }
@@ -695,31 +712,31 @@ function _readSignatureParameters(oid, obj, fillDefaults) {
  * Create signature digest for OID.
  *
  * @param options
- *   signatureOid: the OID specifying the signature algorithm.
- *   type: a human readable type for error messages
+ * @param options.signatureOid: the OID specifying the signature algorithm.
+ * @param options.type: a human readable type for error messages
  * @return a created md instance. throws if unknown oid.
  */
-function _createSignatureDigest(options) {
+function _createSignatureDigest(options: {
+  signatureOid: string
+  type: string
+}): MessageDigest {
   switch (oids[options.signatureOid]) {
     case 'sha1WithRSAEncryption':
     // deprecated alias
     case 'sha1WithRSASignature':
-      return forge.md.sha1.create()
+      return md.sha1.create()
     case 'md5WithRSAEncryption':
-      return forge.md.md5.create()
+      return md.md5.create()
     case 'sha256WithRSAEncryption':
-      return forge.md.sha256.create()
+      return md.sha256.create()
     case 'sha384WithRSAEncryption':
-      return forge.md.sha384.create()
+      return md.sha384.create()
     case 'sha512WithRSAEncryption':
-      return forge.md.sha512.create()
+      return md.sha512.create()
     case 'RSASSA-PSS':
-      return forge.md.sha256.create()
+      return md.sha256.create()
     default:
-      var error = new Error(
-        `Could not compute ${options.type} digest. `
-        + `Unknown signature OID.`,
-      )
+      const error: CustomError = new Error(`Could not compute ${options.type} digest. Unknown signature OID.`)
       error.signatureOid = options.signatureOid
       throw error
   }
@@ -734,7 +751,11 @@ function _createSignatureDigest(options) {
  *   signature the signature
  * @return a created md instance. throws if unknown oid.
  */
-function _verifySignature(options) {
+function _verifySignature(options: {
+  certificate: any
+  md: MessageDigest
+  signature: any
+}): boolean {
   const cert = options.certificate
   let scheme
 
@@ -749,8 +770,8 @@ function _verifySignature(options) {
 
       /* initialize mgf */
       hash = oids[cert.signatureParameters.mgf.hash.algorithmOid]
-      if (hash === undefined || forge.md[hash] === undefined) {
-        var error = new Error('Unsupported MGF hash function.')
+      if (hash === undefined || md[hash] === undefined) {
+        const error: CustomError = new Error('Unsupported MGF hash function.')
         error.oid = cert.signatureParameters.mgf.hash.algorithmOid
         error.name = hash
         throw error
@@ -758,25 +779,25 @@ function _verifySignature(options) {
 
       mgf = oids[cert.signatureParameters.mgf.algorithmOid]
       if (mgf === undefined || forge.mgf[mgf] === undefined) {
-        var error = new Error('Unsupported MGF function.')
+        const error: CustomError = new Error('Unsupported MGF function.')
         error.oid = cert.signatureParameters.mgf.algorithmOid
         error.name = mgf
         throw error
       }
 
-      mgf = forge.mgf[mgf].create(forge.md[hash].create())
+      mgf = forge.mgf[mgf].create(md[hash].create())
 
       /* initialize hash function */
       hash = oids[cert.signatureParameters.hash.algorithmOid]
-      if (hash === undefined || forge.md[hash] === undefined) {
-        var error = new Error('Unsupported RSASSA-PSS hash function.')
+      if (hash === undefined || md[hash] === undefined) {
+        const error = new Error('Unsupported RSASSA-PSS hash function.')
         error.oid = cert.signatureParameters.hash.algorithmOid
         error.name = hash
         throw error
       }
 
       scheme = forge.pss.create(
-        forge.md[hash].create(),
+        md[hash].create(),
         mgf,
         cert.signatureParameters.saltLength,
       )
@@ -912,7 +933,7 @@ pki.publicKeyToRSAPublicKeyPem = function (key, maxline) {
  * Gets a fingerprint for the given public key.
  *
  * @param options the options to use.
- *          [md] the message digest object to use (defaults to forge.md.sha1).
+ *          [md] the message digest object to use (defaults to md.sha1).
  *          [type] the type of fingerprint, such as 'RSAPublicKey',
  *            'SubjectPublicKeyInfo' (defaults to 'RSAPublicKey').
  *          [encoding] an alternative output encoding, such as 'hex'
@@ -924,7 +945,7 @@ pki.publicKeyToRSAPublicKeyPem = function (key, maxline) {
  */
 pki.getPublicKeyFingerprint = function (key, options) {
   options = options || {}
-  const md = options.md || forge.md.sha1.create()
+  const md = options.md || md.sha1.create()
   const type = options.type || 'RSAPublicKey'
 
   let bytes
@@ -1135,11 +1156,11 @@ pki.createCertificate = function () {
    * Signs this certificate using the given private key.
    *
    * @param key the private key to sign with.
-   * @param md the message digest object to use (defaults to forge.md.sha1).
+   * @param md the message digest object to use (defaults to md.sha1).
    */
   cert.sign = function (key, md) {
     // TODO: get signature OID from private key
-    cert.md = md || forge.md.sha1.create()
+    cert.md = md || md.sha1.create()
     const algorithmOid = oids[`${cert.md.algorithm}WithRSAEncryption`]
     if (!algorithmOid) {
       const error = new Error('Could not compute certificate digest. '
@@ -1393,7 +1414,7 @@ export function certificateFromAsn1(obj: any, computeHash: any) {
   }
 
   // handle issuer, build issuer message digest
-  const imd = forge.md.sha1.create()
+  const imd = md.sha1.create()
   const ibytes = asn1.toDer(capture.certIssuer)
   imd.update(ibytes.getBytes())
   cert.issuer.getField = function (sn) {
@@ -1410,7 +1431,7 @@ export function certificateFromAsn1(obj: any, computeHash: any) {
   cert.issuer.hash = imd.digest().toHex()
 
   // handle subject, build subject message digest
-  const smd = forge.md.sha1.create()
+  const smd = md.sha1.create()
   const sbytes = asn1.toDer(capture.certSubject)
   smd.update(sbytes.getBytes())
   cert.subject.getField = function (sn) {
@@ -1515,7 +1536,7 @@ pki.certificateExtensionsFromAsn1 = function (exts) {
  *
  * @return the parsed extension as an object.
  */
-pki.certificateExtensionFromAsn1 = function (ext) {
+export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtension {
   // an extension has:
   // [0] extnID      OBJECT IDENTIFIER
   // [1] critical    BOOLEAN DEFAULT FALSE
@@ -1731,7 +1752,7 @@ pki.certificationRequestFromAsn1 = function (obj, computeHash) {
   }
 
   // handle subject, build subject message digest
-  const smd = forge.md.sha1.create()
+  const smd = md.sha1.create()
   csr.subject.getField = function (sn) {
     return _getAttribute(csr.subject, sn)
   }
@@ -1827,11 +1848,11 @@ pki.createCertificationRequest = function () {
    * Signs this certification request using the given private key.
    *
    * @param key the private key to sign with.
-   * @param md the message digest object to use (defaults to forge.md.sha1).
+   * @param md the message digest object to use (defaults to md.sha1).
    */
   csr.sign = function (key, md) {
     // TODO: get signature OID from private key
-    csr.md = md || forge.md.sha1.create()
+    csr.md = md || md.sha1.create()
     const algorithmOid = oids[`${csr.md.algorithm}WithRSAEncryption`]
     if (!algorithmOid) {
       const error = new Error('Could not compute certification request digest. '
@@ -2948,7 +2969,7 @@ pki.createCaStore = function (certs) {
   function ensureSubjectHasHash(subject) {
     // produce subject hash if it doesn't exist
     if (!subject.hash) {
-      const md = forge.md.sha1.create()
+      const md = md.sha1.create()
       subject.attributes = pki.RDNAttributesAsArray(_dnToAsn1(subject), md)
       subject.hash = md.digest().toHex()
     }
