@@ -23,7 +23,7 @@
   - Fortuna CSPRNG implementation
   - Multiple entropy sources
   - Automatic reseeding
-  - Browser and Node.js support
+  - Browser and Bun / Node.js support
 
 - 📜 **Certificate Management**
   - X.509 certificate handling
