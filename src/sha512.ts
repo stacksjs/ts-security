@@ -571,6 +571,10 @@ const createSHA512_256: () => MessageDigest = () => create('SHA-512/256')
 // Create SHA-512/224 implementation
 const createSHA512_224: () => MessageDigest = () => create('SHA-512/224')
 
+export const sha384: MessageDigest = createSHA384()
+export const sha512_256: MessageDigest = createSHA512_256()
+export const sha512_224: MessageDigest = createSHA512_224()
+
 // Export all implementations
 export const sha512: SHA512API = {
   create,

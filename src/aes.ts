@@ -16,9 +16,9 @@
  * Copyright (c) 2010-2014 Digital Bazaar, Inc.
  */
 
-import type { Algorithm } from './cipher'
+import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode, CipherModeOptions } from './cipher-modes'
-import { registerAlgorithm as registerCipherAlgorithm } from './cipher'
+import { createCipher, registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
 import { ByteStringBuffer, createBuffer } from './utils'
 
@@ -30,16 +30,6 @@ type XTimeTable = number[]
 interface AlgorithmOptions {
   key?: string | number[] | ByteStringBuffer
   decrypt?: boolean
-}
-
-interface AlgorithmFactory {
-  (): {
-    mode: {
-      start: (options: Partial<CipherModeOptions>) => void
-      encrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
-      decrypt: (input: ByteStringBuffer, output: ByteStringBuffer, finish: boolean) => boolean
-    }
-  }
 }
 
 /** AES implementation */
@@ -159,7 +149,7 @@ export class AESAlgorithm implements Algorithm {
  *
  * @return the expanded key.
  */
-function expandKey(key: number[], decrypt: boolean) {
+export function expandKey(key: number[], decrypt: boolean): number[] {
   if (!init) {
     initialize()
   }
@@ -168,10 +158,11 @@ function expandKey(key: number[], decrypt: boolean) {
 
 /** Register AES algorithms */
 
-function registerAESAlgorithm(name: string, mode: any) {
+export function registerAESAlgorithm(name: string, mode: any): void {
   const factory = function () {
     return new AESAlgorithm(name, mode)
   }
+
   registerCipherAlgorithm(name, factory)
 }
 
@@ -848,4 +839,18 @@ export function _updateBlock(w: number[], input: number[], output: number[], dec
       ^ (sub[a >>> 16 & 255] << 16)
       ^ (sub[b >>> 8 & 255] << 8)
       ^ (sub[c & 255]) ^ w[++i]
+}
+
+function createEncryptionCipher(key: string, bits: string | Buffer): BlockCipher {
+  return createCipher(key, bits)
+}
+
+function createDecryptionCipher(key: string, bits: string | Buffer): BlockCipher {
+  return createCipher(key, bits)
+}
+
+export const aes = {
+  createEncryptionCipher,
+  createDecryptionCipher,
+  registerAESAlgorithm,
 }

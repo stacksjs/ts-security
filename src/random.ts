@@ -56,9 +56,13 @@ interface ExtendedNavigator extends Navigator {
 
 declare global {
   interface Window {
+    // @ts-expect-error unsure if there is a better way to do this
     crypto: Crypto
+    // @ts-expect-error unsure if there is a better way to do this
     msCrypto?: Crypto
+    // @ts-expect-error unsure if there is a better way to do this
     navigator: ExtendedNavigator
+    // @ts-expect-error unsure if there is a better way to do this
     document?: any
   }
 }
