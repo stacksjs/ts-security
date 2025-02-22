@@ -2,14 +2,11 @@
  * Socket wrapping functions for TLS.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2009-2012 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
-const forge = require('./forge')
-require('./tls')
 
 /**
- * Wraps a forge.net socket with a TLS layer.
+ * Wraps a net socket with a TLS layer.
  *
  * @param options:
  *   sessionId: a session ID to reuse, null for a new connection if no session
@@ -31,7 +28,9 @@ require('./tls')
  *
  * @return the TLS-wrapped socket.
  */
-forge.tls.wrapSocket = function (options) {
+import { createConnection } from './tls'
+'
+export function wrapSocket(options): Socket {
   // get raw socket
   const socket = options.socket
 
@@ -46,7 +45,7 @@ forge.tls.wrapSocket = function (options) {
   }
 
   // create TLS connection
-  const c = forge.tls.createConnection({
+  const c = createConnection({
     server: false,
     sessionId: options.sessionId || null,
     caStore: options.caStore || [],

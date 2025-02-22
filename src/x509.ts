@@ -1315,7 +1315,7 @@ pki.createCertificate = function () {
  *
  * @return the certificate.
  */
-pki.certificateFromAsn1 = function (obj, computeHash) {
+export function certificateFromAsn1(obj: any, computeHash: any) {
   // validate certificate and capture data
   const capture = {}
   const errors = []
