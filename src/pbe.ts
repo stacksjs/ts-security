@@ -385,7 +385,7 @@ function deriveKeyPBKDF2(
   const { salt, iterationCount, prf } = options
   const md = prfAlgorithmToMessageDigest(prf)
   const saltBuffer = toNodeBufferFromBSB(salt)
-  const result = pbkdf2(toNodeBufferFromString(password), saltBuffer, iterationCount, 32, md)
+  const result = pbkdf2(toNodeBufferFromString(password), saltBuffer, iterationCount, 32, md, undefined)
   return result ? createBuffer(result) : createBuffer('')
 }
 
@@ -744,9 +744,11 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
     // encrypt private key using pbe SHA-1 and AES/DES
-    const dk = pbkdf2(toNodeBuffer(password), toNodeBuffer(salt), count, dkLen, md, undefined)
-    if (!dk)
-      throw new Error('Failed to generate derived key')
+    if (!salt) throw new Error('Salt is required')
+    if (typeof dkLen === 'undefined') throw new Error('Key length is required')
+    const saltBuffer = toNodeBuffer(salt)
+    const dk = pbkdf2(password, saltBuffer, count, dkLen, md, undefined)
+    if (!dk) throw new Error('Failed to generate derived key')
 
     const iv = createBuffer(getBytesSync(ivLen))
     const cipher = cipherFn(toByteStringBuffer(dk))
@@ -1004,6 +1006,7 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
   }
 
   const dk = opensslDeriveBytes(password, iv.bytes(), dkLen, sha1.create())
+  const iv = createBuffer(getBytesSync(16))
   const cipher = cipherFn(createBuffer(dk))
   cipher.start({ iv })
   cipher.update(asn1.toDer(privateKeyToAsn1(rsaKey)))
@@ -1198,34 +1201,38 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   switch (oids[oid]) {
     case 'aes128-CBC':
       dkLen = 16
-      cipherFn = createCipherOriginal('AES-CBC', key)
+      cipherFn = (key: string) => createCipherOriginal('AES-CBC', key)
       break
     case 'aes192-CBC':
       dkLen = 24
-      cipherFn = createCipherOriginal('AES-CBC', key)
+      cipherFn = (key: string) => createCipherOriginal('AES-CBC', key)
       break
     case 'aes256-CBC':
       dkLen = 32
-      cipherFn = createCipherOriginal('AES-CBC', key)
+      cipherFn = (key: string) => createCipherOriginal('AES-CBC', key)
       break
     case 'des-EDE3-CBC':
       dkLen = 24
-      cipherFn = createCipherOriginal('3DES-CBC', key)
+      cipherFn = (key: string) => createCipherOriginal('3DES-CBC', key)
       break
     case 'desCBC':
       dkLen = 8
-      cipherFn = createCipherOriginal('DES-CBC', key)
+      cipherFn = (key: string) => createCipherOriginal('DES-CBC', key)
       break
   }
 
   // get PRF message digest
-  const prfAlgorithm = capture.prfOid
+  const prfAlgorithm = capture.prfOid || 'hmacWithSHA1'
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
   // decrypt private key using pbe with chosen PRF and AES/DES
-  const dk = pbkdf2(password, salt, iterationCount, dkLen, md, undefined)
+  if (!salt) throw new Error('Salt is required')
+  if (typeof dkLen === 'undefined') throw new Error('Key length is required')
+  const saltBuffer = toNodeBuffer(salt)
+  const dk = pbkdf2(password, saltBuffer, iterationCount, dkLen, md, undefined)
+  if (!dk) throw new Error('Failed to generate derived key')
   const iv = capture.encIv
-  const cipher = cipherFn(dk.bytes())
+  const cipher = cipherFn(convertToString(dk))
   cipher.start({ iv: createBuffer(iv) })
 
   return cipher
@@ -1283,7 +1290,7 @@ export function getCipherForPKCS12PBE(oid: string, params: Asn1Object, password:
   }
 
   // get PRF message digest
-  const prfAlgorithm = capture.prfOid
+  const prfAlgorithm = capture.prfOid || 'hmacWithSHA1'
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
   const key = generatePkcs12Key(password, salt, 1, iterationCount, dkLen, md)
   md.start()

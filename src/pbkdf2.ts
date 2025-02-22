@@ -34,8 +34,8 @@ const hashAlgorithms: { [key: string]: { create: () => MessageDigest } } = {
  * @return the derived key, as a binary-encoded string of bytes, for the synchronous version (if no callback is specified).
  */
 export function pbkdf2(
-  p: Buffer,
-  s: Buffer,
+  p: Buffer | string,
+  s: Buffer | string,
   c: number,
   dkLen: number,
   md?: MessageDigest | string | ((err: Error | null, key?: string) => void),
