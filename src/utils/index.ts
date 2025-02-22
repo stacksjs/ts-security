@@ -993,7 +993,6 @@ export function estimateCores(options: any, callback: any): void {
   }
 }
 
-
 /**
  * Performs a per byte XOR between two byte strings and returns the result as a
  * string of bytes.

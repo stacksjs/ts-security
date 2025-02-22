@@ -1,3 +1,6 @@
+import type { RSA } from './algorithms/asymmetric/rsa'
+import type { PemMessage } from './encoding/pem'
+import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetric/rsa'
 /**
  * TypeScript implementation of a basic Public Key Infrastructure, including
  * support for RSA public and private keys.
@@ -5,9 +8,12 @@
  * @author Dave Longley
  * @author Chris Breuer
  */
-import { asn1 } from './asn1'
-import { pem, PemMessage } from './pem'
-import { privateKeyFromAsn1, privateKeyToAsn1 } from './rsa'
+import { asn1 } from './encoding/asn1'
+import { pem } from './encoding/pem'
+
+interface CustomError extends Error {
+  headerType?: string
+}
 
 /**
  * Converts an RSA private key from PEM format.
@@ -20,8 +26,7 @@ export function privateKeyFromPem(pem: PemMessage): any {
   const msg = pem.decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
-    const error = new Error('Could not convert private key from PEM; PEM '
-      + 'header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
+    const error: CustomError = new Error('Could not convert private key from PEM; PEM header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
     error.headerType = msg.type
     throw error
   }
@@ -75,12 +80,14 @@ interface Pki {
   privateKeyFromPem: typeof privateKeyFromPem
   privateKeyToPem: typeof privateKeyToPem
   privateKeyInfoToPem: typeof privateKeyInfoToPem
+  rsa: RSA
 }
 
 export const pki: Pki = {
   privateKeyFromPem,
   privateKeyToPem,
   privateKeyInfoToPem,
+  rsa,
 }
 
 export default pki

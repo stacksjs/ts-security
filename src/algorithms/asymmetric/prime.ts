@@ -5,8 +5,8 @@
  * @author Chris Breuer
  */
 
-import { BigInteger } from './jsbn'
 import { estimateCores, random } from '../../utils'
+import { BigInteger } from './jsbn'
 
 // primes are 30k+i for i = 1, 7, 11, 13, 17, 19, 23, 29
 const GCD_30_DELTA = [6, 4, 2, 4, 2, 4, 6, 2]

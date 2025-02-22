@@ -353,7 +353,6 @@ export class CFB extends BaseCipherMode {
     if (this._partialBytes > 0)
       this._partialOutput.getBytes(this._partialBytes)
 
-
     if (partialBytes > 0 && !finish) {
       output.putBytes(this._partialOutput.getBytes(
         partialBytes - this._partialBytes,

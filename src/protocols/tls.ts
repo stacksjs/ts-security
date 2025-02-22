@@ -1,3 +1,5 @@
+import { asn1 } from '../encoding/asn1'
+import { pki } from '../pki'
 // @ts-nocheck
 /**
  * A TypeScript implementation of Transport Layer Security (TLS).
@@ -230,10 +232,8 @@
  * timing signal.
  */
 import { createBuffer, util } from '../utils'
-import { random } from '../utils/random'
 import { create as hmacCreate } from '../utils/hmac'
-import { pki } from '../pki'
-import { asn1 } from '../encoding/asn1'
+import { random } from '../utils/random'
 import { certificateFromAsn1 } from '../x509'
 
 /**
@@ -4235,7 +4235,7 @@ export interface TLS {
    *
    * @return the new TLS connection.
    */
-  createConnection(options: any): any
+  createConnection: (options: any) => any
 
   /**
    * Creates a new server.
@@ -4244,7 +4244,7 @@ export interface TLS {
    *
    * @return the new TLS server.
    */
-  createServer(options: any): any
+  createServer: (options: any) => any
 
   /**
    * Creates a new client.
@@ -4253,16 +4253,16 @@ export interface TLS {
    *
    * @return the new TLS client.
    */
-  createClient(options: any): any
+  createClient: (options: any) => any
 }
 
 export const tls: TLS = {
-  createConnection: createConnection,
-  createServer: createServer,
-  createClient: createClient,
+  createConnection,
+  createServer,
+  createClient,
   prf_tls1: prf_TLS1, // expose prf_tls1 for testing
-  hmac_sha1: hmac_sha1, // expose sha1 hmac method
-  createSessionCache: createSessionCache // expose session cache creation
+  hmac_sha1, // expose sha1 hmac method
+  createSessionCache, // expose session cache creation
 }
 
 /**

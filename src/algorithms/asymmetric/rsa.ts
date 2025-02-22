@@ -61,13 +61,14 @@
  * The OID for the RSA key algorithm is: 1.2.840.113549.1.1.1
  */
 
-import type { Asn1Validator } from '../../validators/asn1-validator'
 import type { Asn1Object } from '../../encoding/asn1'
+import type { Asn1Validator } from '../../validators/asn1-validator'
 import { asn1 } from '../../encoding/asn1'
-import { BigInteger } from './jsbn'
 import { oids } from '../../oids'
 import { encode_rsa_oaep, pkcs1 } from '../../pkcs1'
-import util, { ByteStringBuffer, createBuffer, isServer, getBytes, random, bytesToHex, hexToBytes, decode64 } from '../../utils'
+import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki'
+import util, { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
+import { BigInteger } from './jsbn'
 
 type CustomError = Error & {
   algorithm?: string
@@ -76,17 +77,6 @@ type CustomError = Error & {
   errors?: any[]
   oid?: string
   max?: number
-}
-
-export interface BigInteger {
-  modInverse: (m: BigInteger) => BigInteger
-  multiply: (x: BigInteger) => BigInteger
-  mod: (m: BigInteger) => BigInteger
-  modPow: (e: BigInteger, m: BigInteger) => BigInteger
-  compareTo: (other: BigInteger) => number
-  equals: (other: BigInteger) => boolean
-  toString: (radix?: number) => string
-  bitLength: () => number
 }
 
 export interface RSAKey {
@@ -276,7 +266,7 @@ export const rsaPublicKeyValidator: Asn1Validator = {
     type: asn1.Type.INTEGER,
     constructed: false,
     capture: 'publicKeyModulus',
-    value: []
+    value: [],
   }, {
     // publicExponent (e)
     name: 'RSAPublicKey.exponent',
@@ -284,8 +274,8 @@ export const rsaPublicKeyValidator: Asn1Validator = {
     type: asn1.Type.INTEGER,
     constructed: false,
     capture: 'publicKeyExponent',
-    value: []
-  }]
+    value: [],
+  }],
 }
 
 // validator for an SubjectPublicKeyInfo structure
@@ -968,22 +958,17 @@ export const stepKeyPairGenerationState: (state: any, n: number) => boolean = fu
  * available, or by breaking up the work on the main thread), pass a
  * callback function.
  *
- * @param [bits] the size for the private key in bits, defaults to 2048.
- * @param [e] the public exponent to use, defaults to 65537.
- * @param [options] options for key-pair generation, if given then 'bits'
- *            and 'e' must *not* be given:
- *          bits the size for the private key in bits, (default: 2048).
- *          e the public exponent to use, (default: 65537 (0x10001)).
- *          workerScript the worker script URL.
- *          workers the number of web workers (if supported) to use,
- *            (default: 2).
- *          workLoad the size of the work load, ie: number of possible prime
- *            numbers for each web worker to check per work assignment,
- *            (default: 100).
- *          prng a custom crypto-secure pseudo-random number generator to use,
- *            that must define "getBytesSync". Disables use of native APIs.
- *          algorithm the algorithm to use (default: 'PRIMEINC').
- * @param [callback(err, keypair)] called once the operation completes.
+ * @param bits the size for the private key in bits, defaults to 2048.
+ * @param e the public exponent to use, defaults to 65537.
+ * @param options the options for key-pair generation, if given then 'bits' and 'e' must *not* be given:
+ * @param options.bits the size for the private key in bits, (default: 2048).
+ * @param options.e the public exponent to use, (default: 65537 (0x10001)).
+ * @param options.workerScript the worker script URL.
+ * @param options.workers the number of web workers (if supported) to use, (default: 2).
+ * @param options.workLoad the size of the work load, ie: number of possible prime numbers for each web worker to check per work assignment, (default: 100).
+ * @param options.prng a custom crypto-secure pseudo-random number generator to use, that must define "getBytesSync". Disables use of native APIs.
+ * @param options.algorithm the algorithm to use (default: 'PRIMEINC').
+ * @param callback(err, keypair) called once the operation completes.
  *
  * @return an object with privateKey and publicKey properties.
  */
@@ -991,13 +976,13 @@ export function generateKeyPair(
   bits: number,
   e?: number,
   options?: Partial<GenerateKeyPairOptions>,
-  callback?: (err: Error | null, keypair?: { privateKey: RSAKeyWithOps, publicKey: RSAKeyWithOps }) => void
+  callback?: (err: Error | null, keypair?: { privateKey: RSAKeyWithOps, publicKey: RSAKeyWithOps }) => void,
 ): void {
   // (bits), (options), (callback)
   if (arguments.length === 1) {
     if (typeof bits === 'object') {
-      options = bits
-      bits = options.algorithm?.options?.workers || 2048
+      options = bits as Partial<GenerateKeyPairOptions>
+      bits = (options as any).algorithm?.options?.workers || 2048
     }
   }
 
@@ -1018,7 +1003,7 @@ export function generateKeyPair(
         }).then((pkcs8) => {
           if (pkcs8) {
             const privateKey = addRSAKeyOps(privateKeyFromAsn1(
-              asn1.fromDer(createBuffer(new Uint8Array(pkcs8)))
+              asn1.fromDer(createBuffer(Buffer.from(pkcs8).toString())),
             ))
             const publicKey = addRSAKeyOps(setRsaPublicKey(privateKey.n, privateKey.e))
             callback(null, { privateKey, publicKey })
@@ -1046,7 +1031,7 @@ export function generateKeyPair(
     algorithm: 'RSASSA-PKCS1-v1_5',
     workers: 2,
     workLoad: 100,
-  }, callback || function () {})
+  }, callback || (() => {}))
 }
 
 /**
@@ -1083,7 +1068,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
    *
    * @return the encrypted byte string.
    */
-  key.encrypt = function (data: string, scheme: string, schemeOptions: any) {
+  function encrypt(data: string, scheme: string, schemeOptions: any) {
     if (typeof scheme === 'string') {
       scheme = scheme.toUpperCase()
     }
@@ -1138,8 +1123,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
    * To perform PSS signature verification, provide an instance
    * of Forge PSS object as the scheme parameter.
    *
-   * @param digest the message digest hash to compare against the signature,
-   *          as a binary-encoded string.
+   * @param digest the message digest hash to compare against the signature, as a binary-encoded string.
    * @param signature the signature to verify, as a binary-encoded string.
    * @param scheme signature verification scheme to use:
    *          'RSASSA-PKCS1-V1_5' or undefined for RSASSA PKCS#1 v1.5,
@@ -1183,7 +1167,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
           const capture = {}
           const errors = []
           if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-            var error = new Error(
+            const error = new Error(
               'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
               + 'DigestInfo value.',
             )
@@ -1203,9 +1187,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
             || oid === oids.sha512
             || oid === oids['sha512-224']
             || oid === oids['sha512-256'])) {
-            var error = new Error(
-              'Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.',
-            )
+            const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
             error.oid = oid
             throw error
           }
@@ -1303,10 +1285,11 @@ export function setPrivateKey(
    *
    * @return the decrypted byte string.
    */
-  key.decrypt = function (data: string, scheme: string, schemeOptions: any) {
+  function decrypt(data: string, scheme: string, schemeOptions: any) {
     if (typeof scheme === 'string') {
       scheme = scheme.toUpperCase()
     }
+
     else if (scheme === undefined) {
       scheme = 'RSAES-PKCS1-V1_5'
     }
@@ -2059,23 +2042,26 @@ export function base64ToBigInt(b64: string): BigInteger {
 
 export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
   const keyWithOps = key as RSAKeyWithOps
-  keyWithOps.encrypt = function(data: string | Uint8Array, scheme: string, schemeOptions?: any) {
+  keyWithOps.encrypt = function (data: string | Uint8Array, scheme: string, schemeOptions?: any) {
     let encodeScheme: EncodeScheme
     if (scheme === 'RSAES-PKCS1-V1_5') {
       encodeScheme = {
         encode(m: string | Uint8Array, key: RSAKey, pub: boolean) {
           return _encodePkcs1_v1_5(m as string, key, 0x02).getBytes()
-        }
+        },
       }
-    } else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+    }
+    else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
       encodeScheme = {
         encode(m: string, key: RSAKey) {
           return encode_rsa_oaep(key, m, schemeOptions)
         },
       }
-    } else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+    }
+    else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
       encodeScheme = { encode(e) { return e } }
-    } else if (typeof scheme === 'string') {
+    }
+    else if (typeof scheme === 'string') {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
     }
 
@@ -2085,19 +2071,22 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     return encrypt(e, key, true)
   }
 
-  keyWithOps.decrypt = function(data: string | Uint8Array, scheme: string, schemeOptions?: any) {
+  keyWithOps.decrypt = function (data: string | Uint8Array, scheme: string, schemeOptions?: any) {
     let decodeScheme
     if (scheme === 'RSAES-PKCS1-V1_5') {
       decodeScheme = { decode: _decodePkcs1_v1_5 }
-    } else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+    }
+    else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
       decodeScheme = {
         decode(d: string, key: any) {
           return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
         },
       }
-    } else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+    }
+    else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
       decodeScheme = { decode(d) { return d } }
-    } else if (typeof scheme === 'string') {
+    }
+    else if (typeof scheme === 'string') {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
     }
 
@@ -2107,15 +2096,18 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     return decrypt(d, key, false, false)
   }
 
-  keyWithOps.sign = function(md: string | Uint8Array, scheme?: string) {
+  keyWithOps.sign = function (md: string | Uint8Array, scheme?: string) {
     let signScheme
     if (scheme === 'RSASSA-PKCS1-V1_5' || scheme === undefined) {
       signScheme = { encode: emsaPkcs1v15encode }
-    } else if (scheme === 'RSASSA-PSS') {
+    }
+    else if (scheme === 'RSASSA-PSS') {
       signScheme = { encode: emsaPssEncode }
-    } else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+    }
+    else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
       signScheme = { encode() { return md } }
-    } else {
+    }
+    else {
       throw new TypeError(`Unsupported signature scheme: "${scheme}".`)
     }
 
@@ -2124,7 +2116,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     return encrypt(d, key, true)
   }
 
-  keyWithOps.verify = function(digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options: any) {
+  keyWithOps.verify = function (digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options: any) {
     if (typeof scheme === 'string') {
       scheme = scheme.toUpperCase()
     }
@@ -2214,4 +2206,18 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
   }
 
   return keyWithOps
+}
+
+export interface RSA {
+  generateKeyPair: typeof generateKeyPair
+  privateKeyFromPem: typeof privateKeyFromPem
+  privateKeyToPem: typeof privateKeyToPem
+  privateKeyInfoToPem: typeof privateKeyInfoToPem
+}
+
+export const rsa: RSA = {
+  generateKeyPair,
+  privateKeyFromPem,
+  privateKeyToPem,
+  privateKeyInfoToPem,
 }

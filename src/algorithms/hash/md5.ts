@@ -51,7 +51,7 @@ function create(): MessageDigest {
   let _input = createBuffer()
 
   // used for word storage
-  const _w: number[] = new Array(16).fill(0)
+  const _w: number[] = Array.from({ length: 16 }).fill(0)
 
   // message digest object
   const md: MessageDigest = {

@@ -648,9 +648,11 @@ export class BigInteger {
     let i = x.getLowestSetBit()
     let g = y.getLowestSetBit()
 
-    if (g < 0) return x
+    if (g < 0)
+      return x
 
-    if (i < g) g = i
+    if (i < g)
+      g = i
 
     if (g > 0) {
       x.rShiftTo(g, x)
@@ -658,8 +660,10 @@ export class BigInteger {
     }
 
     while (x.signum() > 0) {
-      if ((i = x.getLowestSetBit()) > 0) x.rShiftTo(i, x)
-      if ((i = y.getLowestSetBit()) > 0) y.rShiftTo(i, y)
+      if ((i = x.getLowestSetBit()) > 0)
+        x.rShiftTo(i, x)
+      if ((i = y.getLowestSetBit()) > 0)
+        y.rShiftTo(i, y)
 
       if (x.compareTo(y) >= 0) {
         x.subTo(y, x)
@@ -671,7 +675,8 @@ export class BigInteger {
       }
     }
 
-    if (g > 0) y.lShiftTo(g, y)
+    if (g > 0)
+      y.lShiftTo(g, y)
     return y
   }
 
@@ -1080,7 +1085,7 @@ export class BigInteger {
   private exp(e: number, z: IReducer): BigInteger {
     if (e > 0xFFFFFFFF || e < 1)
       return BigInteger.ONE
-    let r = new BigInteger()
+    let r = new BigInteger(1)
     let r2 = new BigInteger()
     const g = z.convert(this)
     let i = this.nbits(e) - 1
@@ -1098,6 +1103,43 @@ export class BigInteger {
       }
     }
     return z.revert(r)
+  }
+
+  public modInverse(m: BigInteger): BigInteger {
+    const g = this.gcd(m)
+    if (!g.equals(BigInteger.ONE)) {
+      throw new Error('Inverse does not exist')
+    }
+
+    const u = this.mod(m)
+    const a = new BigInteger()
+    const b = new BigInteger()
+    this.extendedGcd(u, m, a, b)
+
+    return a.mod(m)
+  }
+
+  private extendedGcd(a: BigInteger, b: BigInteger, x: BigInteger, y: BigInteger): BigInteger {
+    if (b.equals(BigInteger.ZERO)) {
+      x.fromInt(1)
+      y.fromInt(0)
+      return a
+    }
+
+    const x1 = new BigInteger()
+    const y1 = new BigInteger()
+    const g = this.extendedGcd(b, a.mod(b), x1, y1)
+
+    // Calculate x = y1
+    x.fromInt(y1.intValue())
+
+    // Calculate y = x1 - (a/b) * y1
+    const quotient = a.divide(b)
+    const product = quotient.multiply(y1)
+    const diff = x1.subtract(product)
+    y.fromInt(diff.intValue())
+
+    return g
   }
 }
 
@@ -1257,4 +1299,3 @@ class Barrett implements IReducer {
     this.reduce(r)
   }
 }
-

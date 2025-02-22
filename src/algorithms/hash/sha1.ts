@@ -43,7 +43,7 @@ export function create(): MessageDigest {
   let _input = createBuffer()
 
   // Fix array initialization with proper typing
-  const _w: number[] = new Array(80).fill(0)
+  const _w: number[] = Array.from({ length: 80 }).fill(0)
 
   // message digest object
   const md: MessageDigest = {

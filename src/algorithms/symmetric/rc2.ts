@@ -8,10 +8,10 @@
  * http://www.ietf.org/rfc/rfc2268.txt
  */
 
-import type { Algorithm, CipherOptions } from './cipher'
 import type { ByteStringBuffer } from '../../utils'
-import { BlockCipher } from './cipher'
+import type { Algorithm, CipherOptions } from './cipher'
 import { createBuffer } from '../../utils'
+import { BlockCipher } from './cipher'
 
 interface RC2Options extends CipherOptions {
   bits?: number

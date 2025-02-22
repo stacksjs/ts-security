@@ -64,6 +64,7 @@ preinstall
 primeinc
 quickfix
 rootca
+RSAES
 scalarbase
 scalarmult
 shikijs

@@ -30,9 +30,9 @@
 
 import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode, CipherModeOptions } from './cipher-modes'
+import { ByteStringBuffer, createBuffer } from '../../utils'
 import { createCipher, registerAlgorithm as registerAlgo } from './cipher'
 import { modes } from './cipher-modes'
-import { ByteStringBuffer, createBuffer } from '../../utils'
 
 /**
  * Creates a new DES cipher algorithm object.

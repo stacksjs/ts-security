@@ -16,32 +16,31 @@
  * EncryptedData ::= OCTET STRING
  */
 
-import type { Asn1Object } from '../encoding/asn1'
-import type { BlockCipher } from '../algorithms/symmetric/cipher'
-import type { MessageDigest } from '../algorithms/hash/sha1'
 import type { ByteStringBuffer } from '.'
-import { ByteStringBuffer as ByteStringBuff } from '.'
-import type { PemMessage, PemHeader, Pem } from '../encoding/pem'
-import { aes } from '../algorithms/symmetric/aes'
-import { asn1 } from '../encoding/asn1'
-import { wrapRsaPrivateKey, privateKeyToAsn1, privateKeyFromAsn1 } from '../algorithms/asymmetric/rsa'
-import { createCipher, createCipher as createCipherOriginal } from '../algorithms/symmetric/cipher'
+import type { MessageDigest } from '../algorithms/hash/sha1'
+import type { BlockCipher } from '../algorithms/symmetric/cipher'
+import type { Asn1Object } from '../encoding/asn1'
+import type { PemHeader, PemMessage } from '../encoding/pem'
+import { Buffer } from 'node:buffer'
+import { bytesToHex, ByteStringBuffer as ByteStringBuff, createBuffer, hexToBytes } from '.'
+import { privateKeyFromAsn1, privateKeyToAsn1, wrapRsaPrivateKey } from '../algorithms/asymmetric/rsa'
 import { sha1 } from '../algorithms/hash/sha1'
+import { sha512 } from '../algorithms/hash/sha512'
+import { aes } from '../algorithms/symmetric/aes'
+import { createCipher, createCipher as createCipherOriginal } from '../algorithms/symmetric/cipher'
 import { des } from '../algorithms/symmetric/des'
+import { rc2 } from '../algorithms/symmetric/rc2'
+import { asn1 } from '../encoding/asn1'
+import { pem } from '../encoding/pem'
 import { oids } from '../oids'
 import { pbkdf2 } from '../utils/pbkdf2'
 import { getBytesSync } from '../utils/random'
-import { rc2 } from '../algorithms/symmetric/rc2'
-import { sha512 } from '../algorithms/hash/sha512'
-import { bytesToHex, createBuffer, hexToBytes } from '.'
-import { pem } from '../encoding/pem'
-import { Buffer } from 'buffer'
 
 // Error codes enum
 export const PBEErrorCode = {
   INVALID_PARAMS: 'INVALID_PARAMS',
   DECRYPTION_FAILED: 'DECRYPTION_FAILED',
-  UNSUPPORTED_ALGORITHM: 'UNSUPPORTED_ALGORITHM'
+  UNSUPPORTED_ALGORITHM: 'UNSUPPORTED_ALGORITHM',
 } as const
 
 // Custom error class
@@ -51,7 +50,7 @@ export class PBEError extends Error {
   constructor(
     message: string,
     public readonly code: keyof typeof PBEErrorCode,
-    details?: Record<string, unknown>
+    details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'PBEError'
@@ -82,7 +81,7 @@ interface CipherInput {
 }
 
 interface HashFunction {
-  create(): MessageDigest
+  create: () => MessageDigest
 }
 
 interface HashAlgorithms {
@@ -139,7 +138,7 @@ interface SHA512APIMap {
 
 // Constants
 const DEFAULT_ENCRYPTION_PARAMS = {
-  prfAlgorithm: 'hmacWithSHA1'
+  prfAlgorithm: 'hmacWithSHA1',
 } as const
 
 // PBE algorithms configuration
@@ -148,12 +147,12 @@ const pbeAlgorithms: PBEAlgorithmsMap = {
   'aes192-CBC': { cipher: 'AES-CBC', keyLength: 24, ivLength: 16 },
   'aes256-CBC': { cipher: 'AES-CBC', keyLength: 32, ivLength: 16 },
   'des-EDE3-CBC': { cipher: '3DES-CBC', keyLength: 24, ivLength: 8 },
-  'desCBC': { cipher: 'DES-CBC', keyLength: 8, ivLength: 8 }
+  'desCBC': { cipher: 'DES-CBC', keyLength: 8, ivLength: 8 },
 }
 
 // Constants for supported algorithms
 const SUPPORTED_KDF_OIDS = [
-  oids.pkcs5PBKDF2
+  oids.pkcs5PBKDF2,
 ] as const
 
 const SUPPORTED_ENC_OIDS = Object.keys(pbeAlgorithms).map(key => oids[key as keyof typeof oids]) as string[]
@@ -178,7 +177,7 @@ class UnsupportedAlgorithmError extends Error {
   constructor(
     public readonly oid: string,
     public readonly supportedOids: string[],
-    message: string
+    message: string,
   ) {
     super(message)
     this.name = 'UnsupportedAlgorithmError'
@@ -214,7 +213,7 @@ function toValidationCapture(obj: unknown): ASN1ValidationCapture {
     salt: extractString(asObject.salt),
     iterationCount: extractString(asObject.iterationCount),
     iv: extractString(asObject.iv),
-    encryptedData: extractString(asObject.encryptedData)
+    encryptedData: extractString(asObject.encryptedData),
   }
 }
 
@@ -232,7 +231,7 @@ function extractEncryptionParams(obj: unknown): EncryptionParams {
     throw new UnsupportedAlgorithmError(
       kdfOid,
       Array.from(SUPPORTED_KDF_OIDS),
-      `Unsupported KDF algorithm: ${kdfOid}`
+      `Unsupported KDF algorithm: ${kdfOid}`,
     )
   }
 
@@ -246,13 +245,13 @@ function extractEncryptionParams(obj: unknown): EncryptionParams {
     throw new UnsupportedAlgorithmError(
       encOid,
       SUPPORTED_ENC_OIDS,
-      `Unsupported encryption algorithm: ${encOid}`
+      `Unsupported encryption algorithm: ${encOid}`,
     )
   }
 
   // Extract and validate required parameters
   const salt = capture.salt ? createBuffer(capture.salt) : undefined
-  const iterationCount = capture.iterationCount ? parseInt(capture.iterationCount, 10) : undefined
+  const iterationCount = capture.iterationCount ? Number.parseInt(capture.iterationCount, 10) : undefined
   const iv = capture.iv ? createBuffer(capture.iv) : undefined
   const encryptedData = capture.encryptedData ? createBuffer(capture.encryptedData) : undefined
 
@@ -262,7 +261,7 @@ function extractEncryptionParams(obj: unknown): EncryptionParams {
 
   // Find algorithm name from OID
   const algorithm = Object.keys(pbeAlgorithms).find(key =>
-    oids[key as keyof typeof oids] === encOid
+    oids[key as keyof typeof oids] === encOid,
   )
 
   return {
@@ -272,7 +271,7 @@ function extractEncryptionParams(obj: unknown): EncryptionParams {
     iterationCount,
     iv,
     encryptedData,
-    algorithm
+    algorithm,
   }
 }
 
@@ -345,7 +344,7 @@ function createModernCipher(algorithm: string, key: ByteStringBuffer | string): 
     default:
       throw new PBEError(
         `Unsupported cipher algorithm: ${algorithm}`,
-        PBEErrorCode.UNSUPPORTED_ALGORITHM
+        PBEErrorCode.UNSUPPORTED_ALGORITHM,
       )
   }
 }
@@ -373,7 +372,7 @@ function createLegacyDecipher(algorithm: string, key: string): BlockCipher {
     default:
       throw new PBEError(
         `Unsupported encryption algorithm: ${algorithm}`,
-        PBEErrorCode.UNSUPPORTED_ALGORITHM
+        PBEErrorCode.UNSUPPORTED_ALGORITHM,
       )
   }
 }
@@ -385,7 +384,7 @@ function deriveKeyPBKDF2(
     salt: ByteStringBuffer
     iterationCount: number
     prf: string
-  }
+  },
 ): ByteStringBuffer {
   const { salt, iterationCount, prf } = options
   const md = prfAlgorithmToMessageDigest(prf)
@@ -401,7 +400,7 @@ export function generatePkcs12Key(
   id: number,
   iter: number,
   n: number,
-  md?: MessageDigest
+  md?: MessageDigest,
 ): ByteStringBuffer {
   if (!md) {
     md = sha1.create()
@@ -718,25 +717,25 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
         dkLen = 16
         ivLen = 16
         encOid = oids['aes128-CBC']
-        cipherFn = (key) => createAESCipher(key)
+        cipherFn = key => createAESCipher(key)
         break
       case 'aes192':
         dkLen = 24
         ivLen = 16
         encOid = oids['aes192-CBC']
-        cipherFn = (key) => createAESCipher(key)
+        cipherFn = key => createAESCipher(key)
         break
       case 'aes256':
         dkLen = 32
         ivLen = 16
         encOid = oids['aes256-CBC']
-        cipherFn = (key) => createAESCipher(key)
+        cipherFn = key => createAESCipher(key)
         break
       case 'des':
         dkLen = 8
         ivLen = 8
         encOid = oids.desCBC
-        cipherFn = (key) => createCipherOriginal('DES-CBC', convertToString(key))
+        cipherFn = key => createCipherOriginal('DES-CBC', convertToString(key))
         break
       default:
         const error: CustomError = new Error('Cannot encrypt private key. Unknown encryption algorithm.')
@@ -749,15 +748,20 @@ export function encryptPrivateKeyInfo(obj: any, password: string, options: Encry
     const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
     // encrypt private key using pbe SHA-1 and AES/DES
-    if (!salt) throw new Error('Salt is required')
-    if (typeof dkLen === 'undefined') throw new Error('Key length is required')
+    if (!salt)
+      throw new Error('Salt is required')
+    if (typeof dkLen === 'undefined')
+      throw new Error('Key length is required')
     const saltBuffer = toNodeBuffer(salt)
     const dk = pbkdf2(password, saltBuffer, count, dkLen, md, undefined)
-    if (!dk) throw new Error('Failed to generate derived key')
-    if (!cipherFn) throw new Error('Cipher function is not defined')
+    if (!dk)
+      throw new Error('Failed to generate derived key')
+    if (!cipherFn)
+      throw new Error('Cipher function is not defined')
     const iv = createBuffer(getBytesSync(ivLen))
     const cipher = cipherFn(toByteStringBuffer(dk))
-    if (!iv) throw new Error('IV is required')
+    if (!iv)
+      throw new Error('IV is required')
     cipher.start({ iv: convertToString(iv) })
     cipher.update(asn1.toDer(obj))
     if (!cipher.finish())
@@ -866,7 +870,7 @@ export function decryptPrivateKeyInfo(obj: any, password: string): any {
 
   if (!asn1.validate(obj, encryptedPrivateKeyValidator, capture, errors)) {
     const error: CustomError = new Error(
-      'Cannot read encrypted private key. ASN.1 object is not a supported EncryptedPrivateKeyInfo.'
+      'Cannot read encrypted private key. ASN.1 object is not a supported EncryptedPrivateKeyInfo.',
     )
     error.errors = errors
     throw error
@@ -902,7 +906,7 @@ export function encryptedPrivateKeyToPem(epki: Asn1Object, maxline: number): str
     procType: null,
     contentDomain: null,
     dekInfo: null,
-    headers: [] as PemHeader[]
+    headers: [] as PemHeader[],
   }
 
   return pem.encode(msg, { maxline })
@@ -921,7 +925,7 @@ export function encryptedPrivateKeyFromPem(pemString: string): any {
 
   if (msg.type !== 'ENCRYPTED PRIVATE KEY') {
     const error: CustomError = new Error(
-      'Could not convert encrypted private key from PEM; PEM header type is not "ENCRYPTED PRIVATE KEY".'
+      'Could not convert encrypted private key from PEM; PEM header type is not "ENCRYPTED PRIVATE KEY".',
     )
     error.headerType = msg.type
     throw error
@@ -977,35 +981,35 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
       algorithm = 'AES-128-CBC'
       dkLen = 16
       initialIv = createBuffer(getBytesSync(16))
-      cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '128')
+      cipherFn = key => aes.createEncryptionCipher(convertToString(key), '128')
       break
     case 'aes192':
       algorithm = 'AES-192-CBC'
       dkLen = 24
       initialIv = createBuffer(getBytesSync(16))
-      cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '192')
+      cipherFn = key => aes.createEncryptionCipher(convertToString(key), '192')
       break
     case 'aes256':
       algorithm = 'AES-256-CBC'
       dkLen = 32
       initialIv = createBuffer(getBytesSync(16))
-      cipherFn = (key) => aes.createEncryptionCipher(convertToString(key), '256')
+      cipherFn = key => aes.createEncryptionCipher(convertToString(key), '256')
       break
     case '3des':
       algorithm = 'DES-EDE3-CBC'
       dkLen = 24
       initialIv = createBuffer(getBytesSync(8))
-      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
+      cipherFn = key => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
       break
     case 'des':
       algorithm = 'DES-CBC'
       dkLen = 8
       initialIv = createBuffer(getBytesSync(8))
-      cipherFn = (key) => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
+      cipherFn = key => des.createEncryptionCipher(convertToString(key), initialIv.bytes())
       break
     default:
       const error: CustomError = new Error(
-        `Could not encrypt RSA private key; unsupported encryption algorithm "${options.algorithm}".`
+        `Could not encrypt RSA private key; unsupported encryption algorithm "${options.algorithm}".`,
       )
       error.algorithm = options.algorithm
       throw error
@@ -1014,7 +1018,8 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
   const dk = opensslDeriveBytes(password, initialIv.bytes(), dkLen, sha1.create())
   const finalIv = createBuffer(getBytesSync(16))
   const cipher = cipherFn(createBuffer(dk))
-  if (!finalIv) throw new Error('IV is required')
+  if (!finalIv)
+    throw new Error('IV is required')
   cipher.start({ iv: convertToString(finalIv) })
   cipher.update(asn1.toDer(privateKeyToAsn1(rsaKey)))
   if (!cipher.finish()) {
@@ -1028,11 +1033,11 @@ export function encryptRsaPrivateKey(rsaKey: any, password: string, options: Enc
     type: 'RSA PRIVATE KEY',
     procType: {
       version: '4',
-      type: 'ENCRYPTED'
+      type: 'ENCRYPTED',
     },
     dekInfo: {
       algorithm,
-      parameters: bytesToHex(finalIv.bytes()).toUpperCase()
+      parameters: bytesToHex(finalIv.bytes()).toUpperCase(),
     },
     headers: [],
     body: cipher.output.getBytes(),
@@ -1054,18 +1059,19 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
   if (!pemKey || !password) {
     throw new PBEError(
       'PEM key and password are required',
-      PBEErrorCode.INVALID_PARAMS
+      PBEErrorCode.INVALID_PARAMS,
     )
   }
 
   let obj: Asn1Object
   try {
     obj = pemToEncryptedPrivateKey(pemKey)
-  } catch (e) {
+  }
+  catch (e) {
     throw new PBEError(
       'Invalid PEM format',
       PBEErrorCode.INVALID_PARAMS,
-      { error: e }
+      { error: e },
     )
   }
 
@@ -1075,7 +1081,7 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
     const key = deriveKeyPBKDF2(password, {
       salt: params.salt,
       iterationCount: params.iterationCount,
-      prf: DEFAULT_ENCRYPTION_PARAMS.prfAlgorithm
+      prf: DEFAULT_ENCRYPTION_PARAMS.prfAlgorithm,
     })
 
     const algorithm = params.algorithm || 'aes128-CBC'
@@ -1084,7 +1090,7 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
 
     const decipher = createModernCipher(
       pbeAlgorithms[algorithm].cipher,
-      key
+      key,
     )
 
     decipher.start({ iv: params.iv })
@@ -1093,30 +1099,32 @@ export function decryptRsaPrivateKey(pemKey: string, password: string): any {
     if (!decipher.finish()) {
       throw new PBEError(
         'Failed to decrypt private key',
-        PBEErrorCode.DECRYPTION_FAILED
+        PBEErrorCode.DECRYPTION_FAILED,
       )
     }
 
     if (!decipher.output) {
       throw new PBEError(
         'No output from cipher',
-        PBEErrorCode.DECRYPTION_FAILED
+        PBEErrorCode.DECRYPTION_FAILED,
       )
     }
 
     return asn1ToPrivateKey(unwrapRsaPrivateKey(asn1.fromDer(decipher.output.bytes())))
-  } catch (e) {
+  }
+  catch (e) {
     if (e instanceof PBEError && e.code === PBEErrorCode.INVALID_PARAMS) {
       try {
         return decryptRsaPrivateKeyLegacy(pemKey, password)
-      } catch (legacyError) {
+      }
+      catch (legacyError) {
         throw new PBEError(
           'Failed to decrypt private key (both modern and legacy formats)',
           PBEErrorCode.DECRYPTION_FAILED,
           {
             modernError: e,
-            legacyError
-          }
+            legacyError,
+          },
         )
       }
     }
@@ -1234,15 +1242,20 @@ export function getCipherForPBES2(oid: string, params: any, password: string): B
   const md = prfAlgorithmToMessageDigest(prfAlgorithm)
 
   // decrypt private key using pbe with chosen PRF and AES/DES
-  if (!salt) throw new Error('Salt is required')
-  if (typeof dkLen === 'undefined') throw new Error('Key length is required')
+  if (!salt)
+    throw new Error('Salt is required')
+  if (typeof dkLen === 'undefined')
+    throw new Error('Key length is required')
   const saltBuffer = toNodeBuffer(salt)
   const dk = pbkdf2(password, saltBuffer, iterationCount, dkLen, md, undefined)
-  if (!dk) throw new Error('Failed to generate derived key')
-  if (!cipherFn) throw new Error('Cipher function is not defined')
+  if (!dk)
+    throw new Error('Failed to generate derived key')
+  if (!cipherFn)
+    throw new Error('Cipher function is not defined')
   const iv = capture.encIv
   const cipher = cipherFn(convertToString(dk))
-  if (!iv) throw new Error('IV is required')
+  if (!iv)
+    throw new Error('IV is required')
   cipher.start({ iv: convertToString(iv) })
 
   return cipher
@@ -1352,7 +1365,7 @@ class AlgorithmError extends Error {
   constructor(
     public readonly algorithm: string,
     public readonly supported: string[],
-    message: string
+    message: string,
   ) {
     super(message)
     this.name = 'AlgorithmError'
@@ -1376,7 +1389,7 @@ export function prfAlgorithmToMessageDigest(prfAlgorithm: string): MessageDigest
       throw new AlgorithmError(
         prfAlgorithm,
         ['hmacWithSHA1', 'hmacWithSHA224', 'hmacWithSHA256', 'hmacWithSHA384', 'hmacWithSHA512'],
-        'Unsupported PRF algorithm.'
+        'Unsupported PRF algorithm.',
       )
   }
 
@@ -1429,8 +1442,8 @@ function validateKey(key: ByteStringBuffer, expectedLength: number): void {
   if (key.length() !== expectedLength) {
     throw new PBEError(
       `Invalid key length: expected ${expectedLength}, got ${key.length()}`,
-      PBEErrorCode.INVALID_PARAMS
-    );
+      PBEErrorCode.INVALID_PARAMS,
+    )
   }
 }
 
@@ -1438,34 +1451,34 @@ function validateIV(iv: ByteStringBuffer, expectedLength: number): void {
   if (iv.length() !== expectedLength) {
     throw new PBEError(
       `Invalid IV length: expected ${expectedLength}, got ${iv.length()}`,
-      PBEErrorCode.INVALID_PARAMS
-    );
+      PBEErrorCode.INVALID_PARAMS,
+    )
   }
 }
 
 function pemToEncryptedPrivateKey(pemKey: string): Asn1Object {
-  const msg = pem.decode(pemKey)[0];
+  const msg = pem.decode(pemKey)[0]
   if (msg.type !== 'ENCRYPTED PRIVATE KEY') {
     throw new PBEError(
       'Invalid PEM format: not an encrypted private key',
-      PBEErrorCode.INVALID_PARAMS
-    );
+      PBEErrorCode.INVALID_PARAMS,
+    )
   }
-  return asn1.fromDer(msg.body);
+  return asn1.fromDer(msg.body)
 }
 
 function unwrapRsaPrivateKey(obj: Asn1Object): Asn1Object {
   if (obj.type === asn1.Type.SEQUENCE) {
-    return obj;
+    return obj
   }
   throw new PBEError(
     'Invalid private key format',
-    PBEErrorCode.INVALID_PARAMS
-  );
+    PBEErrorCode.INVALID_PARAMS,
+  )
 }
 
 function asn1ToPrivateKey(obj: Asn1Object): any {
-  return privateKeyFromAsn1(obj);
+  return privateKeyFromAsn1(obj)
 }
 
 // Legacy decryption function
@@ -1475,14 +1488,14 @@ function decryptRsaPrivateKeyLegacy(pemKey: string, password: string): any {
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
     throw new PBEError(
       'Invalid PEM format: not a legacy private key',
-      PBEErrorCode.INVALID_PARAMS
+      PBEErrorCode.INVALID_PARAMS,
     )
   }
 
   if (!msg.procType || msg.procType.type !== 'ENCRYPTED') {
     throw new PBEError(
       'Invalid PEM format: not encrypted',
-      PBEErrorCode.INVALID_PARAMS
+      PBEErrorCode.INVALID_PARAMS,
     )
   }
 
@@ -1490,7 +1503,7 @@ function decryptRsaPrivateKeyLegacy(pemKey: string, password: string): any {
   if (!algorithm || !parameters) {
     throw new PBEError(
       'Invalid PEM format: missing encryption parameters',
-      PBEErrorCode.INVALID_PARAMS
+      PBEErrorCode.INVALID_PARAMS,
     )
   }
 
@@ -1504,7 +1517,7 @@ function decryptRsaPrivateKeyLegacy(pemKey: string, password: string): any {
   if (!cipher.finish()) {
     throw new PBEError(
       'Failed to decrypt private key',
-      PBEErrorCode.DECRYPTION_FAILED
+      PBEErrorCode.DECRYPTION_FAILED,
     )
   }
 
@@ -1524,7 +1537,7 @@ function getDkLen(algorithm: string): number {
     default:
       throw new PBEError(
         `Unsupported encryption algorithm: ${algorithm}`,
-        PBEErrorCode.UNSUPPORTED_ALGORITHM
+        PBEErrorCode.UNSUPPORTED_ALGORITHM,
       )
   }
 }

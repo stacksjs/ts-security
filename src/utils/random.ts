@@ -28,9 +28,9 @@
  */
 
 import type { ByteStringBuffer } from '.'
-import { _expandKey, _updateBlock } from '../algorithms/symmetric/aes'
-import * as sha256Module from '../algorithms/hash/sha256'
 import { createBuffer } from '.'
+import * as sha256Module from '../algorithms/hash/sha256'
+import { _expandKey, _updateBlock } from '../algorithms/symmetric/aes'
 
 // Define PRNG interface
 export interface PRNG {

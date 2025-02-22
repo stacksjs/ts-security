@@ -17,9 +17,9 @@
 
 import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode } from './cipher-modes'
+import { ByteStringBuffer, createBuffer } from '../../utils'
 import { createCipher, registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
-import { ByteStringBuffer, createBuffer } from '../../utils'
 
 // AES implementation types
 type SubstitutionBox = number[]
