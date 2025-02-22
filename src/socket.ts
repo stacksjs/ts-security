@@ -2,8 +2,7 @@
  * Socket implementation that uses flash SocketPool class as a backend.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2013 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 /// <reference lib="dom" />

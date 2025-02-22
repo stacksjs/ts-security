@@ -1,4 +1,4 @@
-// Basic JavaScript BN library - subset useful for RSA encryption.
+// Basic TypeScript BN library - subset useful for RSA encryption.
 
 /*
  * Copyright (c) 2003-2005  Tom Wu

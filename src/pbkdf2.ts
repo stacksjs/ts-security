@@ -4,8 +4,7 @@
  * See RFC 2898 for details.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2013 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import type { MessageDigest } from './sha1'

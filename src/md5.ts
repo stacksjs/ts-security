@@ -2,8 +2,7 @@
  * Message Digest Algorithm 5 with 128-bit digest (MD5) implementation.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'

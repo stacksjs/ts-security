@@ -2,8 +2,7 @@
  * Javascript implementation of basic RSA algorithms.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  *
  * The only algorithm currently supported for PKI is RSA.
  *

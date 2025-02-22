@@ -2,8 +2,7 @@
  * Cipher base API.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import type { ByteStringBuffer } from './utils'

@@ -1,7 +1,3 @@
-/**
- * Copyright (c) 2019 Digital Bazaar, Inc.
- */
-
 import { Class, Type } from './asn1'
 
 export interface Asn1Validator {

@@ -2,8 +2,7 @@
  * RC2 implementation.
  *
  * @author Stefan Siegl
- *
- * Copyright (c) 2012 Stefan Siegl <stesie@brokenpipe.de>
+ * @author Chris Breuer
  *
  * Information on the RC2 cipher is available from RFC #2268,
  * http://www.ietf.org/rfc/rfc2268.txt

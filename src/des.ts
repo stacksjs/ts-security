@@ -25,9 +25,7 @@
  *
  * @author Stefan Siegl
  * @author Dave Longley
- *
- * Copyright (c) 2012 Stefan Siegl <stesie@brokenpipe.de>
- * Copyright (c) 2012-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import type { Algorithm, BlockCipher } from './cipher'

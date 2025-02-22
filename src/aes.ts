@@ -1,8 +1,8 @@
 /**
  * Advanced Encryption Standard (AES) implementation.
  *
- * This implementation is based on the public domain library 'jscrypto' which
- * was written by:
+ * This implementation is based on the public domain library 'jscrypto'
+ * which was written by:
  *
  * Emily Stark (estark@stanford.edu)
  * Mike Hamburg (mhamburg@stanford.edu)
@@ -12,8 +12,7 @@
  * http://www.openssl.org
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import type { Algorithm, BlockCipher } from './cipher'

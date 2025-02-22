@@ -69,6 +69,7 @@ shoutout
 Siegl
 socio
 Solana
+spfunction
 sponsorware
 sslx
 stacksjs

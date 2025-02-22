@@ -1,10 +1,9 @@
 /**
- * Javascript implementation of a basic Public Key Infrastructure, including
+ * TypeScript implementation of a basic Public Key Infrastructure, including
  * support for RSA public and private keys.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2013 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 import { asn1 } from './asn1'
 import { pem, PemMessage } from './pem'

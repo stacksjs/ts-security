@@ -24,7 +24,7 @@
  *   as the primary source of entropy.
  *
  * @author Dave Longley
- * Copyright (c) 2009-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 import type { ByteStringBuffer } from './utils'

@@ -1,9 +1,8 @@
 /**
- * A Javascript implementation of Transport Layer Security (TLS).
+ * A TypeScript implementation of Transport Layer Security (TLS).
  *
  * @author Dave Longley
- *
- * Copyright (c) 2009-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  *
  * The TLS Handshake Protocol involves the following steps:
  *
@@ -16,8 +15,7 @@
  * - Exchange certificates and cryptographic information to allow the client
  * and server to authenticate themselves.
  *
- * - Generate a master secret from the premaster secret and exchanged random
- * values.
+ * - Generate a master secret from the premaster secret and exchanged random values.
  *
  * - Provide security parameters to the record layer.
  *
@@ -230,15 +228,9 @@
  * due to the large block size of existing MACs and the small size of the
  * timing signal.
  */
-const forge = require('./forge')
-require('./asn1')
-require('./hmac')
-require('./md5')
-require('./pem')
-require('./pki')
-require('./random')
-require('./sha1')
-require('./util')
+import { createBuffer } from './utils'
+import { random } from './random'
+import { create as hmacCreate } from './hmac'
 
 /**
  * Generates pseudo random bytes by mixing the result of two hash functions,
@@ -288,7 +280,7 @@ require('./util')
  * @return the pseudo random bytes in a byte buffer.
  */
 function prf_TLS1(secret: string, label: string, seed: string, length: number) {
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
 
   /* For TLS 1.0, the secret is split in half, into two secrets of equal
     length. If the secret has an odd length then the last byte of the first
@@ -298,8 +290,8 @@ function prf_TLS1(secret: string, label: string, seed: string, length: number) {
   const slen = idx + (secret.length & 1)
   const s1 = secret.substr(0, slen)
   const s2 = secret.substr(idx, slen)
-  const ai = forge.util.createBuffer()
-  const hmac = forge.hmac.create()
+  const ai = createBuffer()
+  const hmac = hmacCreate()
   seed = label + seed
 
   // determine the number of iterations that must be performed to generate
@@ -309,7 +301,7 @@ function prf_TLS1(secret: string, label: string, seed: string, length: number) {
 
   // do md5 iterations
   hmac.start('MD5', s1)
-  const md5bytes = forge.util.createBuffer()
+  const md5bytes = createBuffer()
   ai.putBytes(seed)
 
   for (var i = 0; i < md5itr; ++i) {
@@ -326,7 +318,7 @@ function prf_TLS1(secret: string, label: string, seed: string, length: number) {
 
   // do sha1 iterations
   hmac.start('SHA1', s2)
-  const sha1bytes = forge.util.createBuffer()
+  const sha1bytes = createBuffer()
   ai.clear()
   ai.putBytes(seed)
 
@@ -393,9 +385,9 @@ function hmac_sha1(key: Buffer, seqNum: number[], record: Record) {
       TLSCompressed.length +
       TLSCompressed.fragment)
   */
-  const hmac = forge.hmac.create()
+  const hmac = hmacCreate()
   hmac.start('SHA1', key)
-  const b = forge.util.createBuffer()
+  const b = createBuffer()
   b.putInt32(seqNum[0])
   b.putInt32(seqNum[1])
   b.putByte(record.type)
@@ -423,7 +415,7 @@ function deflate(c: any, record: Record, s: any) {
 
   try {
     const bytes = c.deflate(record.fragment.getBytes())
-    record.fragment = forge.util.createBuffer(bytes)
+    record.fragment = createBuffer(bytes)
     record.length = bytes.length
     rval = true
   }
@@ -449,7 +441,7 @@ function inflate(c, record, s) {
 
   try {
     const bytes = c.inflate(record.fragment.getBytes())
-    record.fragment = forge.util.createBuffer(bytes)
+    record.fragment = createBuffer(bytes)
     record.length = bytes.length
     rval = true
   }
@@ -494,7 +486,7 @@ function readVector(b, lenBytes) {
   }
 
   // read vector bytes into a new buffer
-  return forge.util.createBuffer(b.getBytes(len))
+  return createBuffer(b.getBytes(len))
 }
 
 /**
@@ -515,7 +507,7 @@ function writeVector(b, lenBytes, v) {
 /**
  * The tls implementation.
  */
-const tls = {}
+const tls: any = {}
 
 /**
  * Version: TLS 1.2 = 3.3, TLS 1.1 = 3.2, TLS 1.0 = 3.1. Both TLS 1.1 and
@@ -572,34 +564,34 @@ tls.BulkCipherAlgorithm = {
  * Cipher types.
  * enum { stream, block, aead } CipherType;
  */
-tls.CipherType = {
+export const CipherType = {
   stream: 0,
   block: 1,
   aead: 2,
-}
+} as const
 
 /**
  * MAC (Message Authentication Code) algorithms.
  * enum { null, hmac_md5, hmac_sha1, hmac_sha256,
  *   hmac_sha384, hmac_sha512} MACAlgorithm;
  */
-tls.MACAlgorithm = {
+export const MACAlgorithm = {
   none: null,
   hmac_md5: 0,
   hmac_sha1: 1,
   hmac_sha256: 2,
   hmac_sha384: 3,
   hmac_sha512: 4,
-}
+} as const
 
 /**
  * Compression algorithms.
  * enum { null(0), deflate(1), (255) } CompressionMethod;
  */
-tls.CompressionMethod = {
+export const CompressionMethod = {
   none: 0,
   deflate: 1,
-}
+} as const
 
 /**
  * TLS record content types.
@@ -608,13 +600,13 @@ tls.CompressionMethod = {
  *   application_data(23), (255)
  * } ContentType;
  */
-tls.ContentType = {
+export const ContentType = {
   change_cipher_spec: 20,
   alert: 21,
   handshake: 22,
   application_data: 23,
   heartbeat: 24,
-}
+} as const
 
 /**
  * TLS handshake types.
@@ -626,7 +618,7 @@ tls.ContentType = {
  *   finished(20), (255)
  * } HandshakeType;
  */
-tls.HandshakeType = {
+export const HandshakeType = {
   hello_request: 0,
   client_hello: 1,
   server_hello: 2,
@@ -637,7 +629,7 @@ tls.HandshakeType = {
   certificate_verify: 15,
   client_key_exchange: 16,
   finished: 20,
-}
+} as const
 
 /**
  * TLS Alert Protocol.
@@ -676,35 +668,37 @@ tls.HandshakeType = {
  *   AlertDescription description;
  * } Alert;
  */
-tls.Alert = {}
-tls.Alert.Level = {
-  warning: 1,
-  fatal: 2,
-}
-tls.Alert.Description = {
-  close_notify: 0,
-  unexpected_message: 10,
-  bad_record_mac: 20,
-  decryption_failed: 21,
-  record_overflow: 22,
-  decompression_failure: 30,
-  handshake_failure: 40,
-  bad_certificate: 42,
-  unsupported_certificate: 43,
-  certificate_revoked: 44,
-  certificate_expired: 45,
-  certificate_unknown: 46,
-  illegal_parameter: 47,
-  unknown_ca: 48,
-  access_denied: 49,
-  decode_error: 50,
-  decrypt_error: 51,
-  export_restriction: 60,
-  protocol_version: 70,
-  insufficient_security: 71,
-  internal_error: 80,
-  user_canceled: 90,
-  no_renegotiation: 100,
+export const Alert = {
+  Level: {
+    warning: 1,
+    fatal: 2,
+  } as const,
+
+  Description: {
+    close_notify: 0,
+    unexpected_message: 10,
+    bad_record_mac: 20,
+    decryption_failed: 21,
+    record_overflow: 22,
+    decompression_failure: 30,
+    handshake_failure: 40,
+    bad_certificate: 42,
+    unsupported_certificate: 43,
+    certificate_revoked: 44,
+    certificate_expired: 45,
+    certificate_unknown: 46,
+    illegal_parameter: 47,
+    unknown_ca: 48,
+    access_denied: 49,
+    decode_error: 50,
+    decrypt_error: 51,
+    export_restriction: 60,
+    protocol_version: 70,
+    insufficient_security: 71,
+    internal_error: 80,
+    user_canceled: 90,
+    no_renegotiation: 100,
+  } as const,
 }
 
 /**
@@ -715,15 +709,15 @@ tls.Alert.Description = {
  *   (255)
  * } HeartbeatMessageType;
  */
-tls.HeartbeatMessageType = {
+export const HeartbeatMessageType = {
   heartbeat_request: 1,
   heartbeat_response: 2,
-}
+} as const
 
 /**
  * Supported cipher suites.
  */
-tls.CipherSuites = {}
+export const CipherSuites = {}
 
 /**
  * Gets a supported cipher suite from its 2 byte ID.
@@ -732,10 +726,10 @@ tls.CipherSuites = {}
  *
  * @return the matching supported cipher suite or null.
  */
-tls.getCipherSuite = function (twoBytes) {
+export function getCipherSuite(twoBytes: string): CipherSuite | null {
   let rval = null
-  for (const key in tls.CipherSuites) {
-    const cs = tls.CipherSuites[key]
+  for (const key in CipherSuites) {
+    const cs = CipherSuites[key]
     if (cs.id[0] === twoBytes.charCodeAt(0)
       && cs.id[1] === twoBytes.charCodeAt(1)) {
       rval = cs
@@ -751,7 +745,7 @@ tls.getCipherSuite = function (twoBytes) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleUnexpected = function (c, record) {
+function handleUnexpected(c: any, record: any) {
   // if connection is client and closed, ignore unexpected messages
   const ignore = (!c.open && c.entity === tls.ConnectionEnd.client)
   if (!ignore) {
@@ -759,8 +753,8 @@ tls.handleUnexpected = function (c, record) {
       message: 'Unexpected message. Received TLS record out of order.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.unexpected_message,
+        level: Alert.Level.fatal,
+        description: Alert.Description.unexpected_message,
       },
     })
   }
@@ -773,14 +767,14 @@ tls.handleUnexpected = function (c, record) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleHelloRequest = function (c, record, length) {
+function handleHelloRequest(c: any, record: any, length: number) {
   // ignore renegotiation requests from the server during a handshake, but
   // if handshaking, send a warning alert that renegotation is denied
   if (!c.handshaking && c.handshakes > 0) {
     // send alert warning
     tls.queue(c, tls.createAlert(c, {
-      level: tls.Alert.Level.warning,
-      description: tls.Alert.Description.no_renegotiation,
+      level: Alert.Level.warning,
+      description: Alert.Description.no_renegotiation,
     }))
     tls.flush(c)
   }
@@ -796,7 +790,7 @@ tls.handleHelloRequest = function (c, record, length) {
  *
  * @return the parsed message.
  */
-tls.parseHelloMessage = function (c, record, length) {
+function parseHelloMessage(c: any, record: any, length: number) {
   let msg = null
 
   const client = (c.entity === tls.ConnectionEnd.client)
@@ -809,8 +803,8 @@ tls.parseHelloMessage = function (c, record, length) {
         : 'Invalid ClientHello message. Message too short.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -823,7 +817,7 @@ tls.parseHelloMessage = function (c, record, length) {
         major: b.getByte(),
         minor: b.getByte(),
       },
-      random: forge.util.createBuffer(b.getBytes(32)),
+      random: createBuffer(b.getBytes(32)),
       session_id: readVector(b, 1),
       extensions: [],
     }
@@ -885,8 +879,8 @@ tls.parseHelloMessage = function (c, record, length) {
           message: 'TLS version change is disallowed during renegotiation.',
           send: true,
           alert: {
-            level: tls.Alert.Level.fatal,
-            description: tls.Alert.Description.protocol_version,
+            level: Alert.Level.fatal,
+            description: Alert.Description.protocol_version,
           },
         })
       }
@@ -895,16 +889,16 @@ tls.parseHelloMessage = function (c, record, length) {
     // get the chosen (ServerHello) cipher suite
     if (client) {
       // FIXME: should be checking configured acceptable cipher suites
-      c.session.cipherSuite = tls.getCipherSuite(msg.cipher_suite)
+      c.session.cipherSuite = getCipherSuite(msg.cipher_suite)
     }
     else {
       // get a supported preferred (ClientHello) cipher suite
       // choose the first supported cipher suite
-      const tmp = forge.util.createBuffer(msg.cipher_suites.bytes())
+      const tmp = createBuffer(msg.cipher_suites.bytes())
       while (tmp.length() > 0) {
         // FIXME: should be checking configured acceptable suites
         // cipher suites take up 2 bytes
-        c.session.cipherSuite = tls.getCipherSuite(tmp.getBytes(2))
+        c.session.cipherSuite = getCipherSuite(tmp.getBytes(2))
         if (c.session.cipherSuite !== null) {
           break
         }
@@ -917,8 +911,8 @@ tls.parseHelloMessage = function (c, record, length) {
         message: 'No cipher suites in common.',
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.handshake_failure,
+          level: Alert.Level.fatal,
+          description: Alert.Description.handshake_failure,
         },
         cipherSuite: forge.util.bytesToHex(msg.cipher_suite),
       })
@@ -930,7 +924,7 @@ tls.parseHelloMessage = function (c, record, length) {
     }
     else {
       // no compression
-      c.session.compressionMethod = tls.CompressionMethod.none
+      c.session.compressionMethod = CompressionMethod.none
     }
   }
 
@@ -944,7 +938,7 @@ tls.parseHelloMessage = function (c, record, length) {
  * @param c the TLS connection.
  * @param msg the hello message.
  */
-tls.createSecurityParameters = function (c, msg) {
+export function createSecurityParameters(c, msg) {
   /* Note: security params are from TLS 1.2, some values like prf_algorithm
   are ignored for TLS 1.0/1.1 and the builtin as specified in the spec is
   used. */
@@ -1005,8 +999,8 @@ tls.createSecurityParameters = function (c, msg) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleServerHello = function (c, record, length) {
-  const msg = tls.parseHelloMessage(c, record, length)
+function handleServerHello(c: any, record: any, length: number) {
+  const msg = parseHelloMessage(c, record, length)
   if (c.fail) {
     return
   }
@@ -1020,8 +1014,8 @@ tls.handleServerHello = function (c, record, length) {
       message: 'Incompatible TLS version.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.protocol_version,
+        level: Alert.Level.fatal,
+        description: Alert.Description.protocol_version,
       },
     })
   }
@@ -1048,7 +1042,7 @@ tls.handleServerHello = function (c, record, length) {
     c.session.resuming = false
 
     // create new security parameters
-    tls.createSecurityParameters(c, msg)
+    createSecurityParameters(c, msg)
   }
 
   // set new session ID
@@ -1071,8 +1065,8 @@ tls.handleServerHello = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleClientHello = function (c, record, length) {
-  const msg = tls.parseHelloMessage(c, record, length)
+function handleClientHello(c: any, record: any, length: number) {
+  const msg = parseHelloMessage(c, record, length)
   if (c.fail) {
     return
   }
@@ -1098,7 +1092,7 @@ tls.handleClientHello = function (c, record, length) {
 
   // no session found to resume, generate a new session ID
   if (sessionId.length === 0) {
-    sessionId = forge.random.getBytes(32)
+    sessionId = random.getBytes(32)
   }
 
   // update session
@@ -1138,47 +1132,47 @@ tls.handleClientHello = function (c, record, length) {
     c.session.resuming = false
 
     // create new security parameters
-    tls.createSecurityParameters(c, msg)
+    createSecurityParameters(c, msg)
   }
 
   // connection now open
   c.open = true
 
   // queue server hello
-  tls.queue(c, tls.createRecord(c, {
+  tls.queue(c, createRecord(c, {
     type: tls.ContentType.handshake,
     data: tls.createServerHello(c),
   }))
 
   if (c.session.resuming) {
     // queue change cipher spec message
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.change_cipher_spec,
       data: tls.createChangeCipherSpec(),
     }))
 
     // create pending state
-    c.state.pending = tls.createConnectionState(c)
+    c.state.pending = createConnectionState(c)
 
     // change current write state to pending write state
     c.state.current.write = c.state.pending.write
 
     // queue finished
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.handshake,
       data: tls.createFinished(c),
     }))
   }
   else {
     // queue server certificate
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.handshake,
       data: tls.createCertificate(c),
     }))
 
     if (!c.fail) {
       // queue server key exchange
-      tls.queue(c, tls.createRecord(c, {
+      tls.queue(c, createRecord(c, {
         type: tls.ContentType.handshake,
         data: tls.createServerKeyExchange(c),
       }))
@@ -1186,14 +1180,14 @@ tls.handleClientHello = function (c, record, length) {
       // request client certificate if set
       if (c.verifyClient !== false) {
         // queue certificate request
-        tls.queue(c, tls.createRecord(c, {
+        tls.queue(c, createRecord(c, {
           type: tls.ContentType.handshake,
           data: tls.createCertificateRequest(c),
         }))
       }
 
       // queue server hello done
-      tls.queue(c, tls.createRecord(c, {
+      tls.queue(c, createRecord(c, {
         type: tls.ContentType.handshake,
         data: tls.createServerHelloDone(c),
       }))
@@ -1232,15 +1226,15 @@ tls.handleClientHello = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleCertificate = function (c, record, length) {
+function handleCertificate(c: any, record: any, length: number) {
   // minimum of 3 bytes in message
   if (length < 3) {
     return c.error(c, {
       message: 'Invalid Certificate message. Message too short.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -1271,8 +1265,8 @@ tls.handleCertificate = function (c, record, length) {
       cause: ex,
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.bad_certificate,
+        level: Alert.Level.fatal,
+        description: Alert.Description.bad_certificate,
       },
     })
   }
@@ -1289,8 +1283,8 @@ tls.handleCertificate = function (c, record, length) {
         : 'No client certificate provided.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -1370,7 +1364,7 @@ tls.handleCertificate = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleServerKeyExchange = function (c, record, length) {
+function handleServerKeyExchange(c: any, record: any, length: number) {
   // this implementation only supports RSA, no Diffie-Hellman support
   // so any length > 0 is invalid
   if (length > 0) {
@@ -1378,8 +1372,8 @@ tls.handleServerKeyExchange = function (c, record, length) {
       message: 'Invalid key parameters. Only RSA is supported.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.unsupported_certificate,
+        level: Alert.Level.fatal,
+        description: Alert.Description.unsupported_certificate,
       },
     })
   }
@@ -1398,7 +1392,7 @@ tls.handleServerKeyExchange = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleClientKeyExchange = function (c, record, length) {
+function handleClientKeyExchange(c: any, record: any, length: number) {
   // this implementation only supports RSA, no Diffie-Hellman support
   // so any length < 48 is invalid
   if (length < 48) {
@@ -1406,8 +1400,8 @@ tls.handleClientKeyExchange = function (c, record, length) {
       message: 'Invalid key parameters. Only RSA is supported.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.unsupported_certificate,
+        level: Alert.Level.fatal,
+        description: Alert.Description.unsupported_certificate,
       },
     })
   }
@@ -1430,8 +1424,8 @@ tls.handleClientKeyExchange = function (c, record, length) {
         cause: ex,
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.internal_error,
+          level: Alert.Level.fatal,
+          description: Alert.Description.internal_error,
         },
       })
     }
@@ -1442,8 +1436,8 @@ tls.handleClientKeyExchange = function (c, record, length) {
       message: 'No private key set.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.internal_error,
+        level: Alert.Level.fatal,
+        description: Alert.Description.internal_error,
       },
     })
   }
@@ -1466,7 +1460,7 @@ tls.handleClientKeyExchange = function (c, record, length) {
       TLS server which is using PKCS#1 encoded RSA, so instead of
       failing here, we generate 48 random bytes and use that as
       the pre-master secret. */
-    sp.pre_master_secret = forge.random.getBytes(48)
+    sp.pre_master_secret = random.getBytes(48)
   }
 
   // expect a CertificateVerify message if a Certificate was received that
@@ -1510,15 +1504,15 @@ tls.handleClientKeyExchange = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleCertificateRequest = function (c, record, length) {
+function handleCertificateRequest(c: any, record: any, length: number) {
   // minimum of 3 bytes in message
   if (length < 3) {
     return c.error(c, {
       message: 'Invalid CertificateRequest. Message too short.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -1548,14 +1542,14 @@ tls.handleCertificateRequest = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleCertificateVerify = function (c, record, length) {
+function handleCertificateVerify(c: any, record: any, length: number) {
   if (length < 2) {
     return c.error(c, {
       message: 'Invalid CertificateVerify. Message too short.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -1575,7 +1569,7 @@ tls.handleCertificateVerify = function (c, record, length) {
   // TODO: add support for DSA
 
   // generate data to verify
-  let verify = forge.util.createBuffer()
+  let verify = createBuffer()
   verify.putBuffer(c.session.md5.digest())
   verify.putBuffer(c.session.sha1.digest())
   verify = verify.getBytes()
@@ -1598,8 +1592,8 @@ tls.handleCertificateVerify = function (c, record, length) {
       message: 'Bad signature in CertificateVerify.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.handshake_failure,
+        level: Alert.Level.fatal,
+        description: Alert.Description.handshake_failure,
       },
     })
   }
@@ -1634,15 +1628,15 @@ tls.handleCertificateVerify = function (c, record, length) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleServerHelloDone = function (c, record, length) {
+function handleServerHelloDone(c: any, record: any, length: number) {
   // len must be 0 bytes
   if (length > 0) {
     return c.error(c, {
       message: 'Invalid ServerHelloDone message. Invalid length.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.record_overflow,
+        level: Alert.Level.fatal,
+        description: Alert.Description.record_overflow,
       },
     })
   }
@@ -1653,8 +1647,8 @@ tls.handleServerHelloDone = function (c, record, length) {
       message: 'No server certificate provided. Not enough security.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.insufficient_security,
+        level: Alert.Level.fatal,
+        description: Alert.Description.insufficient_security,
       },
     }
 
@@ -1686,7 +1680,7 @@ tls.handleServerHelloDone = function (c, record, length) {
 
   // create client certificate message if requested
   if (c.session.certificateRequest !== null) {
-    record = tls.createRecord(c, {
+    record = createRecord(c, {
       type: tls.ContentType.handshake,
       data: tls.createCertificate(c),
     })
@@ -1694,7 +1688,7 @@ tls.handleServerHelloDone = function (c, record, length) {
   }
 
   // create client key exchange message
-  record = tls.createRecord(c, {
+  record = createRecord(c, {
     type: tls.ContentType.handshake,
     data: tls.createClientKeyExchange(c),
   })
@@ -1708,28 +1702,28 @@ tls.handleServerHelloDone = function (c, record, length) {
     if (c.session.certificateRequest !== null
       && c.session.clientCertificate !== null) {
       // create certificate verify message
-      tls.queue(c, tls.createRecord(c, {
+      tls.queue(c, createRecord(c, {
         type: tls.ContentType.handshake,
         data: tls.createCertificateVerify(c, signature),
       }))
     }
 
     // create change cipher spec message
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.change_cipher_spec,
       data: tls.createChangeCipherSpec(),
     }))
 
     // create pending state
-    c.state.pending = tls.createConnectionState(c)
+    c.state.pending = createConnectionState(c)
 
     // change current write state to pending write state
     c.state.current.write = c.state.pending.write
 
     // create finished message
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.handshake,
-      data: tls.createFinished(c),
+      data: createFinished(c),
     }))
 
     // expect a server ChangeCipherSpec message next
@@ -1759,14 +1753,14 @@ tls.handleServerHelloDone = function (c, record, length) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleChangeCipherSpec = function (c, record) {
+function handleChangeCipherSpec(c: any, record: any) {
   if (record.fragment.getByte() !== 0x01) {
     return c.error(c, {
       message: 'Invalid ChangeCipherSpec message received.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.illegal_parameter,
+        level: Alert.Level.fatal,
+        description: Alert.Description.illegal_parameter,
       },
     })
   }
@@ -1835,7 +1829,7 @@ tls.handleChangeCipherSpec = function (c, record) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-tls.handleFinished = function (c, record, length) {
+function handleFinished(c: any, record: any, length: number) {
   // rewind to get full bytes for message so it can be manually
   // digested below (special case for Finished messages because they
   // must be digested *after* handling as opposed to all others)
@@ -1848,7 +1842,7 @@ tls.handleFinished = function (c, record, length) {
   const vd = record.fragment.getBytes()
 
   // ensure verify data is correct
-  b = forge.util.createBuffer()
+  b = createBuffer()
   b.putBuffer(c.session.md5.digest())
   b.putBuffer(c.session.sha1.digest())
 
@@ -1866,8 +1860,8 @@ tls.handleFinished = function (c, record, length) {
       message: 'Invalid verify_data in Finished message.',
       send: true,
       alert: {
-        level: tls.Alert.Level.fatal,
-        description: tls.Alert.Description.decrypt_error,
+        level: Alert.Level.fatal,
+        description: Alert.Description.decrypt_error,
       },
     })
   }
@@ -1879,7 +1873,7 @@ tls.handleFinished = function (c, record, length) {
   // resuming session as client or NOT resuming session as server
   if ((c.session.resuming && client) || (!c.session.resuming && !client)) {
     // create change cipher spec message
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.change_cipher_spec,
       data: tls.createChangeCipherSpec(),
     }))
@@ -1889,7 +1883,7 @@ tls.handleFinished = function (c, record, length) {
     c.state.pending = null
 
     // create finished message
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.handshake,
       data: tls.createFinished(c),
     }))
@@ -1924,7 +1918,7 @@ tls.handleFinished = function (c, record, length) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleAlert = function (c, record) {
+function handleAlert(c: any, record: any) {
   // read alert
   const b = record.fragment
   const alert = {
@@ -1936,73 +1930,73 @@ tls.handleAlert = function (c, record) {
   // get appropriate message
   let msg
   switch (alert.description) {
-    case tls.Alert.Description.close_notify:
+    case Alert.Description.close_notify:
       msg = 'Connection closed.'
       break
-    case tls.Alert.Description.unexpected_message:
+    case Alert.Description.unexpected_message:
       msg = 'Unexpected message.'
       break
-    case tls.Alert.Description.bad_record_mac:
+    case Alert.Description.bad_record_mac:
       msg = 'Bad record MAC.'
       break
-    case tls.Alert.Description.decryption_failed:
+    case Alert.Description.decryption_failed:
       msg = 'Decryption failed.'
       break
-    case tls.Alert.Description.record_overflow:
+    case Alert.Description.record_overflow:
       msg = 'Record overflow.'
       break
-    case tls.Alert.Description.decompression_failure:
+    case Alert.Description.decompression_failure:
       msg = 'Decompression failed.'
       break
-    case tls.Alert.Description.handshake_failure:
+    case Alert.Description.handshake_failure:
       msg = 'Handshake failure.'
       break
-    case tls.Alert.Description.bad_certificate:
+    case Alert.Description.bad_certificate:
       msg = 'Bad certificate.'
       break
-    case tls.Alert.Description.unsupported_certificate:
+    case Alert.Description.unsupported_certificate:
       msg = 'Unsupported certificate.'
       break
-    case tls.Alert.Description.certificate_revoked:
+    case Alert.Description.certificate_revoked:
       msg = 'Certificate revoked.'
       break
-    case tls.Alert.Description.certificate_expired:
+    case Alert.Description.certificate_expired:
       msg = 'Certificate expired.'
       break
-    case tls.Alert.Description.certificate_unknown:
+    case Alert.Description.certificate_unknown:
       msg = 'Certificate unknown.'
       break
-    case tls.Alert.Description.illegal_parameter:
+    case Alert.Description.illegal_parameter:
       msg = 'Illegal parameter.'
       break
-    case tls.Alert.Description.unknown_ca:
+    case Alert.Description.unknown_ca:
       msg = 'Unknown certificate authority.'
       break
-    case tls.Alert.Description.access_denied:
+    case Alert.Description.access_denied:
       msg = 'Access denied.'
       break
-    case tls.Alert.Description.decode_error:
+    case Alert.Description.decode_error:
       msg = 'Decode error.'
       break
-    case tls.Alert.Description.decrypt_error:
+    case Alert.Description.decrypt_error:
       msg = 'Decrypt error.'
       break
-    case tls.Alert.Description.export_restriction:
+    case Alert.Description.export_restriction:
       msg = 'Export restriction.'
       break
-    case tls.Alert.Description.protocol_version:
+    case Alert.Description.protocol_version:
       msg = 'Unsupported protocol version.'
       break
-    case tls.Alert.Description.insufficient_security:
+    case Alert.Description.insufficient_security:
       msg = 'Insufficient security.'
       break
-    case tls.Alert.Description.internal_error:
+    case Alert.Description.internal_error:
       msg = 'Internal error.'
       break
-    case tls.Alert.Description.user_canceled:
+    case Alert.Description.user_canceled:
       msg = 'User canceled.'
       break
-    case tls.Alert.Description.no_renegotiation:
+    case Alert.Description.no_renegotiation:
       msg = 'Renegotiation not supported.'
       break
     default:
@@ -2011,7 +2005,7 @@ tls.handleAlert = function (c, record) {
   }
 
   // close connection on close_notify, not an error
-  if (alert.description === tls.Alert.Description.close_notify) {
+  if (alert.description === Alert.Description.close_notify) {
     return c.close()
   }
 
@@ -2034,7 +2028,7 @@ tls.handleAlert = function (c, record) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleHandshake = function (c, record) {
+function handleHandshake(c: any, record: any) {
   // get the handshake type and message length
   const b = record.fragment
   const type = b.getByte()
@@ -2045,7 +2039,7 @@ tls.handleHandshake = function (c, record) {
     // cache the record, clear its fragment, and reset the buffer read
     // pointer before the type and length were read
     c.fragmented = record
-    record.fragment = forge.util.createBuffer()
+    record.fragment = createBuffer()
     b.read -= 4
 
     // continue
@@ -2102,7 +2096,7 @@ tls.handleHandshake = function (c, record) {
   }
   else {
     // unexpected record
-    tls.handleUnexpected(c, record)
+    handleUnexpected(c, record)
   }
 }
 
@@ -2112,7 +2106,7 @@ tls.handleHandshake = function (c, record) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleApplicationData = function (c, record) {
+function handleApplicationData(c: any, record: any) {
   // buffer data, notify that its ready
   c.data.putBuffer(record.fragment)
   c.dataReady(c)
@@ -2127,7 +2121,7 @@ tls.handleApplicationData = function (c, record) {
  * @param c the connection.
  * @param record the record.
  */
-tls.handleHeartbeat = function (c, record) {
+function handleHeartbeat(c: any, record: any) {
   // get the heartbeat type and payload
   const b = record.fragment
   const type = b.getByte()
@@ -2141,7 +2135,7 @@ tls.handleHeartbeat = function (c, record) {
       return c.process()
     }
     // retransmit payload
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.heartbeat,
       data: tls.createHeartbeat(
         tls.HeartbeatMessageType.heartbeat_response,
@@ -2159,7 +2153,7 @@ tls.handleHeartbeat = function (c, record) {
 
     // notify that a valid heartbeat was received
     if (c.heartbeatReceived) {
-      c.heartbeatReceived(c, forge.util.createBuffer(payload))
+      c.heartbeatReceived(c, createBuffer(payload))
     }
   }
 
@@ -2243,12 +2237,12 @@ var CAD = 6 // rcv application data
 const CER = 7 // not expecting any messages at this point
 
 // map client current expect state and content type to function
-const __ = tls.handleUnexpected
-const R0 = tls.handleChangeCipherSpec
-const R1 = tls.handleAlert
-const R2 = tls.handleHandshake
-const R3 = tls.handleApplicationData
-const R4 = tls.handleHeartbeat
+const __ = handleUnexpected
+const R0 = handleChangeCipherSpec
+const R1 = handleAlert
+const R2 = handleHandshake
+const R3 = handleApplicationData
+const R4 = handleHeartbeat
 const ctTable = []
 ctTable[tls.ConnectionEnd.client] = [
 //      CC,AL,HS,AD,HB
@@ -2277,14 +2271,14 @@ ctTable[tls.ConnectionEnd.server] = [
 ]
 
 // map client current expect state and handshake type to function
-const H0 = tls.handleHelloRequest
-const H1 = tls.handleServerHello
-const H2 = tls.handleCertificate
-const H3 = tls.handleServerKeyExchange
-const H4 = tls.handleCertificateRequest
-const H5 = tls.handleServerHelloDone
-const H6 = tls.handleFinished
-var hsTable = []
+const H0 = handleHelloRequest
+const H1 = handleServerHello
+const H2 = handleCertificate
+const H3 = handleServerKeyExchange
+const H4 = handleCertificateRequest
+const H5 = handleServerHelloDone
+const H6 = handleFinished
+let hsTable: any = []
 hsTable[tls.ConnectionEnd.client] = [
 //      HR,01,SH,03,04,05,06,07,08,09,10,SC,SK,CR,HD,15,CK,17,18,19,FI
 /* SHE */[__, __, H1, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __],
@@ -2300,9 +2294,9 @@ hsTable[tls.ConnectionEnd.client] = [
 
 // map server current expect state and handshake type to function
 // Note: CAD[CH] does not map to FB because renegotation is prohibited
-const H7 = tls.handleClientHello
-const H8 = tls.handleClientKeyExchange
-const H9 = tls.handleCertificateVerify
+const H7 = handleClientHello
+const H8 = handleClientKeyExchange
+const H9 = handleCertificateVerify
 hsTable[tls.ConnectionEnd.server] = [
 //      01,CH,02,03,04,05,06,07,08,09,10,CC,12,13,14,CV,CK,17,18,19,FI
 /* CHE */[__, H7, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __],
@@ -2390,7 +2384,7 @@ hsTable[tls.ConnectionEnd.server] = [
  *
  * @return the security keys.
  */
-tls.generateKeys = function (c, sp) {
+function generateKeys(c, sp) {
   // TLS_RSA_WITH_AES_128_CBC_SHA (required to be compliant with TLS 1.2) &
   // TLS_RSA_WITH_AES_256_CBC_SHA are the only cipher suites implemented
   // at present
@@ -2490,7 +2484,7 @@ tls.generateKeys = function (c, sp) {
  *
  * @return the new initialized TLS connection state.
  */
-tls.createConnectionState = function (c) {
+function createConnectionState(c) {
   const client = (c.entity === tls.ConnectionEnd.client)
 
   const createMode = function () {
@@ -2528,11 +2522,11 @@ tls.createConnectionState = function (c) {
         message: 'Could not decrypt record or bad MAC.',
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
+          level: Alert.Level.fatal,
           // doesn't matter if decryption failed or MAC was
           // invalid, return the same error so as not to reveal
           // which one occurred
-          description: tls.Alert.Description.bad_record_mac,
+          description: Alert.Description.bad_record_mac,
         },
       })
     }
@@ -2541,8 +2535,8 @@ tls.createConnectionState = function (c) {
         message: 'Could not decompress record.',
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.decompression_failure,
+          level: Alert.Level.fatal,
+          description: Alert.Description.decompression_failure,
         },
       })
     }
@@ -2558,8 +2552,8 @@ tls.createConnectionState = function (c) {
         message: 'Could not compress record.',
         send: false,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.internal_error,
+          level: Alert.Level.fatal,
+          description: Alert.Description.internal_error,
         },
       })
     }
@@ -2570,8 +2564,8 @@ tls.createConnectionState = function (c) {
         message: 'Could not encrypt record.',
         send: false,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.internal_error,
+          level: Alert.Level.fatal,
+          description: Alert.Description.internal_error,
         },
       })
     }
@@ -2584,7 +2578,7 @@ tls.createConnectionState = function (c) {
     c.session.cipherSuite.initSecurityParameters(sp)
 
     // generate keys
-    sp.keys = tls.generateKeys(c, sp)
+    sp.keys = generateKeys(c, sp)
     state.read.macKey = client
       ? sp.keys.server_write_MAC_key
       : sp.keys.client_write_MAC_key
@@ -2597,9 +2591,9 @@ tls.createConnectionState = function (c) {
 
     // compression setup
     switch (sp.compression_algorithm) {
-      case tls.CompressionMethod.none:
+      case CompressionMethod.none:
         break
-      case tls.CompressionMethod.deflate:
+      case CompressionMethod.deflate:
         state.read.compressFunction = inflate
         state.write.compressFunction = deflate
         break
@@ -2636,9 +2630,9 @@ tls.createRandom = function () {
   // get UTC milliseconds
   const d = new Date()
   const utc = +d + d.getTimezoneOffset() * 60000
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putInt32(utc)
-  rval.putBytes(forge.random.getBytes(28))
+  rval.putBytes(random.getBytes(28))
   return rval
 }
 
@@ -2652,7 +2646,7 @@ tls.createRandom = function () {
  *
  * @return the created record.
  */
-tls.createRecord = function (c, options) {
+function createRecord(c, options) {
   if (!options.data) {
     return null
   }
@@ -2679,10 +2673,10 @@ tls.createRecord = function (c, options) {
  * @return the created alert record.
  */
 tls.createAlert = function (c, alert) {
-  const b = forge.util.createBuffer()
+  const b = createBuffer()
   b.putByte(alert.level)
   b.putByte(alert.description)
-  return tls.createRecord(c, {
+  return createRecord(c, {
     type: tls.ContentType.alert,
     data: b,
   })
@@ -2762,7 +2756,7 @@ tls.createClientHello = function (c) {
   }
 
   // create supported cipher suites
-  const cipherSuites = forge.util.createBuffer()
+  const cipherSuites = createBuffer()
   for (let i = 0; i < c.cipherSuites.length; ++i) {
     const cs = c.cipherSuites[i]
     cipherSuites.putByte(cs.id[0])
@@ -2772,23 +2766,23 @@ tls.createClientHello = function (c) {
 
   // create supported compression methods, null always supported, but
   // also support deflate if connection has inflate and deflate methods
-  const compressionMethods = forge.util.createBuffer()
-  compressionMethods.putByte(tls.CompressionMethod.none)
+  const compressionMethods = createBuffer()
+  compressionMethods.putByte(CompressionMethod.none)
   // FIXME: deflate support disabled until issues with raw deflate data
   // without zlib headers are resolved
   /*
   if(c.inflate !== null && c.deflate !== null) {
-    compressionMethods.putByte(tls.CompressionMethod.deflate);
+    compressionMethods.putByte(CompressionMethod.deflate);
   }
   */
   const cMethods = compressionMethods.length()
 
   // create TLS SNI (server name indication) extension if virtual host
   // has been specified, see RFC 3546
-  const extensions = forge.util.createBuffer()
+  const extensions = createBuffer()
   if (c.virtualHost) {
     // create extension struct
-    const ext = forge.util.createBuffer()
+    const ext = createBuffer()
     ext.putByte(0x00) // type server_name (ExtensionType is 2 bytes)
     ext.putByte(0x00)
 
@@ -2814,12 +2808,12 @@ tls.createClientHello = function (c) {
      *   ServerName server_name_list<1..2^16-1>
      * } ServerNameList;
      */
-    const serverName = forge.util.createBuffer()
+    const serverName = createBuffer()
     serverName.putByte(0x00) // type host_name
-    writeVector(serverName, 2, forge.util.createBuffer(c.virtualHost))
+    writeVector(serverName, 2, createBuffer(c.virtualHost))
 
     // ServerNameList is in extension_data
-    const snList = forge.util.createBuffer()
+    const snList = createBuffer()
     writeVector(snList, 2, serverName)
     writeVector(ext, 2, snList)
     extensions.putBuffer(ext)
@@ -2843,13 +2837,13 @@ tls.createClientHello = function (c) {
       + extLength // extensions vector
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.client_hello)
   rval.putInt24(length) // handshake length
   rval.putByte(c.version.major) // major version
   rval.putByte(c.version.minor) // minor version
   rval.putBytes(c.session.sp.client_random) // random time + bytes
-  writeVector(rval, 1, forge.util.createBuffer(sessionId))
+  writeVector(rval, 1, createBuffer(sessionId))
   writeVector(rval, 2, cipherSuites)
   writeVector(rval, 1, compressionMethods)
   if (extLength > 0) {
@@ -2876,13 +2870,13 @@ tls.createServerHello = function (c) {
       + 1 // chosen compression method
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.server_hello)
   rval.putInt24(length) // handshake length
   rval.putByte(c.version.major) // major version
   rval.putByte(c.version.minor) // minor version
   rval.putBytes(c.session.sp.server_random) // random time + bytes
-  writeVector(rval, 1, forge.util.createBuffer(sessionId))
+  writeVector(rval, 1, createBuffer(sessionId))
   rval.putByte(c.session.cipherSuite.id[0])
   rval.putByte(c.session.cipherSuite.id[1])
   rval.putByte(c.session.compressionMethod)
@@ -2929,7 +2923,7 @@ tls.createCertificate = function (c) {
   }
 
   // buffer to hold certificate list
-  const certList = forge.util.createBuffer()
+  const certList = createBuffer()
   if (cert !== null) {
     try {
       // normalize cert to a chain of certificates
@@ -2952,13 +2946,13 @@ tls.createCertificate = function (c) {
           throw new Error('Could not convert certificate from PEM; PEM is encrypted.')
         }
 
-        const der = forge.util.createBuffer(msg.body)
+        const der = createBuffer(msg.body)
         if (asn1 === null) {
           asn1 = forge.asn1.fromDer(der.bytes(), false)
         }
 
         // certificate entry is itself a vector with 3 length bytes
-        const certBuffer = forge.util.createBuffer()
+        const certBuffer = createBuffer()
         writeVector(certBuffer, 3, der)
 
         // add cert vector to cert list vector
@@ -2980,8 +2974,8 @@ tls.createCertificate = function (c) {
         cause: ex,
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.bad_certificate,
+          level: Alert.Level.fatal,
+          description: Alert.Description.bad_certificate,
         },
       })
     }
@@ -2991,7 +2985,7 @@ tls.createCertificate = function (c) {
   const length = 3 + certList.length() // cert list vector
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.certificate)
   rval.putInt24(length)
   writeVector(rval, 3, certList)
@@ -3049,7 +3043,7 @@ tls.createCertificate = function (c) {
  */
 tls.createClientKeyExchange = function (c) {
   // create buffer to encrypt
-  let b = forge.util.createBuffer()
+  let b = createBuffer()
 
   // add highest client-supported protocol to help server avoid version
   // rollback attacks
@@ -3057,7 +3051,7 @@ tls.createClientKeyExchange = function (c) {
   b.putByte(c.session.clientHelloVersion.minor)
 
   // generate and add 46 random bytes
-  b.putBytes(forge.random.getBytes(46))
+  b.putBytes(random.getBytes(46))
 
   // save pre-master secret
   const sp = c.session.sp
@@ -3076,7 +3070,7 @@ tls.createClientKeyExchange = function (c) {
   const length = b.length + 2
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.client_key_exchange)
   rval.putInt24(length)
   // add vector length bytes
@@ -3100,7 +3094,7 @@ tls.createServerKeyExchange = function (c) {
   const length = 0
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   if (length > 0) {
     rval.putByte(tls.HandshakeType.server_key_exchange)
     rval.putInt24(length)
@@ -3117,7 +3111,7 @@ tls.createServerKeyExchange = function (c) {
  */
 tls.getClientSignature = function (c, callback) {
   // generate data to RSA encrypt
-  let b = forge.util.createBuffer()
+  let b = createBuffer()
   b.putBuffer(c.session.md5.digest())
   b.putBuffer(c.session.sha1.digest())
   b = b.getBytes()
@@ -3137,8 +3131,8 @@ tls.getClientSignature = function (c, callback) {
           cause: ex,
           send: true,
           alert: {
-            level: tls.Alert.Level.fatal,
-            description: tls.Alert.Description.internal_error,
+            level: Alert.Level.fatal,
+            description: Alert.Description.internal_error,
           },
         })
       }
@@ -3148,8 +3142,8 @@ tls.getClientSignature = function (c, callback) {
         message: 'No private key set.',
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
-          description: tls.Alert.Description.internal_error,
+          level: Alert.Level.fatal,
+          description: Alert.Description.internal_error,
         },
       })
     }
@@ -3235,7 +3229,7 @@ tls.createCertificateVerify = function (c, signature) {
   const length = signature.length + 2
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.certificate_verify)
   rval.putInt24(length)
   // add vector length bytes
@@ -3253,13 +3247,13 @@ tls.createCertificateVerify = function (c, signature) {
  */
 tls.createCertificateRequest = function (c) {
   // TODO: support other certificate types
-  const certTypes = forge.util.createBuffer()
+  const certTypes = createBuffer()
 
   // common RSA certificate type
   certTypes.putByte(0x01)
 
   // add distinguished names from CA store
-  const cAs = forge.util.createBuffer()
+  const cAs = createBuffer()
   for (const key in c.caStore.certs) {
     const cert = c.caStore.certs[key]
     const dn = forge.pki.distinguishedNameToAsn1(cert.subject)
@@ -3276,7 +3270,7 @@ tls.createCertificateRequest = function (c) {
       + 2 + cAs.length()
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.certificate_request)
   rval.putInt24(length)
   writeVector(rval, 1, certTypes)
@@ -3293,7 +3287,7 @@ tls.createCertificateRequest = function (c) {
  */
 tls.createServerHelloDone = function (c) {
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.server_hello_done)
   rval.putInt24(0)
   return rval
@@ -3314,7 +3308,7 @@ tls.createServerHelloDone = function (c) {
  * @return the ChangeCipherSpec byte buffer.
  */
 tls.createChangeCipherSpec = function () {
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(0x01)
   return rval
 }
@@ -3348,7 +3342,7 @@ tls.createChangeCipherSpec = function () {
  */
 tls.createFinished = function (c) {
   // generate verify_data
-  let b = forge.util.createBuffer()
+  let b = createBuffer()
   b.putBuffer(c.session.md5.digest())
   b.putBuffer(c.session.sha1.digest())
 
@@ -3361,7 +3355,7 @@ tls.createFinished = function (c) {
   b = prf(sp.master_secret, label, b.getBytes(), vdl)
 
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(tls.HandshakeType.finished)
   rval.putInt24(b.length())
   rval.putBuffer(b)
@@ -3416,14 +3410,14 @@ tls.createHeartbeat = function (type, payload, payloadLength) {
     payloadLength = payload.length
   }
   // build record fragment
-  const rval = forge.util.createBuffer()
+  const rval = createBuffer()
   rval.putByte(type) // heartbeat message type
   rval.putInt16(payloadLength) // payload length
   rval.putBytes(payload) // payload
   // padding
   const plaintextLength = rval.length()
   const paddingLength = Math.max(16, plaintextLength - payloadLength - 3)
-  rval.putBytes(forge.random.getBytes(paddingLength))
+  rval.putBytes(random.getBytes(paddingLength))
   return rval
 }
 
@@ -3466,17 +3460,17 @@ tls.queue = function (c, record) {
     records = []
     let data = record.fragment.bytes()
     while (data.length > tls.MaxFragment) {
-      records.push(tls.createRecord(c, {
+      records.push(createRecord(c, {
         type: record.type,
-        data: forge.util.createBuffer(data.slice(0, tls.MaxFragment)),
+        data: createBuffer(data.slice(0, tls.MaxFragment)),
       }))
       data = data.slice(tls.MaxFragment)
     }
     // add last record
     if (data.length > 0) {
-      records.push(tls.createRecord(c, {
+      records.push(createRecord(c, {
         type: record.type,
-        data: forge.util.createBuffer(data),
+        data: createBuffer(data),
       }))
     }
   }
@@ -3517,7 +3511,7 @@ tls.flush = function (c) {
 }
 
 /**
- * Maps a pki.certificateError to a tls.Alert.Description.
+ * Maps a pki.certificateError to a Alert.Description.
  *
  * @param error the error to map.
  *
@@ -3528,24 +3522,24 @@ function _certErrorToAlertDesc(error) {
     case true:
       return true
     case forge.pki.certificateError.bad_certificate:
-      return tls.Alert.Description.bad_certificate
+      return Alert.Description.bad_certificate
     case forge.pki.certificateError.unsupported_certificate:
-      return tls.Alert.Description.unsupported_certificate
+      return Alert.Description.unsupported_certificate
     case forge.pki.certificateError.certificate_revoked:
-      return tls.Alert.Description.certificate_revoked
+      return Alert.Description.certificate_revoked
     case forge.pki.certificateError.certificate_expired:
-      return tls.Alert.Description.certificate_expired
+      return Alert.Description.certificate_expired
     case forge.pki.certificateError.certificate_unknown:
-      return tls.Alert.Description.certificate_unknown
+      return Alert.Description.certificate_unknown
     case forge.pki.certificateError.unknown_ca:
-      return tls.Alert.Description.unknown_ca
+      return Alert.Description.unknown_ca
     default:
-      return tls.Alert.Description.bad_certificate
+      return Alert.Description.bad_certificate
   }
 }
 
 /**
- * Maps a tls.Alert.Description to a pki.certificateError.
+ * Maps a Alert.Description to a pki.certificateError.
  *
  * @param desc the alert description.
  *
@@ -3555,17 +3549,17 @@ function _alertDescToCertError(desc) {
   switch (desc) {
     case true:
       return true
-    case tls.Alert.Description.bad_certificate:
+    case Alert.Description.bad_certificate:
       return forge.pki.certificateError.bad_certificate
-    case tls.Alert.Description.unsupported_certificate:
+    case Alert.Description.unsupported_certificate:
       return forge.pki.certificateError.unsupported_certificate
-    case tls.Alert.Description.certificate_revoked:
+    case Alert.Description.certificate_revoked:
       return forge.pki.certificateError.certificate_revoked
-    case tls.Alert.Description.certificate_expired:
+    case Alert.Description.certificate_expired:
       return forge.pki.certificateError.certificate_expired
-    case tls.Alert.Description.certificate_unknown:
+    case Alert.Description.certificate_unknown:
       return forge.pki.certificateError.certificate_unknown
-    case tls.Alert.Description.unknown_ca:
+    case Alert.Description.unknown_ca:
       return forge.pki.certificateError.unknown_ca
     default:
       return forge.pki.certificateError.bad_certificate
@@ -3603,8 +3597,8 @@ tls.verifyCertificateChain = function (c, chain) {
           const error = new Error('The application rejected the certificate.')
           error.send = true
           error.alert = {
-            level: tls.Alert.Level.fatal,
-            description: tls.Alert.Description.bad_certificate,
+            level: Alert.Level.fatal,
+            description: Alert.Description.bad_certificate,
           }
           if (ret.message) {
             error.message = ret.message
@@ -3634,7 +3628,7 @@ tls.verifyCertificateChain = function (c, chain) {
       err = {
         send: true,
         alert: {
-          level: tls.Alert.Level.fatal,
+          level: Alert.Level.fatal,
           description: _certErrorToAlertDesc(ex),
         },
       }
@@ -3644,7 +3638,7 @@ tls.verifyCertificateChain = function (c, chain) {
     }
     if (!('alert' in err)) {
       err.alert = {
-        level: tls.Alert.Level.fatal,
+        level: Alert.Level.fatal,
         description: _certErrorToAlertDesc(err.error),
       }
     }
@@ -3794,9 +3788,9 @@ tls.createConnection = function (options) {
     getCertificate: options.getCertificate || null,
     getPrivateKey: options.getPrivateKey || null,
     getSignature: options.getSignature || null,
-    input: forge.util.createBuffer(),
-    tlsData: forge.util.createBuffer(),
-    data: forge.util.createBuffer(),
+    input: createBuffer(),
+    tlsData: createBuffer(),
+    data: createBuffer(),
     tlsDataReady: options.tlsDataReady,
     dataReady: options.dataReady,
     heartbeatReceived: options.heartbeatReceived,
@@ -3856,7 +3850,7 @@ tls.createConnection = function (options) {
     c.input.clear()
     c.tlsData.clear()
     c.data.clear()
-    c.state.current = tls.createConnectionState(c)
+    c.state.current = createConnectionState(c)
   }
 
   // do initial reset of connection
@@ -3911,7 +3905,7 @@ tls.createConnection = function (options) {
           minor: b.getByte(),
         },
         length: b.getInt16(),
-        fragment: forge.util.createBuffer(),
+        fragment: createBuffer(),
         ready: false,
       }
 
@@ -3926,8 +3920,8 @@ tls.createConnection = function (options) {
           message: 'Incompatible TLS version.',
           send: true,
           alert: {
-            level: tls.Alert.Level.fatal,
-            description: tls.Alert.Description.protocol_version,
+            level: Alert.Level.fatal,
+            description: Alert.Description.protocol_version,
           },
         })
       }
@@ -3980,9 +3974,9 @@ tls.createConnection = function (options) {
               message: 'Invalid fragmented record.',
               send: true,
               alert: {
-                level: tls.Alert.Level.fatal,
+                level: Alert.Level.fatal,
                 description:
-                  tls.Alert.Description.unexpected_message,
+                  Alert.Description.unexpected_message,
               },
             })
           }
@@ -4080,7 +4074,7 @@ tls.createConnection = function (options) {
       c.open = true
 
       // send hello
-      tls.queue(c, tls.createRecord(c, {
+      tls.queue(c, createRecord(c, {
         type: tls.ContentType.handshake,
         data: tls.createClientHello(c),
       }))
@@ -4145,9 +4139,9 @@ tls.createConnection = function (options) {
    * @return true on success, false on failure.
    */
   c.prepare = function (data) {
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.application_data,
-      data: forge.util.createBuffer(data),
+      data: createBuffer(data),
     }))
     return tls.flush(c)
   }
@@ -4175,7 +4169,7 @@ tls.createConnection = function (options) {
       payloadLength = payload.length
     }
     c.expectedHeartbeatPayload = payload
-    tls.queue(c, tls.createRecord(c, {
+    tls.queue(c, createRecord(c, {
       type: tls.ContentType.heartbeat,
       data: tls.createHeartbeat(
         tls.HeartbeatMessageType.heartbeat_request,
@@ -4215,8 +4209,8 @@ tls.createConnection = function (options) {
 
         // send close_notify alert
         tls.queue(c, tls.createAlert(c, {
-          level: tls.Alert.Level.warning,
-          description: tls.Alert.Description.close_notify,
+          level: Alert.Level.warning,
+          description: Alert.Description.close_notify,
         }))
         tls.flush(c)
       }
@@ -4274,14 +4268,14 @@ forge.tls.createSessionCache = tls.createSessionCache
  * Where:
  * c         The TLS connection
  * verified  Set to true if certificate was verified, otherwise the alert
- *           tls.Alert.Description for why the certificate failed.
+ *           Alert.Description for why the certificate failed.
  * depth     The current index in the chain, where 0 is the server's cert.
  * certs     The certificate chain, *NOTE* if the server was anonymous then
  *           the chain will be empty.
  *
  * The function returns true on success and on failure either the appropriate
- * tls.Alert.Description or an object with 'alert' set to the appropriate
- * tls.Alert.Description and 'message' set to a custom error message. If true
+ * Alert.Description or an object with 'alert' set to the appropriate
+ * Alert.Description and 'message' set to a custom error message. If true
  * is not returned then the connection will abort using, in order of
  * availability, first the returned alert description, second the preVerify
  * alert description, and lastly the default 'bad_certificate'.

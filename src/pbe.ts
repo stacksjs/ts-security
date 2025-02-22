@@ -3,9 +3,7 @@
  *
  * @author Dave Longley
  * @author Stefan Siegl <stesie@brokenpipe.de>
- *
- * Copyright (c) 2010-2013 Digital Bazaar, Inc.
- * Copyright (c) 2012 Stefan Siegl <stesie@brokenpipe.de>
+ * @author Chris Breuer
  *
  * An EncryptedPrivateKeyInfo:
  *
@@ -34,9 +32,8 @@ import { oids } from './oids'
 import { pbkdf2 } from './pbkdf2'
 import { getBytesSync } from './random'
 import { rc2 } from './rc2'
-import { pki } from './pki'
 import { sha512 } from './sha512'
-import { ByteBuffer, bytesToHex, createBuffer, hexToBytes } from './utils'
+import { bytesToHex, createBuffer, hexToBytes } from './utils'
 import { pem } from './pem'
 import { Buffer } from 'buffer'
 

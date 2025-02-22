@@ -2,8 +2,7 @@
  * Object IDs for ASN.1.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2013 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 
 export const oids: { [key: string]: string } = {}

@@ -1,13 +1,12 @@
 /**
- * Javascript implementation of basic PEM (Privacy Enhanced Mail) algorithms.
+ * TypeScript implementation of basic PEM (Privacy Enhanced Mail) algorithms.
  *
  * See: RFC 1421.
  *
  * @author Dave Longley
+ * @author Chris Breuer
  *
- * Copyright (c) 2013-2014 Digital Bazaar, Inc.
- *
- * A Forge PEM object has the following fields:
+ * A PEM object has the following fields:
  *
  * type: identifies the type of message (eg: "RSA PRIVATE KEY").
  *

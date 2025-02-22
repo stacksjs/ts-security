@@ -2,8 +2,7 @@
  * Secure Hash Algorithm with 160-bit digest (SHA-1) implementation.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2015 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
 

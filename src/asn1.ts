@@ -1,9 +1,8 @@
 /**
- * Javascript implementation of Abstract Syntax Notation Number One.
+ * TypeScript implementation of Abstract Syntax Notation Number One.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2015 Digital Bazaar, Inc.
+ * @author Chris Breuer
  *
  * An API for storing data using the Abstract Syntax Notation Number One
  * format using DER (Distinguished Encoding Rules) encoding. This encoding is

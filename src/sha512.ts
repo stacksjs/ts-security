@@ -7,8 +7,7 @@
  * See FIPS 180-4 for details.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2014-2015 Digital Bazaar, Inc.
+ * @author Chris Breuer
  */
 import type { ByteStringBuffer } from './utils'
 import { createBuffer, fillString } from './utils'

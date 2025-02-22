@@ -1,7 +1,5 @@
 /**
- * JavaScript implementation of Ed25519.
- *
- * Copyright (c) 2017-2019 Digital Bazaar, Inc.
+ * TypeScript implementation of Ed25519.
  *
  * This implementation is based on the most excellent TweetNaCl which is
  * in the public domain. Many thanks to its contributors:

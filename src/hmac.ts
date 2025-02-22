@@ -1,11 +1,9 @@
 /**
  * Hash-based Message Authentication Code implementation. Requires a message
- * digest object that can be obtained, for example, from forge.md.sha1 or
- * forge.md.md5.
+ * digest object that can be obtained, for example, from `sha1` or `md5`.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2012 Digital Bazaar, Inc. All rights reserved.
+ * @author Chris Breuer
  */
 
 import { ByteStringBuffer, createBuffer } from './utils'
