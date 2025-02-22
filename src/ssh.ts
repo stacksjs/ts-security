@@ -12,7 +12,9 @@
 import { createCipher } from './cipher'
 import { create as hmacCreate } from './hmac'
 import { encryptRsaPrivateKey, privateKeyToPem } from './pki'
-import { createBuffer, encode64 } from './utils'
+import util, { createBuffer, encode64 } from './utils'
+import { sha1 } from './sha1'
+import { md5 } from './md5'
 
 /**
  * Encodes (and optionally encrypts) a private RSA key as a Putty PPK file.
@@ -122,7 +124,7 @@ function privateKeyToPutty(privateKey: any, passphrase: any, comment: any) {
  *
  * @return the public key in OpenSSH format.
  */
-ssh.publicKeyToOpenSSH = function (key, comment) {
+export function publicKeyToOpenSSH(key: any, comment: any) {
   const type = 'ssh-rsa'
   comment = comment || ''
 
@@ -162,9 +164,9 @@ export function privateKeyToOpenSSH(privateKey: any, passphrase: any): string {
  *
  * @return the fingerprint as a byte buffer or other encoding based on options.
  */
-ssh.getPublicKeyFingerprint = function (key, options) {
+export function getPublicKeyFingerprint(key: any, options: any): string | Buffer {
   options = options || {}
-  const md = options.md || forge.md.md5.create()
+  const md = options.md || md5.create()
 
   const type = 'ssh-rsa'
   const buffer = createBuffer()
@@ -178,9 +180,10 @@ ssh.getPublicKeyFingerprint = function (key, options) {
   const digest = md.digest()
   if (options.encoding === 'hex') {
     const hex = digest.toHex()
-    if (options.delimiter) {
+
+    if (options.delimiter)
       return hex.match(/.{2}/g).join(options.delimiter)
-    }
+
     return hex
   }
   else if (options.encoding === 'binary') {
@@ -198,13 +201,13 @@ ssh.getPublicKeyFingerprint = function (key, options) {
  * @param buffer the buffer to add to.
  * @param val a big integer.
  */
-function _addBigIntegerToBuffer(buffer, val) {
+function _addBigIntegerToBuffer(buffer: any, val: any) {
   let hexVal = val.toString(16)
   // ensure 2s complement +ve
   if (hexVal[0] >= '8') {
     hexVal = `00${hexVal}`
   }
-  const bytes = forge.util.hexToBytes(hexVal)
+  const bytes = util.hexToBytes(hexVal)
   buffer.putInt32(bytes.length)
   buffer.putBytes(bytes)
 }
@@ -226,7 +229,7 @@ function _addStringToBuffer(buffer, val) {
  * @return the sha1 hash of the provided arguments.
  */
 function _sha1() {
-  const sha = forge.md.sha1.create()
+  const sha = sha1.create()
   const num = arguments.length
   for (let i = 0; i < num; ++i) {
     sha.update(arguments[i])

@@ -216,7 +216,7 @@ export const Type = {
  *
  * @return the asn1 object.
  */
-export function create(tagClass: number, type: number, constructed: boolean, value: any, options?: CreateOptions): Asn1Object {
+export function createAsn1Object(tagClass: number, type: number, constructed: boolean, value: any, options?: CreateOptions): Asn1Object {
   /* An asn1 object has a tagClass, a type, a constructed flag, and a
     value. The value's type depends on the constructed flag. If
     constructed, it will contain a list of other asn1 objects. If not,
@@ -1480,7 +1480,7 @@ export function prettyPrint(obj: any, level: number, indentation: number): strin
 export interface Asn1 {
   Class: typeof Class
   Type: typeof Type
-  create: typeof create
+  create: typeof createAsn1Object
   copy: typeof copy
   equals: typeof equals
   getBerValueLength: typeof getBerValueLength
@@ -1501,7 +1501,7 @@ export interface Asn1 {
 export const asn1: Asn1 = {
   Class,
   Type,
-  create,
+  create: createAsn1Object,
   copy,
   equals,
   getBerValueLength,
