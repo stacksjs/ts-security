@@ -27,10 +27,10 @@
  * @author Chris Breuer
  */
 
-import type { ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from '.'
 import { _expandKey, _updateBlock } from './aes'
 import * as sha256Module from './sha256'
-import { createBuffer } from './utils'
+import { createBuffer } from '.'
 
 // Define PRNG interface
 export interface PRNG {

@@ -6,7 +6,7 @@
  * @author Chris Breuer
  */
 
-import { ByteStringBuffer, createBuffer } from './utils'
+import { ByteStringBuffer, createBuffer } from '.'
 
 interface MessageDigest {
   start: () => MessageDigest

@@ -10,7 +10,7 @@
 import type { MessageDigest } from './sha1'
 import { hmac } from './hmac'
 import { sha1 } from './sha1'
-import { int32ToBytes, isServer, xorBytes } from './utils'
+import { int32ToBytes, isServer, xorBytes } from '.'
 
 let crypto: typeof import('node:crypto') | undefined
 if (isServer) {

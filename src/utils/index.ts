@@ -1,3 +1,8 @@
+export * from './hmac'
+export * from './pbe'
+export * from './pbkdf2'
+export * from './random'
+
 /**
  * Constructor for a binary string backed byte buffer.
  *
