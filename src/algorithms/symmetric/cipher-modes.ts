@@ -5,8 +5,8 @@
  * @author Chris Breuer
  */
 
-import type { ByteStringBuffer } from './utils'
-import { createBuffer } from './utils'
+import type { ByteStringBuffer } from '../../utils'
+import { createBuffer } from '../../utils'
 
 export interface CipherMode {
   name: string

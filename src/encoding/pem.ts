@@ -25,7 +25,7 @@
  *
  * body: the binary-encoded body.
  */
-import { decode64, encode64 } from './utils'
+import { decode64, encode64 } from '../utils'
 
 export interface ProcType {
   version: string

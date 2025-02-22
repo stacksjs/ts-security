@@ -17,9 +17,9 @@ interface MessageDigest {
 
 type NativeBuffer = Buffer | Uint8Array | ArrayBuffer
 
-type HMACInput = string | ByteStringBuffer | NativeBuffer
+export type HMACInput = string | ByteStringBuffer | NativeBuffer
 
-interface HMAC {
+export interface HMAC {
   start: (md: MessageDigest, key: HMACInput) => void
   update: (bytes: HMACInput) => void
   getMac: () => ByteStringBuffer

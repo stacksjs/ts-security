@@ -6,24 +6,23 @@
  */
 
 import { BigInteger } from './jsbn'
-import { random } from './random'
-import { estimateCores } from './utils'
+import { estimateCores, random } from '../../utils'
 
 // primes are 30k+i for i = 1, 7, 11, 13, 17, 19, 23, 29
 const GCD_30_DELTA = [6, 4, 2, 4, 2, 4, 6, 2]
 const THIRTY = new BigInteger(null)
 THIRTY.fromInt(30)
 
-interface WorkerMessageData {
+export interface WorkerMessageData {
   found: boolean
   prime?: string
   hex?: string
   workLoad?: number
 }
 
-type WorkerMessageEvent = MessageEvent<WorkerMessageData>
+export type WorkerMessageEvent = MessageEvent<WorkerMessageData>
 
-interface PrimeOptions {
+export interface PrimeOptions {
   algorithm?: string | { name: string, options?: any }
   prng?: {
     getBytesSync: (length: number) => string
@@ -35,7 +34,7 @@ interface PrimeOptions {
   workerScript?: string
 }
 
-interface RNGInterface {
+export interface RNGInterface {
   nextBytes: (x: Uint8Array) => void
 }
 
@@ -62,9 +61,8 @@ interface RNGInterface {
  *
  * @param bits the number of bits for the prime number.
  * @param options the options to use.
- *          [algorithm] the algorithm to use (default: 'PRIMEINC').
- *          [prng] a custom crypto-secure pseudo-random number generator to use,
- *            that must define "getBytesSync".
+ * @param options.algorithm the algorithm to use (default: 'PRIMEINC').
+ * @param options.prng a custom crypto-secure pseudo-random number generator to use, that must define "getBytesSync".
  *
  * @return callback(err, num) called once the operation completes.
  */
@@ -94,9 +92,8 @@ export function generateProbablePrime(bits: number, options: PrimeOptions, callb
     },
   }
 
-  if (algorithm.name === 'PRIMEINC') {
+  if (algorithm.name === 'PRIMEINC')
     return primeincFindPrime(bits, rng, algorithm.options, callback)
-  }
 
   throw new Error(`Invalid prime generation algorithm: ${algorithm.name}`)
 };
@@ -129,9 +126,8 @@ function primeincFindPrimeWithoutWorkers(bits: number, rng: RNGInterface, option
   // below 60fps (1000/60 == 16.67), but in reality, the number will
   // likely be higher due to an 'atomic' big int modPow
   let maxBlockTime = 10
-  if ('maxBlockTime' in options) {
+  if ('maxBlockTime' in options)
     maxBlockTime = options.maxBlockTime
-  }
 
   _primeinc(num, bits, rng, deltaIdx, mrTests, maxBlockTime, callback)
 }
@@ -145,9 +141,8 @@ function _primeinc(num: BigInteger, bits: number, rng: RNGInterface, deltaIdx: n
     }
 
     // do primality test
-    if (num.isProbablePrime(mrTests)) {
+    if (num.isProbablePrime(mrTests))
       return callback(null, num)
-    }
 
     // get next potential prime
     num.dAddOffset(GCD_30_DELTA[deltaIdx++ % 8], 0)
@@ -165,9 +160,8 @@ function _primeinc(num: BigInteger, bits: number, rng: RNGInterface, deltaIdx: n
 // may produce different outputs.
 function primeincFindPrimeWithWorkers(bits: number, rng: RNGInterface, options: PrimeOptions, callback: (err: Error | null, num?: BigInteger) => void) {
   // web workers unavailable
-  if (typeof Worker === 'undefined') {
+  if (typeof Worker === 'undefined')
     return primeincFindPrimeWithoutWorkers(bits, rng, options, callback)
-  }
 
   // initialize random number
   let num = generateRandom(bits, rng)

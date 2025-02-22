@@ -16,10 +16,10 @@
  */
 
 import type { Algorithm, BlockCipher } from './cipher'
-import type { CipherMode, CipherModeOptions } from './cipher-modes'
+import type { CipherMode } from './cipher-modes'
 import { createCipher, registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
-import { ByteStringBuffer, createBuffer } from './utils'
+import { ByteStringBuffer, createBuffer } from '../../utils'
 
 // AES implementation types
 type SubstitutionBox = number[]

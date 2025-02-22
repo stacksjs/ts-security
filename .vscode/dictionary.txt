@@ -61,7 +61,9 @@ Postcardware
 postcompile
 prefetch
 preinstall
+primeinc
 quickfix
+rootca
 scalarbase
 scalarmult
 shikijs

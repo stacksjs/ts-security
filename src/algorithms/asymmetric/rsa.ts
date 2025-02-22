@@ -61,13 +61,91 @@
  * The OID for the RSA key algorithm is: 1.2.840.113549.1.1.1
  */
 
-import type { Asn1Object } from './asn1'
-import { asn1 } from './asn1'
+import type { Asn1Validator } from '../../validators/asn1-validator'
+import type { Asn1Object } from '../../encoding/asn1'
+import { asn1 } from '../../encoding/asn1'
 import { BigInteger } from './jsbn'
-import { oids } from './oids'
-import { encode_rsa_oaep } from './pkcs1'
-import { getBytes, random } from './random'
-import util, { createBuffer, isServer } from './utils'
+import { oids } from '../../oids'
+import { encode_rsa_oaep, pkcs1 } from '../../pkcs1'
+import util, { ByteStringBuffer, createBuffer, isServer, getBytes, random, bytesToHex, hexToBytes, decode64 } from '../../utils'
+
+type CustomError = Error & {
+  algorithm?: string
+  length?: number
+  expected?: number
+  errors?: any[]
+  oid?: string
+  max?: number
+}
+
+export interface BigInteger {
+  modInverse: (m: BigInteger) => BigInteger
+  multiply: (x: BigInteger) => BigInteger
+  mod: (m: BigInteger) => BigInteger
+  modPow: (e: BigInteger, m: BigInteger) => BigInteger
+  compareTo: (other: BigInteger) => number
+  equals: (other: BigInteger) => boolean
+  toString: (radix?: number) => string
+  bitLength: () => number
+}
+
+export interface RSAKey {
+  n: BigInteger
+  e: BigInteger
+  d?: BigInteger
+  p?: BigInteger
+  q?: BigInteger
+  dP?: BigInteger
+  dQ?: BigInteger
+  qInv?: BigInteger
+}
+
+export interface RSAKeyWithOps extends RSAKey {
+  encrypt: (data: string | Uint8Array, scheme: string, schemeOptions?: any) => string
+  decrypt: (data: string | Uint8Array, scheme: string, schemeOptions?: any) => string
+  verify: (digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options?: any) => boolean
+  sign: (md: string | Uint8Array, scheme?: string) => string
+}
+
+interface EncodeScheme {
+  encode: (m: string | Uint8Array, key: RSAKey, pub: boolean) => string | Uint8Array
+}
+
+interface DecodeScheme {
+  decode: (d: string | Uint8Array, key: RSAKey, pub: boolean) => string | Uint8Array
+}
+
+interface SignScheme {
+  encode: (md: string | Uint8Array, bits: number) => string | Uint8Array
+}
+
+interface VerifyScheme {
+  verify: (digest: string | Uint8Array, d: string | Uint8Array, bits: number) => boolean
+}
+
+interface KeyPairGenerationState {
+  algorithm: string
+  workers: number
+  workLoad: number
+  workerScript?: string
+  bits: number
+  e: BigInteger
+  p?: BigInteger
+  q?: BigInteger
+  n?: BigInteger
+  keys?: {
+    privateKey: RSAKeyWithOps
+    publicKey: RSAKeyWithOps
+  }
+}
+
+interface GenerateKeyPairOptions {
+  algorithm: string
+  workers: number
+  workLoad: number
+  workerScript?: string
+  prng?: any
+}
 
 const _crypto = isServer ? require('node:crypto') : null
 
@@ -185,7 +263,7 @@ const rsaPrivateKeyValidator = {
 }
 
 // validator for an RSA public key
-const rsaPublicKeyValidator = {
+export const rsaPublicKeyValidator: Asn1Validator = {
   // RSAPublicKey
   name: 'RSAPublicKey',
   tagClass: asn1.Class.UNIVERSAL,
@@ -198,6 +276,7 @@ const rsaPublicKeyValidator = {
     type: asn1.Type.INTEGER,
     constructed: false,
     capture: 'publicKeyModulus',
+    value: []
   }, {
     // publicExponent (e)
     name: 'RSAPublicKey.exponent',
@@ -205,12 +284,13 @@ const rsaPublicKeyValidator = {
     type: asn1.Type.INTEGER,
     constructed: false,
     capture: 'publicKeyExponent',
-  }],
+    value: []
+  }]
 }
 
 // validator for an SubjectPublicKeyInfo structure
 // Note: Currently only works with an RSA public key
-export const publicKeyValidator: Asn1Object = {
+const publicKeyValidator: Asn1Object = {
   name: 'SubjectPublicKeyInfo',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -264,7 +344,7 @@ const digestInfoValidator = {
       constructed: false,
       capture: 'algorithmIdentifier',
     }, {
-      // NULL paramters
+      // NULL parameters
       name: 'DigestInfo.DigestAlgorithm.parameters',
       tagClass: asn1.Class.UNIVERSAL,
       type: asn1.Type.NULL,
@@ -308,7 +388,7 @@ function emsaPkcs1v15encode(md: any) {
     oid = oids[md.algorithm]
   }
   else {
-    const error = new Error('Unknown message digest algorithm.')
+    const error: CustomError = new Error('Unknown message digest algorithm.')
     error.algorithm = md.algorithm
     throw error
   }
@@ -464,7 +544,7 @@ function _modPow(x: any, key: any, pub: boolean) {
   let r
   do {
     r = new BigInteger(
-      util.bytesToHex(getBytes(key.n.bitLength() / 8)),
+      bytesToHex(getBytes(key.n.bitLength() / 8) || '0'),
       16,
     )
   } while (r.compareTo(key.n) >= 0 || !r.gcd(key.n).equals(BigInteger.ONE))
@@ -529,7 +609,7 @@ export const encrypt: (m: string, key: any, bt: any) => string = function (m, ke
     eb = _encodePkcs1_v1_5(m, key, bt)
   }
   else {
-    eb = util.createBuffer()
+    eb = createBuffer()
     eb.putBytes(m)
   }
 
@@ -544,13 +624,13 @@ export const encrypt: (m: string, key: any, bt: any) => string = function (m, ke
   // bytes than k, then prepend zero bytes to fill up ed
   // FIXME: hex conversion inefficient, get BigInteger w/byte strings
   const yhex = y.toString(16)
-  const ed = util.createBuffer()
+  const ed = createBuffer()
   let zeros = k - Math.ceil(yhex.length / 2)
   while (zeros > 0) {
     ed.putByte(0x00)
     --zeros
   }
-  ed.putBytes(util.hexToBytes(yhex))
+  ed.putBytes(hexToBytes(yhex))
   return ed.getBytes()
 }
 
@@ -578,7 +658,7 @@ export const decrypt: (ed: string, key: any, pub: boolean, ml: boolean) => strin
 
   // error if the length of the encrypted data ED is not k
   if (ed.length !== k) {
-    const error = new Error('Encrypted message length is invalid.')
+    const error = new Error('Encrypted message length is invalid.') as CustomError
     error.length = ed.length
     error.expected = k
     throw error
@@ -586,7 +666,7 @@ export const decrypt: (ed: string, key: any, pub: boolean, ml: boolean) => strin
 
   // convert encrypted data into a big integer
   // FIXME: hex conversion inefficient, get BigInteger w/byte strings
-  const y = new BigInteger(util.createBuffer(ed).toHex(), 16)
+  const y = new BigInteger(createBuffer(ed).toHex(), 16)
 
   // y must be less than the modulus or it wasn't the result of
   // a previous mod operation (encryption) using that modulus
@@ -601,14 +681,14 @@ export const decrypt: (ed: string, key: any, pub: boolean, ml: boolean) => strin
   // prepend zero bytes to fill up eb
   // FIXME: hex conversion inefficient, get BigInteger w/byte strings
   const xhex = x.toString(16)
-  const eb = util.createBuffer()
+  const eb = createBuffer()
   let zeros = k - Math.ceil(xhex.length / 2)
   while (zeros > 0) {
     eb.putByte(0x00)
     --zeros
   }
 
-  eb.putBytes(util.hexToBytes(xhex))
+  eb.putBytes(hexToBytes(xhex))
 
   if (ml !== false) {
     // legacy, default to PKCS#1 v1.5 padding
@@ -864,7 +944,7 @@ export const stepKeyPairGenerationState: (state: any, n: number) => boolean = fu
           d.mod(state.q1),
           state.q.modInverse(state.p),
         ),
-        publicKey: setPublicKey(state.n, state.e),
+        publicKey: setRsaPublicKey(state.n, state.e),
       }
     }
 
@@ -907,184 +987,66 @@ export const stepKeyPairGenerationState: (state: any, n: number) => boolean = fu
  *
  * @return an object with privateKey and publicKey properties.
  */
-pki.rsa.generateKeyPair = function (bits, e, options, callback) {
+export function generateKeyPair(
+  bits: number,
+  e?: number,
+  options?: Partial<GenerateKeyPairOptions>,
+  callback?: (err: Error | null, keypair?: { privateKey: RSAKeyWithOps, publicKey: RSAKeyWithOps }) => void
+): void {
   // (bits), (options), (callback)
   if (arguments.length === 1) {
     if (typeof bits === 'object') {
       options = bits
-      bits = undefined
+      bits = options.algorithm?.options?.workers || 2048
     }
-    else if (typeof bits === 'function') {
-      callback = bits
-      bits = undefined
-    }
-  }
-  else if (arguments.length === 2) {
-    // (bits, e), (bits, options), (bits, callback), (options, callback)
-    if (typeof bits === 'number') {
-      if (typeof e === 'function') {
-        callback = e
-        e = undefined
-      }
-      else if (typeof e !== 'number') {
-        options = e
-        e = undefined
-      }
-    }
-    else {
-      options = bits
-      callback = e
-      bits = undefined
-      e = undefined
-    }
-  }
-  else if (arguments.length === 3) {
-    // (bits, e, options), (bits, e, callback), (bits, options, callback)
-    if (typeof e === 'number') {
-      if (typeof options === 'function') {
-        callback = options
-        options = undefined
-      }
-    }
-    else {
-      callback = options
-      options = e
-      e = undefined
-    }
-  }
-  options = options || {}
-  if (bits === undefined) {
-    bits = options.bits || 2048
-  }
-  if (e === undefined) {
-    e = options.e || 0x10001
   }
 
-  // use native code if permitted, available, and parameters are acceptable
-  if (!forge.options.usePureJavaScript && !options.prng
-    && bits >= 256 && bits <= 16384 && (e === 0x10001 || e === 3)) {
+  // Generate key pair using native crypto if available and permitted
+  if (!options?.prng && bits >= 256 && bits <= 16384 && (e === 0x10001 || e === 3)) {
     if (callback) {
-      // try native async
-      if (_detectNodeCrypto('generateKeyPair')) {
-        return _crypto.generateKeyPair('rsa', {
+      // Try native async
+      if (typeof crypto !== 'undefined' && crypto.subtle
+        && typeof crypto.subtle.generateKey === 'function'
+        && typeof crypto.subtle.exportKey === 'function') {
+        crypto.subtle.generateKey({
+          name: 'RSASSA-PKCS1-v1_5',
           modulusLength: bits,
-          publicExponent: e,
-          publicKeyEncoding: {
-            type: 'spki',
-            format: 'pem',
-          },
-          privateKeyEncoding: {
-            type: 'pkcs8',
-            format: 'pem',
-          },
-        }, (err, pub, priv) => {
-          if (err) {
-            return callback(err)
+          publicExponent: intToUint8Array(e || 0x10001),
+          hash: { name: 'SHA-256' },
+        }, true, ['sign', 'verify']).then((keypair) => {
+          return crypto.subtle.exportKey('pkcs8', keypair.privateKey)
+        }).then((pkcs8) => {
+          if (pkcs8) {
+            const privateKey = addRSAKeyOps(privateKeyFromAsn1(
+              asn1.fromDer(createBuffer(new Uint8Array(pkcs8)))
+            ))
+            const publicKey = addRSAKeyOps(setRsaPublicKey(privateKey.n, privateKey.e))
+            callback(null, { privateKey, publicKey })
           }
-          callback(null, {
-            privateKey: pki.privateKeyFromPem(priv),
-            publicKey: pki.publicKeyFromPem(pub),
-          })
+        }).catch((err) => {
+          callback(err as Error)
         })
-      }
-      if (_detectSubtleCrypto('generateKey')
-        && _detectSubtleCrypto('exportKey')) {
-        // use standard native generateKey
-        return util.globalScope.crypto.subtle.generateKey({
-          name: 'RSASSA-PKCS1-v1_5',
-          modulusLength: bits,
-          publicExponent: _intToUint8Array(e),
-          hash: { name: 'SHA-256' },
-        }, true /* key can be exported */, ['sign', 'verify'])
-          .then((pair) => {
-            return util.globalScope.crypto.subtle.exportKey(
-              'pkcs8',
-              pair.privateKey,
-            )
-            // avoiding catch(function(err) {...}) to support IE <= 8
-          })
-          .then(undefined, (err) => {
-            callback(err)
-          })
-          .then((pkcs8) => {
-            if (pkcs8) {
-              const privateKey = pki.privateKeyFromAsn1(
-                asn1.fromDer(util.createBuffer(pkcs8)),
-              )
-              callback(null, {
-                privateKey,
-                publicKey: pki.setRsaPublicKey(privateKey.n, privateKey.e),
-              })
-            }
-          })
-      }
-      if (_detectSubtleMsCrypto('generateKey')
-        && _detectSubtleMsCrypto('exportKey')) {
-        const genOp = util.globalScope.msCrypto.subtle.generateKey({
-          name: 'RSASSA-PKCS1-v1_5',
-          modulusLength: bits,
-          publicExponent: _intToUint8Array(e),
-          hash: { name: 'SHA-256' },
-        }, true /* key can be exported */, ['sign', 'verify'])
-        genOp.oncomplete = function (e) {
-          const pair = e.target.result
-          const exportOp = util.globalScope.msCrypto.subtle.exportKey(
-            'pkcs8',
-            pair.privateKey,
-          )
-          exportOp.oncomplete = function (e) {
-            const pkcs8 = e.target.result
-            const privateKey = pki.privateKeyFromAsn1(
-              asn1.fromDer(util.createBuffer(pkcs8)),
-            )
-            callback(null, {
-              privateKey,
-              publicKey: pki.setRsaPublicKey(privateKey.n, privateKey.e),
-            })
-          }
-          exportOp.onerror = function (err) {
-            callback(err)
-          }
-        }
-        genOp.onerror = function (err) {
-          callback(err)
-        }
         return
       }
     }
-    else {
-      // try native sync
-      if (_detectNodeCrypto('generateKeyPairSync')) {
-        const keypair = _crypto.generateKeyPairSync('rsa', {
-          modulusLength: bits,
-          publicExponent: e,
-          publicKeyEncoding: {
-            type: 'spki',
-            format: 'pem',
-          },
-          privateKeyEncoding: {
-            type: 'pkcs8',
-            format: 'pem',
-          },
-        })
-        return {
-          privateKey: pki.privateKeyFromPem(keypair.privateKey),
-          publicKey: pki.publicKeyFromPem(keypair.publicKey),
-        }
-      }
-    }
   }
 
-  // use JavaScript implementation
-  const state = createKeyPairGenerationState(bits, e, options)
-
-  if (!callback) {
-    stepKeyPairGenerationState(state, 0)
-
-    return state.keys
+  // Use pure JavaScript implementation
+  const state = createKeyPairGenerationState(bits, e || 0x10001, options || {
+    algorithm: 'RSASSA-PKCS1-v1_5',
+    workers: 2,
+    workLoad: 100,
+  })
+  if (!state) {
+    callback?.(new Error('Key generation state creation failed'))
+    return
   }
 
-  _generateKeyPair(state, options, callback)
+  _generateKeyPair(state, options || {
+    algorithm: 'RSASSA-PKCS1-v1_5',
+    workers: 2,
+    workLoad: 100,
+  }, callback || function () {})
 }
 
 /**
@@ -1463,7 +1425,7 @@ export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   let capture = {}
   let errors = []
   if (asn1.validate(obj, privateKeyValidator, capture, errors)) {
-    obj = asn1.fromDer(util.createBuffer(capture.privateKey))
+    obj = asn1.fromDer(createBuffer(capture.privateKey))
   }
 
   // get RSAPrivateKey
@@ -1480,14 +1442,14 @@ export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   // capture.privateKeyVersion
   // FIXME: inefficient, get a BigInteger that uses byte strings
   let n, e, d, p, q, dP, dQ, qInv
-  n = util.createBuffer(capture.privateKeyModulus).toHex()
-  e = util.createBuffer(capture.privateKeyPublicExponent).toHex()
-  d = util.createBuffer(capture.privateKeyPrivateExponent).toHex()
-  p = util.createBuffer(capture.privateKeyPrime1).toHex()
-  q = util.createBuffer(capture.privateKeyPrime2).toHex()
-  dP = util.createBuffer(capture.privateKeyExponent1).toHex()
-  dQ = util.createBuffer(capture.privateKeyExponent2).toHex()
-  qInv = util.createBuffer(capture.privateKeyCoefficient).toHex()
+  n = createBuffer(capture.privateKeyModulus).toHex()
+  e = createBuffer(capture.privateKeyPublicExponent).toHex()
+  d = createBuffer(capture.privateKeyPrivateExponent).toHex()
+  p = createBuffer(capture.privateKeyPrime1).toHex()
+  q = createBuffer(capture.privateKeyPrime2).toHex()
+  dP = createBuffer(capture.privateKeyExponent1).toHex()
+  dQ = createBuffer(capture.privateKeyExponent2).toHex()
+  qInv = createBuffer(capture.privateKeyCoefficient).toHex()
 
   // set private key
   return setRsaPrivateKey(
@@ -1574,8 +1536,8 @@ export function publicKeyFromAsn1(obj: Asn1Object): RSAKey {
   }
 
   // FIXME: inefficient, get a BigInteger that uses byte strings
-  const n = util.createBuffer(capture.publicKeyModulus).toHex()
-  const e = util.createBuffer(capture.publicKeyExponent).toHex()
+  const n = createBuffer(capture.publicKeyModulus).toHex()
+  const e = createBuffer(capture.publicKeyExponent).toHex()
 
   // set public key
   return setRsaPublicKey(
@@ -1741,7 +1703,7 @@ function _decodePkcs1_v1_5(em: string, key: {
    */
 
   // parse the encryption block
-  const eb = util.createBuffer(em)
+  const eb = createBuffer(em)
   const first = eb.getByte()
   const bt = eb.getByte()
   if (first !== 0x00
@@ -1945,7 +1907,7 @@ function _bnToBytes(b: BigInteger) {
     hex = `00${hex}`
   }
 
-  const bytes = util.hexToBytes(hex)
+  const bytes = hexToBytes(hex)
 
   // ensure integer is minimally-encoded
   if (bytes.length > 1
@@ -2004,8 +1966,8 @@ function _getMillerRabinTests(bits: number) {
  *
  * @return true if detected, false if not.
  */
-function _detectNodeCrypto(fn: string) {
-  return util.isServer && typeof _crypto[fn] === 'function'
+export function detectNodeCrypto(fn: string): boolean {
+  return isServer && typeof _crypto[fn] === 'function'
 }
 
 /**
@@ -2015,7 +1977,7 @@ function _detectNodeCrypto(fn: string) {
  *
  * @return true if detected, false if not.
  */
-function _detectSubtleCrypto(fn: string) {
+export function detectSubtleCrypto(fn: string): boolean {
   return (typeof util.globalScope !== 'undefined'
     && typeof util.globalScope.crypto === 'object'
     && typeof util.globalScope.crypto.subtle === 'object'
@@ -2031,23 +1993,25 @@ function _detectSubtleCrypto(fn: string) {
  *
  * @return true if detected, false if not.
  */
-function _detectSubtleMsCrypto(fn: string) {
+export function detectSubtleMsCrypto(fn: string): boolean {
   return (typeof util.globalScope !== 'undefined'
     && typeof util.globalScope.msCrypto === 'object'
     && typeof util.globalScope.msCrypto.subtle === 'object'
     && typeof util.globalScope.msCrypto.subtle[fn] === 'function')
 }
 
-function _intToUint8Array(x: number) {
-  const bytes = util.hexToBytes(x.toString(16))
+export function intToUint8Array(x: number): Uint8Array {
+  const bytes = hexToBytes(x.toString(16))
   const buffer = new Uint8Array(bytes.length)
+
   for (let i = 0; i < bytes.length; ++i) {
     buffer[i] = bytes.charCodeAt(i)
   }
+
   return buffer
 }
 
-function _privateKeyFromJwk(jwk: {
+export function privateKeyFromJwk(jwk: {
   kty: string
   n: string
   e: string
@@ -2057,7 +2021,7 @@ function _privateKeyFromJwk(jwk: {
   dp: string
   dq: string
   qi: string
-}) {
+}): RSAKey {
   if (jwk.kty !== 'RSA') {
     throw new Error(
       `Unsupported key algorithm "${jwk.kty}"; algorithm must be "RSA".`,
@@ -2075,11 +2039,11 @@ function _privateKeyFromJwk(jwk: {
   )
 }
 
-function _publicKeyFromJwk(jwk: {
+export function publicKeyFromJwk(jwk: {
   kty: string
   n: string
   e: string
-}) {
+}): RSAKey {
   if (jwk.kty !== 'RSA') {
     throw new Error('Key algorithm must be "RSA".')
   }
@@ -2089,6 +2053,165 @@ function _publicKeyFromJwk(jwk: {
   )
 }
 
-function _base64ToBigInt(b64: string) {
-  return new BigInteger(util.bytesToHex(util.decode64(b64)), 16)
+export function base64ToBigInt(b64: string): BigInteger {
+  return new BigInteger(bytesToHex(decode64(b64)), 16)
+}
+
+export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
+  const keyWithOps = key as RSAKeyWithOps
+  keyWithOps.encrypt = function(data: string | Uint8Array, scheme: string, schemeOptions?: any) {
+    let encodeScheme: EncodeScheme
+    if (scheme === 'RSAES-PKCS1-V1_5') {
+      encodeScheme = {
+        encode(m: string | Uint8Array, key: RSAKey, pub: boolean) {
+          return _encodePkcs1_v1_5(m as string, key, 0x02).getBytes()
+        }
+      }
+    } else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+      encodeScheme = {
+        encode(m: string, key: RSAKey) {
+          return encode_rsa_oaep(key, m, schemeOptions)
+        },
+      }
+    } else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+      encodeScheme = { encode(e) { return e } }
+    } else if (typeof scheme === 'string') {
+      throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
+    }
+
+    // do scheme-based encoding then rsa encryption
+    const e = encodeScheme.encode(data, key, true)
+
+    return encrypt(e, key, true)
+  }
+
+  keyWithOps.decrypt = function(data: string | Uint8Array, scheme: string, schemeOptions?: any) {
+    let decodeScheme
+    if (scheme === 'RSAES-PKCS1-V1_5') {
+      decodeScheme = { decode: _decodePkcs1_v1_5 }
+    } else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+      decodeScheme = {
+        decode(d: string, key: any) {
+          return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
+        },
+      }
+    } else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+      decodeScheme = { decode(d) { return d } }
+    } else if (typeof scheme === 'string') {
+      throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
+    }
+
+    // do scheme-based decoding then rsa decryption
+    const d = decodeScheme?.decode(data, key, false)
+
+    return decrypt(d, key, false, false)
+  }
+
+  keyWithOps.sign = function(md: string | Uint8Array, scheme?: string) {
+    let signScheme
+    if (scheme === 'RSASSA-PKCS1-V1_5' || scheme === undefined) {
+      signScheme = { encode: emsaPkcs1v15encode }
+    } else if (scheme === 'RSASSA-PSS') {
+      signScheme = { encode: emsaPssEncode }
+    } else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+      signScheme = { encode() { return md } }
+    } else {
+      throw new TypeError(`Unsupported signature scheme: "${scheme}".`)
+    }
+
+    // do scheme-based signing then rsa encryption
+    const d = signScheme.encode(md, key.n.bitLength())
+    return encrypt(d, key, true)
+  }
+
+  keyWithOps.verify = function(digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options: any) {
+    if (typeof scheme === 'string') {
+      scheme = scheme.toUpperCase()
+    }
+    else if (scheme === undefined) {
+      scheme = 'RSASSA-PKCS1-V1_5'
+    }
+    if (options === undefined) {
+      options = {
+        _parseAllDigestBytes: true,
+      }
+    }
+    if (!('_parseAllDigestBytes' in options)) {
+      options._parseAllDigestBytes = true
+    }
+
+    if (scheme === 'RSASSA-PKCS1-V1_5') {
+      scheme = {
+        verify(digest, d) {
+          // remove padding
+          d = _decodePkcs1_v1_5(d, key, true)
+          // d is ASN.1 BER-encoded DigestInfo
+          const obj = asn1.fromDer(d, {
+            parseAllBytes: options._parseAllDigestBytes,
+          })
+
+          // validate DigestInfo
+          const capture = {}
+          const errors = []
+          if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
+            var error = new Error(
+              'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
+              + 'DigestInfo value.',
+            )
+            error.errors = errors
+            throw error
+          }
+          // check hash algorithm identifier
+          // see PKCS1-v1-5DigestAlgorithms in RFC 8017
+          // FIXME: add support to vaidator for strict value choices
+          const oid = asn1.derToOid(capture.algorithmIdentifier)
+          if (!(oid === oids.md2
+            || oid === oids.md5
+            || oid === oids.sha1
+            || oid === oids.sha224
+            || oid === oids.sha256
+            || oid === oids.sha384
+            || oid === oids.sha512
+            || oid === oids['sha512-224']
+            || oid === oids['sha512-256'])) {
+            var error = new Error(
+              'Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.',
+            )
+            error.oid = oid
+            throw error
+          }
+
+          // special check for md2 and md5 that NULL parameters exist
+          if (oid === oids.md2 || oid === oids.md5) {
+            if (!('parameters' in capture)) {
+              throw new Error(
+                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
+                + 'DigestInfo value. '
+                + 'Missing algorithm identifier NULL parameters.',
+              )
+            }
+          }
+
+          // compare the given digest to the decrypted one
+          return digest === capture.digest
+        },
+      }
+    }
+    else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+      scheme = {
+        verify(digest, d) {
+          // remove padding
+          d = _decodePkcs1_v1_5(d, key, true)
+          return digest === d
+        },
+      }
+    }
+
+    // do rsa decryption w/o any decoding, then verify -- which does decoding
+    const d = decrypt(signature, key, true, false)
+
+    return scheme.verify(digest, d, key.n.bitLength())
+  }
+
+  return keyWithOps
 }

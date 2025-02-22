@@ -16,8 +16,8 @@
  * @author Chris Breuer
  */
 
-import type { ByteStringBuffer } from './utils'
-import { createBuffer, fillString } from './utils'
+import type { ByteStringBuffer } from '../../utils'
+import { createBuffer, fillString } from '../../utils'
 
 // SHA-256 state interface
 interface SHA256State {

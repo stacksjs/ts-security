@@ -9,8 +9,8 @@
  * @author Dave Longley
  * @author Chris Breuer
  */
-import type { ByteStringBuffer } from './utils'
-import { createBuffer, fillString } from './utils'
+import type { ByteStringBuffer } from '../../utils'
+import { createBuffer, fillString } from '../../utils'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
 interface SHA512State {

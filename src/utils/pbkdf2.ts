@@ -7,10 +7,10 @@
  * @author Chris Breuer
  */
 
-import type { MessageDigest } from './sha1'
-import { hmac } from './hmac'
-import { sha1 } from './sha1'
-import { int32ToBytes, isServer, xorBytes } from '.'
+import type { MessageDigest } from '../algorithms/hash/sha1'
+import { hmac } from '../utils/hmac'
+import { sha1 } from '../algorithms/hash/sha1'
+import { int32ToBytes, isServer, xorBytes } from '../utils'
 
 let crypto: typeof import('node:crypto') | undefined
 if (isServer) {

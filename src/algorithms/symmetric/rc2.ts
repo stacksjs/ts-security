@@ -9,9 +9,9 @@
  */
 
 import type { Algorithm, CipherOptions } from './cipher'
-import type { ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from '../../utils'
 import { BlockCipher } from './cipher'
-import { createBuffer } from './utils'
+import { createBuffer } from '../../utils'
 
 interface RC2Options extends CipherOptions {
   bits?: number

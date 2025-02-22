@@ -9,12 +9,12 @@
  * @author https://github.com/shellac
  */
 
-import { createCipher } from './cipher'
-import { create as hmacCreate } from './hmac'
-import { encryptRsaPrivateKey, privateKeyToPem } from './pki'
-import util, { createBuffer, encode64 } from './utils'
-import { sha1 } from './sha1'
-import { md5 } from './md5'
+import { createCipher } from '../algorithms/symmetric/cipher'
+import { create as hmacCreate } from '../utils/hmac'
+import { encryptRsaPrivateKey, privateKeyToPem } from '../pki'
+import util, { createBuffer, encode64 } from '../utils'
+import { sha1 } from '../algorithms/hash/sha1'
+import { md5 } from '../algorithms/hash/md5'
 
 /**
  * Encodes (and optionally encrypts) a private RSA key as a Putty PPK file.

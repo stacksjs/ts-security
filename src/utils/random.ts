@@ -28,8 +28,8 @@
  */
 
 import type { ByteStringBuffer } from '.'
-import { _expandKey, _updateBlock } from './aes'
-import * as sha256Module from './sha256'
+import { _expandKey, _updateBlock } from '../algorithms/symmetric/aes'
+import * as sha256Module from '../algorithms/hash/sha256'
 import { createBuffer } from '.'
 
 // Define PRNG interface
@@ -56,9 +56,7 @@ interface ExtendedNavigator extends Navigator {
 
 declare global {
   interface Window {
-    // @ts-expect-error unsure if there is a better way to do this
     crypto: Crypto
-    // @ts-expect-error unsure if there is a better way to do this
     msCrypto?: Crypto
     // @ts-expect-error unsure if there is a better way to do this
     navigator: ExtendedNavigator

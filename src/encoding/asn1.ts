@@ -132,9 +132,9 @@
  * The full OID (including ASN.1 tag and length of 6 bytes) is:
  * 0x06062A864886F70D
  */
-import type { ByteStringBuffer } from './utils'
-import { oids } from './oids'
-import { bytesToHex, createBuffer, decodeUtf8 } from './utils'
+import type { ByteStringBuffer } from '../utils'
+import { oids } from '../oids'
+import { bytesToHex, createBuffer, decodeUtf8 } from '../utils'
 
 interface ExtendedError extends Error {
   available?: number

@@ -1,4 +1,4 @@
-import { Class, Type } from './asn1'
+import { Class, Type } from '../encoding/asn1'
 
 export interface Asn1Validator {
   name: string
@@ -15,11 +15,11 @@ export interface Asn1Validator {
 }
 
 export interface ValidatorMap {
-  privateKeyValidator: Asn1Validator
-  publicKeyValidator: Asn1Validator
+  ans1PrivateKeyValidator: Asn1Validator
+  ans1PublicKeyValidator: Asn1Validator
 }
 
-export const privateKeyValidator: Asn1Validator = {
+export const ans1PrivateKeyValidator: Asn1Validator = {
   // PrivateKeyInfo
   name: 'PrivateKeyInfo',
   tagClass: Class.UNIVERSAL,
@@ -58,7 +58,7 @@ export const privateKeyValidator: Asn1Validator = {
   }],
 }
 
-export const publicKeyValidator: Asn1Validator = {
+export const ans1PublicKeyValidator: Asn1Validator = {
   name: 'SubjectPublicKeyInfo',
   tagClass: Class.UNIVERSAL,
   type: Type.SEQUENCE,
@@ -91,8 +91,8 @@ export const publicKeyValidator: Asn1Validator = {
 }
 
 export const asn1Validator: ValidatorMap = {
-  privateKeyValidator,
-  publicKeyValidator,
+  ans1PrivateKeyValidator,
+  ans1PublicKeyValidator,
 }
 
 export default asn1Validator

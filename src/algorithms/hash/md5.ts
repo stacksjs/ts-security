@@ -5,7 +5,7 @@
  * @author Chris Breuer
  */
 
-import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
+import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from '../../utils'
 
 interface MD5State {
   h0: number

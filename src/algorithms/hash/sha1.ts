@@ -4,7 +4,7 @@
  * @author Dave Longley
  * @author Chris Breuer
  */
-import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from './utils'
+import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from '../../utils'
 
 export interface MessageDigest {
   algorithm: string

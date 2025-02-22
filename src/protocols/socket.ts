@@ -7,7 +7,7 @@
 
 /// <reference lib="dom" />
 
-import { decode64, encode64 } from './utils'
+import { decode64, encode64 } from '../utils'
 
 interface Socket {
   id: string

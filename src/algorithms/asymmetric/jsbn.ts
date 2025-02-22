@@ -327,6 +327,10 @@ export class BigInteger {
     return 0
   }
 
+  public equals(a: BigInteger): boolean {
+    return this.compareTo(a) === 0
+  }
+
   public bitLength(): number {
     if (this.t <= 0)
       return 0
@@ -378,17 +382,29 @@ export class BigInteger {
     return r
   }
 
-  private addTo(a: BigInteger, r: BigInteger): void {
+  public multiply(a: BigInteger): BigInteger {
+    const r = new BigInteger()
+    this.multiplyTo(a, r)
+    return r
+  }
+
+  public subtract(a: BigInteger): BigInteger {
+    const r = new BigInteger()
+    this.subTo(a, r)
+    return r
+  }
+
+  public subTo(a: BigInteger, r: BigInteger): void {
     let i = 0
     let c = 0
     const m = Math.min(a.t, this.t)
     while (i < m) {
-      c += this.data[i] + a.data[i]
+      c += this.data[i] - a.data[i]
       r.data[i++] = c & BigInteger.DM
       c >>= BigInteger.DB
     }
     if (a.t < this.t) {
-      c += a.s
+      c -= a.s
       while (i < this.t) {
         c += this.data[i]
         r.data[i++] = c & BigInteger.DM
@@ -399,17 +415,17 @@ export class BigInteger {
     else {
       c += this.s
       while (i < a.t) {
-        c += a.data[i]
+        c -= a.data[i]
         r.data[i++] = c & BigInteger.DM
         c >>= BigInteger.DB
       }
-      c += a.s
+      c -= a.s
     }
     r.s = (c < 0) ? -1 : 0
-    if (c > 0)
-      r.data[i++] = c
-    else if (c < -1)
+    if (c < -1)
       r.data[i++] = BigInteger.DV + c
+    else if (c > 0)
+      r.data[i++] = c
     r.t = i
     r.clamp()
   }
@@ -481,434 +497,6 @@ export class BigInteger {
   }
 
   // Additional arithmetic operations
-  public subtract(a: BigInteger): BigInteger {
-    const r = new BigInteger()
-    this.subTo(a, r)
-    return r
-  }
-
-  public subTo(a: BigInteger, r: BigInteger): void {
-    let i = 0
-    let c = 0
-    const m = Math.min(a.t, this.t)
-    while (i < m) {
-      c += this.data[i] - a.data[i]
-      r.data[i++] = c & BigInteger.DM
-      c >>= BigInteger.DB
-    }
-    if (a.t < this.t) {
-      c -= a.s
-      while (i < this.t) {
-        c += this.data[i]
-        r.data[i++] = c & BigInteger.DM
-        c >>= BigInteger.DB
-      }
-      c += this.s
-    }
-    else {
-      c += this.s
-      while (i < a.t) {
-        c -= a.data[i]
-        r.data[i++] = c & BigInteger.DM
-        c >>= BigInteger.DB
-      }
-      c -= a.s
-    }
-    r.s = (c < 0) ? -1 : 0
-    if (c < -1)
-      r.data[i++] = BigInteger.DV + c
-    else if (c > 0)
-      r.data[i++] = c
-    r.t = i
-    r.clamp()
-  }
-
-  // Modular arithmetic
-  public modPow(e: BigInteger, m: BigInteger): BigInteger {
-    let i = e.bitLength()
-    let k: number
-    let r = new BigInteger(1)
-    let z: IReducer
-
-    if (i <= 0)
-      return r
-    else if (i < 18)
-      k = 1
-    else if (i < 48)
-      k = 3
-    else if (i < 144)
-      k = 4
-    else if (i < 768)
-      k = 5
-    else k = 6
-
-    if (i < 8) {
-      z = new Classic(m)
-    }
-    else if (m.isEven()) {
-      z = new Barrett(m)
-    }
-    else {
-      z = new Montgomery(m)
-    }
-
-    // Precomputation
-    const g: BigInteger[] = []
-    let n = 3
-    const k1 = k - 1
-    const km = (1 << k) - 1
-    g[1] = z.convert(this)
-
-    if (k > 1) {
-      const g2 = new BigInteger()
-      z.sqrTo(g[1], g2)
-      while (n <= km) {
-        g[n] = new BigInteger()
-        z.mulTo(g2, g[n - 2], g[n])
-        n += 2
-      }
-    }
-
-    let j = e.t - 1
-    let w: number
-    let is1 = true
-    let r2 = new BigInteger()
-    let t: BigInteger
-    i = this.nbits(e.data[j]) - 1
-
-    while (j >= 0) {
-      if (i >= k1) {
-        w = (e.data[j] >> (i - k1)) & km
-      }
-      else {
-        w = (e.data[j] & ((1 << (i + 1)) - 1)) << (k1 - i)
-        if (j > 0) {
-          w |= e.data[j - 1] >> (BigInteger.DB + i - k1)
-        }
-      }
-
-      n = k
-      while ((w & 1) === 0) {
-        w >>= 1
-        --n
-      }
-      if ((i -= n) < 0) {
-        i += BigInteger.DB
-        --j
-      }
-
-      if (is1) {
-        g[w].copyTo(r)
-        is1 = false
-      }
-      else {
-        while (n > 1) {
-          z.sqrTo(r, r2)
-          z.sqrTo(r2, r)
-          n -= 2
-        }
-        if (n > 0) {
-          z.sqrTo(r, r2)
-        }
-        else {
-          t = r
-          r = r2
-          r2 = t
-        }
-        z.mulTo(r2, g[w], r)
-      }
-
-      while (j >= 0 && (e.data[j] & (1 << i)) === 0) {
-        z.sqrTo(r, r2)
-        t = r
-        r = r2
-        r2 = t
-        if (--i < 0) {
-          i = BigInteger.DB - 1
-          --j
-        }
-      }
-    }
-    return z.revert(r)
-  }
-
-  public modPowInt(e: number, m: BigInteger): BigInteger {
-    let z: IReducer
-    if (e < 256 || m.isEven()) {
-      z = new Classic(m)
-    }
-    else {
-      z = new Montgomery(m)
-    }
-    return this.exp(e, z)
-  }
-
-  private exp(e: number, z: IReducer): BigInteger {
-    if (e > 0xFFFFFFFF || e < 1)
-      return BigInteger.ONE
-    let r = new BigInteger()
-    let r2 = new BigInteger()
-    const g = z.convert(this)
-    let i = this.nbits(e) - 1
-
-    g.copyTo(r)
-    while (--i >= 0) {
-      z.sqrTo(r, r2)
-      if ((e & (1 << i)) > 0) {
-        z.mulTo(r2, g, r)
-      }
-      else {
-        const t = r
-        r = r2
-        r2 = t
-      }
-    }
-    return z.revert(r)
-  }
-
-  // Utility methods
-  public isEven(): boolean {
-    return ((this.t > 0) ? (this.data[0] & 1) : this.s) === 0
-  }
-
-  public modInt(n: number): number {
-    if (n <= 0)
-      return 0
-    const d = BigInteger.DV % n
-    let r = (this.s < 0) ? n - 1 : 0
-    if (this.t > 0) {
-      if (d === 0) {
-        r = this.data[0] % n
-      }
-      else {
-        for (let i = this.t - 1; i >= 0; --i) {
-          r = (d * r + this.data[i]) % n
-        }
-      }
-    }
-    return r
-  }
-
-  public getLowestSetBit(): number {
-    for (let i = 0; i < this.t; ++i) {
-      if (this.data[i] !== 0) {
-        return i * BigInteger.DB + this.lbit(this.data[i])
-      }
-    }
-    if (this.s < 0)
-      return this.t * BigInteger.DB
-    return -1
-  }
-
-  public lbit(x: number): number {
-    if (x === 0)
-      return -1
-    let r = 0
-    if ((x & 0xFFFF) === 0) { x >>= 16; r += 16 }
-    if ((x & 0xFF) === 0) { x >>= 8; r += 8 }
-    if ((x & 0xF) === 0) { x >>= 4; r += 4 }
-    if ((x & 3) === 0) { x >>= 2; r += 2 }
-    if ((x & 1) === 0)
-      ++r
-    return r
-  }
-
-  public multiplyLowerTo(a: BigInteger, n: number, r: BigInteger): void {
-    let i = Math.min(this.t + a.t, n)
-    r.s = 0 // assumes a,this >= 0
-    r.t = i
-    while (i > 0) r.data[--i] = 0
-    let j
-    for (j = r.t - this.t; i < j; ++i) r.data[i + this.t] = this.am(0, a.data[i], r, i, 0, this.t)
-    for (j = Math.min(a.t, n); i < j; ++i) this.am(0, a.data[i], r, i, 0, n - i)
-    r.clamp()
-  }
-
-  public multiplyUpperTo(a: BigInteger, n: number, r: BigInteger): void {
-    --n
-    let i = r.t = this.t + a.t - n
-    r.s = 0 // assumes a,this >= 0
-    while (--i >= 0) r.data[i] = 0
-    for (i = Math.max(n - this.t, 0); i < a.t; ++i) {
-      r.data[this.t + i - n] = this.am(n - i, a.data[i], r, 0, 0, this.t + i - n)
-    }
-    r.clamp()
-    r.drShiftTo(1, r)
-  }
-
-  // Shifting operations
-  public shiftLeft(n: number): BigInteger {
-    const r = new BigInteger()
-    if (n < 0)
-      this.rShiftTo(-n, r)
-    else this.lShiftTo(n, r)
-    return r
-  }
-
-  public shiftRight(n: number): BigInteger {
-    const r = new BigInteger()
-    if (n < 0)
-      this.lShiftTo(-n, r)
-    else this.rShiftTo(n, r)
-    return r
-  }
-
-  private lShiftTo(n: number, r: BigInteger): void {
-    const bs = n % BigInteger.DB
-    const cbs = BigInteger.DB - bs
-    const bm = (1 << cbs) - 1
-    const ds = Math.floor(n / BigInteger.DB)
-    let c = (this.s << bs) & BigInteger.DM
-
-    for (let i = this.t - 1; i >= 0; --i) {
-      r.data[i + ds + 1] = (this.data[i] >> cbs) | c
-      c = (this.data[i] & bm) << bs
-    }
-
-    for (let i = ds - 1; i >= 0; --i) r.data[i] = 0
-    r.data[ds] = c
-    r.t = this.t + ds + 1
-    r.s = this.s
-    r.clamp()
-  }
-
-  private rShiftTo(n: number, r: BigInteger): void {
-    r.s = this.s
-    const ds = Math.floor(n / BigInteger.DB)
-    if (ds >= this.t) {
-      r.t = 0
-      return
-    }
-    const bs = n % BigInteger.DB
-    const cbs = BigInteger.DB - bs
-    const bm = (1 << bs) - 1
-    r.data[0] = this.data[ds] >> bs
-    for (let i = ds + 1; i < this.t; ++i) {
-      r.data[i - ds - 1] |= (this.data[i] & bm) << cbs
-      r.data[i - ds] = this.data[i] >> bs
-    }
-    if (bs > 0)
-      r.data[this.t - ds - 1] |= (this.s & bm) << cbs
-    r.t = this.t - ds
-    r.clamp()
-  }
-
-  // Division operations
-  public divRemTo(m: BigInteger, q: BigInteger | null, r: BigInteger | null): void {
-    const pm = m.abs()
-    if (pm.t <= 0)
-      return
-    const pt = this.abs()
-    if (pt.t < pm.t) {
-      if (q != null)
-        q.fromInt(0)
-      if (r != null)
-        this.copyTo(r)
-      return
-    }
-    if (r == null)
-      r = new BigInteger()
-    const y = new BigInteger()
-    const ts = this.s
-    const ms = m.s
-    const nsh = BigInteger.DB - this.nbits(pm.data[pm.t - 1])
-    if (nsh > 0) {
-      pm.lShiftTo(nsh, y)
-      pt.lShiftTo(nsh, r)
-    }
-    else {
-      pm.copyTo(y)
-      pt.copyTo(r)
-    }
-    const ys = y.t
-    const y0 = y.data[ys - 1]
-    if (y0 === 0)
-      return
-    const yt = y0 * (1 << BigInteger.F1) + ((ys > 1) ? y.data[ys - 2] >> BigInteger.F2 : 0)
-    const d1 = BigInteger.FV / yt
-    const d2 = (1 << BigInteger.F1) / yt
-    const e = 1 << BigInteger.F2
-    let i = r.t
-    let j = i - ys
-    const t = q == null ? new BigInteger() : q
-    y.dlShiftTo(j, t)
-    if (r.compareTo(t) >= 0) {
-      r.data[r.t++] = 1
-      r.subTo(t, r)
-    }
-    BigInteger.ONE.dlShiftTo(ys, t)
-    t.subTo(y, y)
-    while (y.t < ys) y.data[y.t++] = 0
-    while (--j >= 0) {
-      let qd = (r.data[--i] === y0) ? BigInteger.DM : Math.floor(r.data[i] * d1 + (r.data[i - 1] + e) * d2)
-      if ((r.data[i] += y.am(0, qd, r, j, 0, ys)) < qd) {
-        y.dlShiftTo(j, t)
-        r.subTo(t, r)
-        while (r.data[i] < --qd) r.subTo(t, r)
-      }
-    }
-    if (q != null) {
-      r.drShiftTo(ys, q)
-      if (ts !== ms)
-        BigInteger.ZERO.subTo(q, q)
-    }
-    r.t = ys
-    r.clamp()
-    if (nsh > 0)
-      r.rShiftTo(nsh, r)
-    if (ts < 0)
-      BigInteger.ZERO.subTo(r, r)
-  }
-
-  // Multiply operations
-  public dlShiftTo(n: number, r: BigInteger): void {
-    for (let i = this.t - 1; i >= 0; --i) r.data[i + n] = this.data[i]
-    for (let i = n - 1; i >= 0; --i) r.data[i] = 0
-    r.t = this.t + n
-    r.s = this.s
-  }
-
-  public drShiftTo(n: number, r: BigInteger): void {
-    for (let i = n; i < this.t; ++i) r.data[i - n] = this.data[i]
-    r.t = Math.max(this.t - n, 0)
-    r.s = this.s
-  }
-
-  public copyTo(r: BigInteger): void {
-    for (let i = this.t - 1; i >= 0; --i) r.data[i] = this.data[i]
-    r.t = this.t
-    r.s = this.s
-  }
-
-  public invDigit(): number {
-    if (this.t < 1)
-      return 0
-    const x = this.data[0]
-    if ((x & 1) === 0)
-      return 0
-    let y = x & 3
-    y = (y * (2 - (x & 0xF) * y)) & 0xF
-    y = (y * (2 - (x & 0xFF) * y)) & 0xFF
-    y = (y * (2 - (((x & 0xFFFF) * y) & 0xFFFF))) & 0xFFFF
-    y = (y * (2 - x * y % BigInteger.DV)) % BigInteger.DV
-    return (y > 0) ? BigInteger.DV - y : -y
-  }
-
-  public mod(m: BigInteger): BigInteger {
-    const r = new BigInteger()
-    this.abs().divRemTo(m, null, r)
-    if (this.s < 0 && r.compareTo(BigInteger.ZERO) > 0)
-      m.subTo(r, r)
-    return r
-  }
-
-  public testBit(n: number): boolean {
-    const j = Math.floor(n / BigInteger.DB)
-    if (j >= this.t)
-      return (this.s !== 0)
-    return ((this.data[j] & (1 << (n % BigInteger.DB))) !== 0)
-  }
-
   public multiplyTo(a: BigInteger, r: BigInteger): void {
     const x = this.abs()
     const y = a.abs()
@@ -1045,6 +633,471 @@ export class BigInteger {
     this.data[this.t] = this.am(0, n - 1, this, 0, 0, this.t)
     ++this.t
     this.clamp()
+  }
+
+  public gcd(a: BigInteger): BigInteger {
+    let x = this.s < 0 ? this.negate() : this.clone()
+    let y = a.s < 0 ? a.negate() : a.clone()
+
+    if (x.compareTo(y) < 0) {
+      const t = x
+      x = y
+      y = t
+    }
+
+    let i = x.getLowestSetBit()
+    let g = y.getLowestSetBit()
+
+    if (g < 0) return x
+
+    if (i < g) g = i
+
+    if (g > 0) {
+      x.rShiftTo(g, x)
+      y.rShiftTo(g, y)
+    }
+
+    while (x.signum() > 0) {
+      if ((i = x.getLowestSetBit()) > 0) x.rShiftTo(i, x)
+      if ((i = y.getLowestSetBit()) > 0) y.rShiftTo(i, y)
+
+      if (x.compareTo(y) >= 0) {
+        x.subTo(y, x)
+        x.rShiftTo(1, x)
+      }
+      else {
+        y.subTo(x, y)
+        y.rShiftTo(1, y)
+      }
+    }
+
+    if (g > 0) y.lShiftTo(g, y)
+    return y
+  }
+
+  private clone(): BigInteger {
+    const r = new BigInteger()
+    this.copyTo(r)
+    return r
+  }
+
+  public isEven(): boolean {
+    return ((this.t > 0) ? (this.data[0] & 1) : this.s) === 0
+  }
+
+  public modInt(n: number): number {
+    if (n <= 0)
+      return 0
+    const d = BigInteger.DV % n
+    let r = (this.s < 0) ? n - 1 : 0
+    if (this.t > 0) {
+      if (d === 0) {
+        r = this.data[0] % n
+      }
+      else {
+        for (let i = this.t - 1; i >= 0; --i) {
+          r = (d * r + this.data[i]) % n
+        }
+      }
+    }
+    return r
+  }
+
+  public testBit(n: number): boolean {
+    const j = Math.floor(n / BigInteger.DB)
+    if (j >= this.t)
+      return (this.s !== 0)
+    return ((this.data[j] & (1 << (n % BigInteger.DB))) !== 0)
+  }
+
+  public shiftLeft(n: number): BigInteger {
+    const r = new BigInteger()
+    if (n < 0)
+      this.rShiftTo(-n, r)
+    else
+      this.lShiftTo(n, r)
+    return r
+  }
+
+  private lShiftTo(n: number, r: BigInteger): void {
+    const bs = n % BigInteger.DB
+    const cbs = BigInteger.DB - bs
+    const bm = (1 << cbs) - 1
+    const ds = Math.floor(n / BigInteger.DB)
+    let c = (this.s << bs) & BigInteger.DM
+
+    for (let i = this.t - 1; i >= 0; --i) {
+      r.data[i + ds + 1] = (this.data[i] >> cbs) | c
+      c = (this.data[i] & bm) << bs
+    }
+
+    for (let i = ds - 1; i >= 0; --i) r.data[i] = 0
+    r.data[ds] = c
+    r.t = this.t + ds + 1
+    r.s = this.s
+    r.clamp()
+  }
+
+  private rShiftTo(n: number, r: BigInteger): void {
+    r.s = this.s
+    const ds = Math.floor(n / BigInteger.DB)
+    if (ds >= this.t) {
+      r.t = 0
+      return
+    }
+    const bs = n % BigInteger.DB
+    const cbs = BigInteger.DB - bs
+    const bm = (1 << bs) - 1
+    r.data[0] = this.data[ds] >> bs
+    for (let i = ds + 1; i < this.t; ++i) {
+      r.data[i - ds - 1] |= (this.data[i] & bm) << cbs
+      r.data[i - ds] = this.data[i] >> bs
+    }
+    if (bs > 0)
+      r.data[this.t - ds - 1] |= (this.s & bm) << cbs
+    r.t = this.t - ds
+    r.clamp()
+  }
+
+  public shiftRight(n: number): BigInteger {
+    const r = new BigInteger()
+    if (n < 0)
+      this.lShiftTo(-n, r)
+    else
+      this.rShiftTo(n, r)
+    return r
+  }
+
+  public getLowestSetBit(): number {
+    for (let i = 0; i < this.t; ++i) {
+      if (this.data[i] !== 0) {
+        return i * BigInteger.DB + this.lbit(this.data[i])
+      }
+    }
+    if (this.s < 0)
+      return this.t * BigInteger.DB
+    return -1
+  }
+
+  public modPow(e: BigInteger, m: BigInteger): BigInteger {
+    let i = e.bitLength()
+    let k: number
+    let r = new BigInteger(1)
+    let z: IReducer
+
+    if (i <= 0)
+      return r
+    else if (i < 18)
+      k = 1
+    else if (i < 48)
+      k = 3
+    else if (i < 144)
+      k = 4
+    else if (i < 768)
+      k = 5
+    else k = 6
+
+    if (i < 8) {
+      z = new Classic(m)
+    }
+    else if (m.isEven()) {
+      z = new Barrett(m)
+    }
+    else {
+      z = new Montgomery(m)
+    }
+
+    // Precomputation
+    const g: BigInteger[] = []
+    let n = 3
+    const k1 = k - 1
+    const km = (1 << k) - 1
+    g[1] = z.convert(this)
+
+    if (k > 1) {
+      const g2 = new BigInteger()
+      z.sqrTo(g[1], g2)
+      while (n <= km) {
+        g[n] = new BigInteger()
+        z.mulTo(g2, g[n - 2], g[n])
+        n += 2
+      }
+    }
+
+    let j = e.t - 1
+    let w: number
+    let is1 = true
+    let r2 = new BigInteger()
+    let t: BigInteger
+    i = this.nbits(e.data[j]) - 1
+
+    while (j >= 0) {
+      if (i >= k1) {
+        w = (e.data[j] >> (i - k1)) & km
+      }
+      else {
+        w = (e.data[j] & ((1 << (i + 1)) - 1)) << (k1 - i)
+        if (j > 0) {
+          w |= e.data[j - 1] >> (BigInteger.DB + i - k1)
+        }
+      }
+
+      n = k
+      while ((w & 1) === 0) {
+        w >>= 1
+        --n
+      }
+      if ((i -= n) < 0) {
+        i += BigInteger.DB
+        --j
+      }
+
+      if (is1) {
+        g[w].copyTo(r)
+        is1 = false
+      }
+      else {
+        while (n > 1) {
+          z.sqrTo(r, r2)
+          z.sqrTo(r2, r)
+          n -= 2
+        }
+        if (n > 0) {
+          z.sqrTo(r, r2)
+        }
+        else {
+          t = r
+          r = r2
+          r2 = t
+        }
+        z.mulTo(r2, g[w], r)
+      }
+
+      while (j >= 0 && (e.data[j] & (1 << i)) === 0) {
+        z.sqrTo(r, r2)
+        t = r
+        r = r2
+        r2 = t
+        if (--i < 0) {
+          i = BigInteger.DB - 1
+          --j
+        }
+      }
+    }
+    return z.revert(r)
+  }
+
+  public divRemTo(m: BigInteger, q: BigInteger | null, r: BigInteger | null): void {
+    const pm = m.abs()
+    if (pm.t <= 0)
+      return
+    const pt = this.abs()
+    if (pt.t < pm.t) {
+      if (q != null)
+        q.fromInt(0)
+      if (r != null)
+        this.copyTo(r)
+      return
+    }
+    if (r == null)
+      r = new BigInteger()
+    const y = new BigInteger()
+    const ts = this.s
+    const ms = m.s
+    const nsh = BigInteger.DB - this.nbits(pm.data[pm.t - 1])
+    if (nsh > 0) {
+      pm.lShiftTo(nsh, y)
+      pt.lShiftTo(nsh, r)
+    }
+    else {
+      pm.copyTo(y)
+      pt.copyTo(r)
+    }
+    const ys = y.t
+    const y0 = y.data[ys - 1]
+    if (y0 === 0)
+      return
+    const yt = y0 * (1 << BigInteger.F1) + ((ys > 1) ? y.data[ys - 2] >> BigInteger.F2 : 0)
+    const d1 = BigInteger.FV / yt
+    const d2 = (1 << BigInteger.F1) / yt
+    const e = 1 << BigInteger.F2
+    let i = r.t
+    let j = i - ys
+    const t = q == null ? new BigInteger() : q
+    y.dlShiftTo(j, t)
+    if (r.compareTo(t) >= 0) {
+      r.data[r.t++] = 1
+      r.subTo(t, r)
+    }
+    BigInteger.ONE.dlShiftTo(ys, t)
+    t.subTo(y, y)
+    while (y.t < ys) y.data[y.t++] = 0
+    while (--j >= 0) {
+      let qd = (r.data[--i] === y0) ? BigInteger.DM : Math.floor(r.data[i] * d1 + (r.data[i - 1] + e) * d2)
+      if ((r.data[i] += y.am(0, qd, r, j, 0, ys)) < qd) {
+        y.dlShiftTo(j, t)
+        r.subTo(t, r)
+        while (r.data[i] < --qd) r.subTo(t, r)
+      }
+    }
+    if (q != null) {
+      r.drShiftTo(ys, q)
+      if (ts !== ms)
+        BigInteger.ZERO.subTo(q, q)
+    }
+    r.t = ys
+    r.clamp()
+    if (nsh > 0)
+      r.rShiftTo(nsh, r)
+    if (ts < 0)
+      BigInteger.ZERO.subTo(r, r)
+  }
+
+  public addTo(a: BigInteger, r: BigInteger): void {
+    let i = 0
+    let c = 0
+    const m = Math.min(a.t, this.t)
+    while (i < m) {
+      c += this.data[i] + a.data[i]
+      r.data[i++] = c & BigInteger.DM
+      c >>= BigInteger.DB
+    }
+    if (a.t < this.t) {
+      c += a.s
+      while (i < this.t) {
+        c += this.data[i]
+        r.data[i++] = c & BigInteger.DM
+        c >>= BigInteger.DB
+      }
+      c += this.s
+    }
+    else {
+      c += this.s
+      while (i < a.t) {
+        c += a.data[i]
+        r.data[i++] = c & BigInteger.DM
+        c >>= BigInteger.DB
+      }
+      c += a.s
+    }
+    r.s = (c < 0) ? -1 : 0
+    if (c > 0)
+      r.data[i++] = c
+    else if (c < -1)
+      r.data[i++] = BigInteger.DV + c
+    r.t = i
+    r.clamp()
+  }
+
+  public copyTo(r: BigInteger): void {
+    for (let i = this.t - 1; i >= 0; --i) r.data[i] = this.data[i]
+    r.t = this.t
+    r.s = this.s
+  }
+
+  public lbit(x: number): number {
+    if (x === 0)
+      return -1
+    let r = 0
+    if ((x & 0xFFFF) === 0) { x >>= 16; r += 16 }
+    if ((x & 0xFF) === 0) { x >>= 8; r += 8 }
+    if ((x & 0xF) === 0) { x >>= 4; r += 4 }
+    if ((x & 3) === 0) { x >>= 2; r += 2 }
+    if ((x & 1) === 0)
+      ++r
+    return r
+  }
+
+  public dlShiftTo(n: number, r: BigInteger): void {
+    for (let i = this.t - 1; i >= 0; --i) r.data[i + n] = this.data[i]
+    for (let i = n - 1; i >= 0; --i) r.data[i] = 0
+    r.t = this.t + n
+    r.s = this.s
+  }
+
+  public drShiftTo(n: number, r: BigInteger): void {
+    for (let i = n; i < this.t; ++i) r.data[i - n] = this.data[i]
+    r.t = Math.max(this.t - n, 0)
+    r.s = this.s
+  }
+
+  public mod(m: BigInteger): BigInteger {
+    const r = new BigInteger()
+    this.abs().divRemTo(m, null, r)
+    if (this.s < 0 && r.compareTo(BigInteger.ZERO) > 0)
+      m.subTo(r, r)
+    return r
+  }
+
+  public invDigit(): number {
+    if (this.t < 1)
+      return 0
+    const x = this.data[0]
+    if ((x & 1) === 0)
+      return 0
+    let y = x & 3
+    y = (y * (2 - (x & 0xF) * y)) & 0xF
+    y = (y * (2 - (x & 0xFF) * y)) & 0xFF
+    y = (y * (2 - (((x & 0xFFFF) * y) & 0xFFFF))) & 0xFFFF
+    y = (y * (2 - x * y % BigInteger.DV)) % BigInteger.DV
+    return (y > 0) ? BigInteger.DV - y : -y
+  }
+
+  public multiplyUpperTo(a: BigInteger, n: number, r: BigInteger): void {
+    --n
+    let i = r.t = this.t + a.t - n
+    r.s = 0 // assumes a,this >= 0
+    while (--i >= 0) r.data[i] = 0
+    for (i = Math.max(n - this.t, 0); i < a.t; ++i) {
+      r.data[this.t + i - n] = this.am(n - i, a.data[i], r, 0, 0, this.t + i - n)
+    }
+    r.clamp()
+    r.drShiftTo(1, r)
+  }
+
+  public multiplyLowerTo(a: BigInteger, n: number, r: BigInteger): void {
+    let i = Math.min(this.t + a.t, n)
+    r.s = 0 // assumes a,this >= 0
+    r.t = i
+    while (i > 0) r.data[--i] = 0
+    let j
+    for (j = r.t - this.t; i < j; ++i) r.data[i + this.t] = this.am(0, a.data[i], r, i, 0, this.t)
+    for (j = Math.min(a.t, n); i < j; ++i) this.am(0, a.data[i], r, i, 0, n - i)
+    r.clamp()
+  }
+
+  public modPowInt(e: number, m: BigInteger): BigInteger {
+    let z: IReducer
+    if (e < 256 || m.isEven()) {
+      z = new Classic(m)
+    }
+    else {
+      z = new Montgomery(m)
+    }
+    return this.exp(e, z)
+  }
+
+  private exp(e: number, z: IReducer): BigInteger {
+    if (e > 0xFFFFFFFF || e < 1)
+      return BigInteger.ONE
+    let r = new BigInteger()
+    let r2 = new BigInteger()
+    const g = z.convert(this)
+    let i = this.nbits(e) - 1
+
+    g.copyTo(r)
+    while (--i >= 0) {
+      z.sqrTo(r, r2)
+      if ((e & (1 << i)) > 0) {
+        z.mulTo(r2, g, r)
+      }
+      else {
+        const t = r
+        r = r2
+        r2 = t
+      }
+    }
+    return z.revert(r)
   }
 }
 
@@ -1204,3 +1257,4 @@ class Barrett implements IReducer {
     this.reduce(r)
   }
 }
+

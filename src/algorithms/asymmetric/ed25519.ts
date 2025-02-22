@@ -7,15 +7,15 @@
  * https://github.com/dchest/tweetnacl-js
  */
 
-import { asn1 } from './asn1'
-import { asn1Validator } from './asn1-validator'
-import { oids } from './oids'
-import { getBytesSync } from './random'
-import { sha512 as sha } from './sha512'
-import { ByteBuffer, ByteStringBuffer } from './utils'
+import { asn1 } from '../../encoding/asn1'
+import { asn1Validator } from '../../validators/asn1-validator'
+import { oids } from '../../oids'
+import { getBytesSync } from '../../utils/random'
+import { sha512 as sha } from '../../algorithms/hash/sha512'
+import { ByteBuffer, ByteStringBuffer } from '../../utils'
 
-const publicKeyValidator = asn1Validator.publicKeyValidator
-const privateKeyValidator = asn1Validator.privateKeyValidator
+const publicKeyValidator = asn1Validator.ans1PublicKeyValidator
+const privateKeyValidator = asn1Validator.ans1PrivateKeyValidator
 
 const NativeBuffer = typeof Buffer === 'undefined' ? Uint8Array : Buffer
 

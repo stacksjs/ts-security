@@ -16,33 +16,33 @@
  * EncryptedData ::= OCTET STRING
  */
 
-import type { Asn1Object } from './asn1'
-import type { BlockCipher } from './cipher'
-import type { MessageDigest } from './sha1'
+import type { Asn1Object } from '../encoding/asn1'
+import type { BlockCipher } from '../algorithms/symmetric/cipher'
+import type { MessageDigest } from '../algorithms/hash/sha1'
 import type { ByteStringBuffer } from '.'
 import { ByteStringBuffer as ByteStringBuff } from '.'
-import type { PemMessage, PemHeader, Pem } from './pem'
-import { aes } from './aes'
-import { asn1 } from './asn1'
-import { wrapRsaPrivateKey, privateKeyToAsn1, privateKeyFromAsn1 } from './rsa'
-import { createCipher, createCipher as createCipherOriginal, createDecipher } from './cipher'
-import { sha1 } from './sha1'
-import { des } from './des'
-import { oids } from './oids'
-import { pbkdf2 } from './pbkdf2'
-import { getBytesSync } from './random'
-import { rc2 } from './rc2'
-import { sha512 } from './sha512'
+import type { PemMessage, PemHeader, Pem } from '../encoding/pem'
+import { aes } from '../algorithms/symmetric/aes'
+import { asn1 } from '../encoding/asn1'
+import { wrapRsaPrivateKey, privateKeyToAsn1, privateKeyFromAsn1 } from '../algorithms/asymmetric/rsa'
+import { createCipher, createCipher as createCipherOriginal } from '../algorithms/symmetric/cipher'
+import { sha1 } from '../algorithms/hash/sha1'
+import { des } from '../algorithms/symmetric/des'
+import { oids } from '../oids'
+import { pbkdf2 } from '../utils/pbkdf2'
+import { getBytesSync } from '../utils/random'
+import { rc2 } from '../algorithms/symmetric/rc2'
+import { sha512 } from '../algorithms/hash/sha512'
 import { bytesToHex, createBuffer, hexToBytes } from '.'
-import { pem } from './pem'
+import { pem } from '../encoding/pem'
 import { Buffer } from 'buffer'
 
 // Error codes enum
-export enum PBEErrorCode {
-  INVALID_PARAMS = 'INVALID_PARAMS',
-  DECRYPTION_FAILED = 'DECRYPTION_FAILED',
-  UNSUPPORTED_ALGORITHM = 'UNSUPPORTED_ALGORITHM'
-}
+export const PBEErrorCode = {
+  INVALID_PARAMS: 'INVALID_PARAMS',
+  DECRYPTION_FAILED: 'DECRYPTION_FAILED',
+  UNSUPPORTED_ALGORITHM: 'UNSUPPORTED_ALGORITHM'
+} as const
 
 // Custom error class
 export class PBEError extends Error {
@@ -50,7 +50,7 @@ export class PBEError extends Error {
 
   constructor(
     message: string,
-    public readonly code: PBEErrorCode,
+    public readonly code: keyof typeof PBEErrorCode,
     details?: Record<string, unknown>
   ) {
     super(message)
@@ -320,12 +320,14 @@ function convertToString(input: ByteStringBuffer | string): string {
 // Update cipher creation functions
 function createAESCipher(key: string | ByteStringBuffer, bits: string = '128'): BlockCipher {
   const keyStr = convertToString(key)
+
   return aes.createEncryptionCipher(keyStr, bits)
 }
 
 function createDESCipher(key: string | ByteStringBuffer, iv: ByteStringBuffer): BlockCipher {
   const keyStr = convertToString(key)
   const ivBuffer = toNodeBufferFromBSB(iv)
+
   return des.createEncryptionCipher(keyStr, ivBuffer)
 }
 

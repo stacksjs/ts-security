@@ -229,12 +229,12 @@
  * due to the large block size of existing MACs and the small size of the
  * timing signal.
  */
-import { createBuffer, util } from './utils'
-import { random } from './random'
-import { create as hmacCreate } from './hmac'
-import { pki } from './pki'
-import { asn1 } from './asn1'
-import { certificateFromAsn1 } from './x509'
+import { createBuffer, util } from '../utils'
+import { random } from '../utils/random'
+import { create as hmacCreate } from '../utils/hmac'
+import { pki } from '../pki'
+import { asn1 } from '../encoding/asn1'
+import { certificateFromAsn1 } from '../x509'
 
 /**
  * Generates pseudo random bytes by mixing the result of two hash functions,
