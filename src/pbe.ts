@@ -148,23 +148,6 @@ const pbeAlgorithms: PBEAlgorithmsMap = {
   'desCBC': { cipher: 'DES-CBC', keyLength: 8, ivLength: 8 }
 }
 
-function convertToString(input: ByteStringBuffer | string): string {
-  if (typeof input === 'string')
-    return input
-
-  return input.bytes()
-}
-
-function toByteStringBuffer(input: string | Buffer | ByteStringBuffer): ByteStringBuffer {
-  if (input instanceof ByteStringBuff)
-    return input
-
-  if (typeof input === 'string')
-    return createBuffer(input)
-
-  return createBuffer(input.toString('binary'))
-}
-
 // Type for cipher creation functions
 interface CipherCreationOptions {
   key: string | ByteStringBuffer
@@ -187,29 +170,48 @@ function toNodeBufferFromBSB(buf: ByteStringBuffer): Buffer {
   return Buffer.from(buf.bytes(), 'binary')
 }
 
-// Update cipher creation functions
-function createAESCipher(options: CipherCreationOptions): BlockCipher {
-  const keyStr = typeof options.key === 'string' ? options.key : options.key.toString()
-  return aes.createEncryptionCipher(keyStr, options.bits || '128')
+// Helper function to convert any input to ByteStringBuffer
+function toByteStringBuffer(input: string | Buffer | ByteStringBuffer): ByteStringBuffer {
+  if (input instanceof ByteStringBuff)
+    return input
+
+  if (typeof input === 'string')
+    return createBuffer(input)
+
+  return createBuffer(input.toString('binary'))
 }
 
-function createDESCipher(options: CipherCreationOptions): BlockCipher {
-  const keyStr = typeof options.key === 'string' ? options.key : options.key.toString()
-  const ivStr = options.iv ? toBufferString(options.iv) : undefined
-  return des.createEncryptionCipher(keyStr, ivStr)
+// Helper function to convert any input to string
+function convertToString(input: ByteStringBuffer | string): string {
+  if (typeof input === 'string')
+    return input
+
+  return input.bytes()
+}
+
+// Update cipher creation functions
+function createAESCipher(key: string | ByteStringBuffer, bits: string = '128'): BlockCipher {
+  const keyStr = convertToString(key)
+  return aes.createEncryptionCipher(keyStr, bits)
+}
+
+function createDESCipher(key: string | ByteStringBuffer, iv: ByteStringBuffer): BlockCipher {
+  const keyStr = convertToString(key)
+  const ivBuffer = toNodeBufferFromBSB(iv)
+  return des.createEncryptionCipher(keyStr, ivBuffer)
 }
 
 function createModernCipher(algorithm: string, key: ByteStringBuffer | string): BlockCipher {
-  const keyStr = typeof key === 'string' ? key : key.toString()
+  const keyStr = convertToString(key)
   const iv = createBuffer(getBytesSync(8))
 
   switch (algorithm) {
     case 'AES-CBC':
-      return createAESCipher({ key: keyStr, bits: '128' })
+      return createAESCipher(keyStr, '128')
     case '3DES-CBC':
-      return createDESCipher({ key: keyStr, iv })
+      return createDESCipher(keyStr, iv)
     case 'DES-CBC':
-      return createDESCipher({ key: keyStr, iv })
+      return createDESCipher(keyStr, iv)
     default:
       throw new PBEError(
         `Unsupported cipher algorithm: ${algorithm}`,
@@ -223,15 +225,15 @@ function createLegacyDecipher(algorithm: string, key: string): BlockCipher {
 
   switch (algorithm) {
     case 'DES-CBC':
-      return createDESCipher({ key, iv })
+      return createDESCipher(key, iv)
     case 'DES-EDE3-CBC':
-      return createDESCipher({ key, iv })
+      return createDESCipher(key, iv)
     case 'AES-128-CBC':
-      return createAESCipher({ key, bits: '128' })
+      return createAESCipher(key, '128')
     case 'AES-192-CBC':
-      return createAESCipher({ key, bits: '192' })
+      return createAESCipher(key, '192')
     case 'AES-256-CBC':
-      return createAESCipher({ key, bits: '256' })
+      return createAESCipher(key, '256')
     case 'RC2-40-CBC':
       return rc2.createDecryptionCipher(key, 40)
     case 'RC2-64-CBC':
@@ -258,7 +260,7 @@ function deriveKeyPBKDF2(
   const { salt, iterationCount, prf } = options
   const md = prfAlgorithmToMessageDigest(prf)
   const saltBuffer = toNodeBufferFromBSB(salt)
-  const result = pbkdf2(password, saltBuffer, iterationCount, 32, md)
+  const result = pbkdf2(toNodeBufferFromString(password), saltBuffer, iterationCount, 32, md)
   return result ? createBuffer(result) : createBuffer('')
 }
 
