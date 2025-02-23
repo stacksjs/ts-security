@@ -22,8 +22,8 @@ interface CustomError extends Error {
  *
  * @return the private key.
  */
-export function privateKeyFromPem(pem: PemMessage): any {
-  const msg = pem.decode(pem)[0]
+export function privateKeyFromPem(pemString: string): any {
+  const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
     const error: CustomError = new Error('Could not convert private key from PEM; PEM header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
@@ -48,7 +48,7 @@ export function privateKeyFromPem(pem: PemMessage): any {
  *
  * @return the PEM-formatted private key.
  */
-export function privateKeyToPem(key: any, maxline: number): string {
+export function privateKeyToPem(key: any, maxline: number = 64): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PRIVATE KEY',
@@ -66,7 +66,7 @@ export function privateKeyToPem(key: any, maxline: number): string {
  *
  * @return the PEM-formatted private key.
  */
-export function privateKeyInfoToPem(pki: any, maxline: number): string {
+export function privateKeyInfoToPem(pki: any, maxline: number = 64): string {
   // convert to DER, then PEM-encode
   const msg = {
     type: 'PRIVATE KEY',

@@ -797,7 +797,7 @@ export function readSignatureParameters(
   if (!asn1.validate(obj, rsassaPssParameterValidator, capture, errors)) {
     throw {
       message: 'Cannot read RSASSA-PSS parameter block.',
-      error: 'forge.pki.BadCertificate',
+      error: 'pki.BadCertificate',
       errors
     } as CustomError
   }
@@ -879,7 +879,7 @@ export function verifySignature(options: {
     if (!params) {
       throw {
         message: 'Missing signature parameters',
-        error: 'forge.pki.BadCertificate'
+        error: 'pki.BadCertificate'
       } as CustomError
     }
 
@@ -887,7 +887,7 @@ export function verifySignature(options: {
     if (!hashAlgorithm || !((md as unknown as HashFunctions)[hashAlgorithm])) {
       throw {
         message: 'Unsupported MGF hash function.',
-        error: 'forge.pki.BadCertificate',
+        error: 'pki.BadCertificate',
         oid: params.mgf?.hash?.algorithmOid
       } as CustomError
     }
@@ -896,7 +896,7 @@ export function verifySignature(options: {
     if (!mgfOid || !((mgfImport as unknown as MaskGenFunctions)[mgfOid])) {
       throw {
         message: 'Unsupported MGF function.',
-        error: 'forge.pki.BadCertificate',
+        error: 'pki.BadCertificate',
         oid: mgfOid
       } as CustomError
     }
@@ -910,7 +910,7 @@ export function verifySignature(options: {
     if (!hashOid || !((md as unknown as HashFunctions)[hashOid])) {
       throw {
         message: 'Unsupported RSASSA-PSS hash function.',
-        error: 'forge.pki.BadCertificate',
+        error: 'pki.BadCertificate',
         oid: hashOid
       } as CustomError
     }
@@ -1217,7 +1217,7 @@ export function createCertificate(): Certificate {
         }
       }
       return false
-    }
+    },
   }
 
   return cert
@@ -1226,10 +1226,9 @@ export function createCertificate(): Certificate {
 /**
  * Converts an X.509v3 RSA certificate from an ASN.1 object.
  *
- * Note: If the certificate is to be verified then compute hash should
- * be set to true. There is currently no implementation for converting
- * a certificate back to ASN.1 so the TBSCertificate part of the ASN.1
- * object needs to be scanned before the cert object is created.
+ * Note: If the certificate is to be verified then compute hash should be set to true. There is currently
+ * no implementation for converting a certificate back to ASN.1 so the TBSCertificate
+ * part of the ASN.1 object needs to be scanned before the cert object is created.
  *
  * @param obj the asn1 representation of an X.509v3 RSA certificate.
  * @param computeHash true to compute the hash for verification.
@@ -1240,6 +1239,7 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
   // validate certificate and capture data
   const capture: CaptureObject = {}
   const errors: CustomError[] = []
+
   if (!asn1.validate(obj, x509CertificateValidator, capture, errors)) {
     const error: CustomError = new Error('Cannot read X.509 certificate. ASN.1 object is not an X509v3 Certificate.')
     error.errors = errors
@@ -1248,9 +1248,8 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
 
   // get oid
   const oid = asn1.derToOid(capture.publicKeyOid)
-  if (oid !== oids.rsaEncryption) {
+  if (oid !== oids.rsaEncryption)
     throw new Error('Cannot read public key. OID is not RSA.')
-  }
 
   // create certificate
   const cert = createCertificate()
@@ -1272,22 +1271,24 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
   cert.signature = capture.certSignature
 
   const validity = []
-  if (capture.certValidity1UTCTime !== undefined) {
+  if (capture.certValidity1UTCTime !== undefined)
     validity.push(asn1.utcTimeToDate(capture.certValidity1UTCTime))
-  }
+
   if (capture.certValidity2GeneralizedTime !== undefined) {
     validity.push(asn1.generalizedTimeToDate(
       capture.certValidity2GeneralizedTime,
     ))
   }
-  if (capture.certValidity3UTCTime !== undefined) {
+
+  if (capture.certValidity3UTCTime !== undefined)
     validity.push(asn1.utcTimeToDate(capture.certValidity3UTCTime))
-  }
+
   if (capture.certValidity4GeneralizedTime !== undefined) {
     validity.push(asn1.generalizedTimeToDate(
       capture.certValidity4GeneralizedTime,
     ))
   }
+
   if (validity.length > 2)
     throw new Error('Cannot read notBefore/notAfter validity times; more than two times were provided in the certificate.')
   if (validity.length < 2)
@@ -1552,7 +1553,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
         // get GeneralName
         gn = ev.value[n]
 
-        const altName = {
+        const altName: AltName = {
           type: gn.type,
           value: gn.value,
         }
@@ -1584,10 +1585,11 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
     else if (e.name === 'subjectKeyIdentifier') {
       // value is an OCTETSTRING w/the hash of the key-type specific
       // public key structure (eg: RSAPublicKey)
-      var ev = asn1.fromDer(e.value)
-      e.subjectKeyIdentifier = forge.util.bytesToHex(ev.value)
+      const ev = asn1.fromDer(e.value)
+      e.subjectKeyIdentifier = util.bytesToHex(ev.value)
     }
   }
+
   return e
 }
 
@@ -1604,10 +1606,11 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
  *
  * @return the certification request (CSR).
  */
-export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boolean) {
+export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boolean): CertificationRequest {
   // validate certification request and capture data
-  const capture = {}
+  const capture: CertificationRequestCapture = {}
   const errors: CustomError[] = []
+
   if (!asn1.validate(obj, certificationRequestValidator, capture, errors)) {
     const error: CustomError = new Error('Cannot read PKCS#10 certificate request. '
       + 'ASN.1 object is not a PKCS#10 CertificationRequest.')
@@ -1623,13 +1626,13 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
   // create certification request
   const csr = createCertificationRequest()
   csr.version = capture.csrVersion ? capture.csrVersion.charCodeAt(0) : 0
-  csr.signatureOid = forge.asn1.derToOid(capture.csrSignatureOid)
+  csr.signatureOid = asn1.derToOid(capture.csrSignatureOid)
   csr.signatureParameters = readSignatureParameters(
     csr.signatureOid,
     capture.csrSignatureParams,
     true,
   )
-  csr.siginfo.algorithmOid = forge.asn1.derToOid(capture.csrSignatureOid)
+  csr.siginfo.algorithmOid = asn1.derToOid(capture.csrSignatureOid)
   csr.siginfo.parameters = readSignatureParameters(
     csr.siginfo.algorithmOid,
     capture.csrSignatureParams,
@@ -1842,9 +1845,9 @@ function _dnToAsn1(obj) {
     if ('valueTagClass' in attr) {
       valueTagClass = attr.valueTagClass
 
-      if (valueTagClass === asn1.Type.UTF8) {
-        value = forge.util.encodeUtf8(value)
-      }
+      if (valueTagClass === asn1.Type.UTF8)
+        value = util.encodeUtf8(value)
+
       // FIXME: handle more encodings
     }
 
@@ -1883,7 +1886,7 @@ function _getAttributesAsJson(attrs) {
       || attr.valueTagClass === asn1.Type.IA5STRING)) {
       let value = attr.value
       if (attr.valueTagClass === asn1.Type.UTF8) {
-        value = forge.util.encodeUtf8(attr.value)
+        value = util.encodeUtf8(attr.value)
       }
       if (!(attr.shortName in rval)) {
         rval[attr.shortName] = value
@@ -2161,7 +2164,7 @@ function _fillMissingExtensionFields(e, options) {
       var value = altName.value
       // handle IP
       if (altName.type === 7 && altName.ip) {
-        value = forge.util.bytesFromIP(altName.ip)
+        value = util.bytesFromIP(altName.ip)
         if (value === null) {
           var error = new Error(
             'Extension "ip" value is not a valid IPv4 or IPv6 address.',
@@ -2274,7 +2277,7 @@ function _fillMissingExtensionFields(e, options) {
       var value = altName.value
       // handle IP
       if (altName.type === 7 && altName.ip) {
-        value = forge.util.bytesFromIP(altName.ip)
+        value = util.bytesFromIP(altName.ip)
         if (value === null) {
           var error = new Error(
             'Extension "ip" value is not a valid IPv4 or IPv6 address.',
@@ -2396,7 +2399,7 @@ function _CRIAttributesToAsn1(csr) {
       valueTagClass = attr.valueTagClass
     }
     if (valueTagClass === asn1.Type.UTF8) {
-      value = forge.util.encodeUtf8(value)
+      value = util.encodeUtf8(value)
     }
     let valueConstructed = false
     if ('valueConstructed' in attr) {
@@ -2842,12 +2845,12 @@ export function createCaStore(certs): CAStore {
  * Certificate verification errors, based on TLS.
  */
 export const certificateError = {
-  bad_certificate: 'forge.pki.BadCertificate',
-  unsupported_certificate: 'forge.pki.UnsupportedCertificate',
-  certificate_revoked: 'forge.pki.CertificateRevoked',
-  certificate_expired: 'forge.pki.CertificateExpired',
-  certificate_unknown: 'forge.pki.CertificateUnknown',
-  unknown_ca: 'forge.pki.UnknownCertificateAuthority',
+  bad_certificate: 'pki.BadCertificate',
+  unsupported_certificate: 'pki.UnsupportedCertificate',
+  certificate_revoked: 'pki.CertificateRevoked',
+  certificate_expired: 'pki.CertificateExpired',
+  certificate_unknown: 'pki.CertificateUnknown',
+  unknown_ca: 'pki.UnknownCertificateAuthority',
 } as const
 
 /**
@@ -2855,23 +2858,16 @@ export const certificateError = {
  * with an optional custom verify callback.
  *
  * @param caStore a certificate store to verify against.
- * @param chain the certificate chain to verify, with the root or highest
- *          authority at the end (an array of certificates).
+ * @param chain the certificate chain to verify, with the root or highest authority at the end (an array of certificates).
  * @param options a callback to be called for every certificate in the chain or
- *                  an object with:
- *                  verify a callback to be called for every certificate in the
- *                    chain
- *                  validityCheckDate the date against which the certificate
- *                    validity period should be checked. Pass null to not check
- *                    the validity period. By default, the current date is used.
+ * @param options.verify a callback to be called for every certificate in the chain
+ * @param options.validityCheckDate the date against which the certificate validity period should be checked. Pass null to not check the validity period. By default, the current date is used.
  *
  * The verify callback has the following signature:
  *
- * verified - Set to true if certificate was verified, otherwise the
- *   certificateError for why the certificate failed.
+ * verified - Set to true if certificate was verified, otherwise the certificateError for why the certificate failed.
  * depth - The current index in the chain, where 0 is the end point's cert.
- * certs - The certificate chain, *NOTE* an empty chain indicates an anonymous
- *   end point.
+ * certs - The certificate chain, *NOTE* an empty chain indicates an anonymous end point.
  *
  * The function returns true on success and on failure either the appropriate
  * certificateError or an object with 'error' set to the appropriate
@@ -2910,7 +2906,7 @@ export function verifyCertificateChain(
     if (validityCheckDate < cert.validity.notBefore || validityCheckDate > cert.validity.notAfter) {
       error = {
         message: 'Certificate is not valid yet or has expired.',
-        error: 'forge.pki.CertificateExpired',
+        error: 'pki.CertificateExpired',
         notBefore: cert.validity.notBefore,
         notAfter: cert.validity.notAfter,
         now: validityCheckDate,
@@ -2936,14 +2932,14 @@ export function verifyCertificateChain(
           if (!parent.verify(cert)) {
             error = {
               message: 'Certificate signature is invalid.',
-              error: 'forge.pki.BadCertificate',
+              error: 'pki.BadCertificate',
             }
           }
         }
         catch (ex) {
           error = {
             message: 'Certificate signature is invalid.',
-            error: 'forge.pki.BadCertificate',
+            error: 'pki.BadCertificate',
             details: ex.toString(),
           }
         }
@@ -2952,7 +2948,7 @@ export function verifyCertificateChain(
       if (error === null && (!parent || selfSigned) && !caStore.hasCertificate(cert)) {
         error = {
           message: 'Certificate is not trusted.',
-          error: 'forge.pki.UnknownCertificateAuthority',
+          error: 'pki.UnknownCertificateAuthority',
         }
       }
     }
@@ -2967,14 +2963,14 @@ export function verifyCertificateChain(
             message:
               'Certificate keyUsage or basicConstraints conflict or indicate certificate is not a CA. ' +
               'Certificate cannot be used for certification.',
-            error: 'forge.pki.BadCertificate',
+            error: 'pki.BadCertificate',
           }
         }
         else if ('pathLenConstraint' in bcExt && bcExt.pathLenConstraint >= 0) {
           if (depth > bcExt.pathLenConstraint) {
             error = {
               message: 'Certificate path is too long; path length constraint violated.',
-              error: 'forge.pki.BadCertificate',
+              error: 'pki.BadCertificate',
             }
           }
         }
@@ -2987,7 +2983,7 @@ export function verifyCertificateChain(
       if (ret === false) {
         error = {
           message: 'The application rejected the certificate.',
-          error: 'forge.pki.BadCertificate',
+          error: 'pki.BadCertificate',
         }
       }
       else if (typeof ret === 'object' && !Array.isArray(ret)) {
@@ -3141,8 +3137,16 @@ function _createSignatureDigest(options: {
     default:
       throw {
         message: `Could not compute ${options.type} digest. Unknown signature OID.`,
-        error: 'forge.pki.BadCertificate',
+        error: 'pki.BadCertificate',
         signatureOid: options.signatureOid
       } as CustomError
   }
+}
+
+// Add this interface near the top with other interfaces
+interface AltName {
+  type: number
+  value: any
+  ip?: string | null
+  oid?: string
 }
