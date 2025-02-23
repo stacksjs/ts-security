@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const MD5 = require('../../lib/md5')
 const UTIL = require('../../lib/util');

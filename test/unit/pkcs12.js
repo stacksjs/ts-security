@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const ASN1 = require('../../lib/asn1')
 const forge = require('../../lib/forge')

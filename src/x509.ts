@@ -2821,12 +2821,12 @@ export function createCaStore(certs: Certificate[]): CAStore {
     },
   }
 
-  function getBySubject(subject: RDNAttribute) {
+  function getBySubject(subject: { hash: string | null }) {
     ensureSubjectHasHash(subject)
-    return caStore.certs[subject.hash] || null
+    return caStore.certs[subject.hash || ''] || null
   }
 
-  function ensureSubjectHasHash(subject: RDNAttribute) {
+  function ensureSubjectHasHash(subject: { hash: string | null, attributes?: RDNAttribute[] }) {
     // produce subject hash if it doesn't exist
     if (!subject.hash) {
       const sha = sha1.create()

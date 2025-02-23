@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const JSBN = require('../../lib/jsbn')
 const KEM = require('../../lib/kem')

@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const SHA256 = require('../../lib/sha256')
 const UTIL = require('../../lib/util');

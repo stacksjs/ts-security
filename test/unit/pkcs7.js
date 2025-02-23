@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const AES = require('../../lib/aes')
 const DES = require('../../lib/des')

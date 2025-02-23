@@ -1,3 +1,5 @@
+import { describe, it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const RANDOM = require('../../lib/random')
 const UTIL = require('../../lib/util');

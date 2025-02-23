@@ -1,3 +1,5 @@
+import { it } from 'bun:test'
+
 const ASSERT = require('node:assert')
 const SHA512 = require('../../lib/sha512');
 
