@@ -10,6 +10,7 @@ import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetr
  */
 import { asn1 } from './encoding/asn1'
 import { pem } from './encoding/pem'
+import { certificateToAsn1, CRIAttributesAsArray, getCertificationRequestInfo } from './x509'
 
 interface CustomError extends Error {
   headerType?: string
@@ -76,7 +77,10 @@ export function privateKeyInfoToPem(pki: any, maxline: number = 64): string {
   return pem.encode(msg, { maxline })
 }
 
-interface Pki {
+export interface Pki {
+  certificateToAsn1: typeof certificateToAsn1
+  CRIAttributesAsArray: typeof CRIAttributesAsArray
+  getCertificationRequestInfo: typeof getCertificationRequestInfo
   privateKeyFromPem: typeof privateKeyFromPem
   privateKeyToPem: typeof privateKeyToPem
   privateKeyInfoToPem: typeof privateKeyInfoToPem
@@ -84,6 +88,9 @@ interface Pki {
 }
 
 export const pki: Pki = {
+  certificateToAsn1,
+  getCertificationRequestInfo,
+  CRIAttributesAsArray,
   privateKeyFromPem,
   privateKeyToPem,
   privateKeyInfoToPem,

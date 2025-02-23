@@ -117,6 +117,7 @@ import util, { hexToBytes } from './utils'
 import { pem } from './encoding/pem'
 import { publicKeyToAsn1, publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
 import { pss } from './pss'
+import { sha1 } from './algorithms/hash/sha1'
 
 // Constants
 const DATE_1950 = new Date('1950-01-01T00:00:00Z')
@@ -205,6 +206,7 @@ export interface Certificate {
   generateSubjectKeyIdentifier: () => any
   verifySubjectKeyIdentifier: () => boolean
   verify?: (cert: Certificate) => boolean
+  getExtension: (name: string) => CertificateExtension | null
 }
 
 export interface CertificateExtension {
@@ -948,7 +950,7 @@ export function verifySignature(options: {
  *
  * @return the certificate.
  */
-export function certificateFromPem(pemString: string, computeHash: boolean, strict: boolean): Certificate {
+export function certificateFromPem(pemString: string, computeHash?: boolean, strict?: boolean): Certificate {
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE' && msg.type !== 'X509 CERTIFICATE'
@@ -1236,7 +1238,7 @@ export function createCertificate(): Certificate {
  *
  * @return the certificate.
  */
-export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate {
+export function certificateFromAsn1(obj: any, computeHash?: boolean): Certificate {
   // validate certificate and capture data
   const capture: CaptureObject = {}
   const errors: CustomError[] = []
@@ -1462,8 +1464,8 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
     // handle key usage
     if (e.name === 'keyUsage') {
       // get value as BIT STRING
-      var ev = asn1.fromDer(e.value)
-      var b2 = 0x00
+      const ev = asn1.fromDer(e.value)
+      let b2 = 0x00
       let b3 = 0x00
       if (ev.value.length > 1) {
         // skip first byte, just indicates unused bits which
@@ -1486,7 +1488,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
     else if (e.name === 'basicConstraints') {
       // handle basic constraints
       // get value as SEQUENCE
-      var ev = asn1.fromDer(e.value)
+      const ev = asn1.fromDer(e.value)
       // get cA BOOLEAN flag (defaults to false)
       if (ev.value.length > 0 && ev.value[0].type === asn1.Type.BOOLEAN) {
         e.cA = (ev.value[0].value.charCodeAt(0) !== 0x00)
@@ -1509,7 +1511,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
     else if (e.name === 'extKeyUsage') {
       // handle extKeyUsage
       // value is a SEQUENCE of OIDs
-      var ev = asn1.fromDer(e.value)
+      const ev = asn1.fromDer(e.value)
       for (let vi = 0; vi < ev.value.length; ++vi) {
         const oid = asn1.derToOid(ev.value[vi].value)
         if (oid in oids) {
@@ -1523,8 +1525,8 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
     else if (e.name === 'nsCertType') {
       // handle nsCertType
       // get value as BIT STRING
-      var ev = asn1.fromDer(e.value)
-      var b2 = 0x00
+      const ev = asn1.fromDer(e.value)
+      let b2 = 0x00
       if (ev.value.length > 1) {
         // skip first byte, just indicates unused bits which
         // will be padded with 0s anyway
@@ -1549,7 +1551,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
 
       // ev is a SYNTAX SEQUENCE
       let gn
-      var ev = asn1.fromDer(e.value)
+      const ev = asn1.fromDer(e.value)
       for (let n = 0; n < ev.value.length; ++n) {
         // get GeneralName
         gn = ev.value[n]
@@ -1708,23 +1710,35 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
  * @return the empty certification request.
  */
 export function createCertificationRequest(): CertificationRequest {
-  const csr = {}
-  csr.version = 0x00
-  csr.signatureOid = null
-  csr.signature = null
-  csr.siginfo = {}
-  csr.siginfo.algorithmOid = null
-
-  csr.subject = {}
-  csr.subject.getField = function (sn) {
-    return _getAttribute(csr.subject, sn)
+  const csr: CertificationRequest = {
+    version: 0x00,
+    signatureOid: null,
+    signature: null,
+    siginfo: {
+      algorithmOid: null,
+    },
+    subject: {
+      getField: function (sn: string) {
+        return _getAttribute(csr.subject, sn)
+      },
+      addField: function (attr: Attribute) {
+        _fillMissingFields([attr])
+        csr.subject.attributes.push(attr)
+      },
+      attributes: [],
+      hash: null,
+    },
+    publicKey: null,
+    attributes: [],
+    getAttribute: function (sn: string) {
+      return _getAttribute(csr, sn)
+    },
+    addAttribute: function (attr: Attribute) {
+      _fillMissingFields([attr])
+      csr.attributes.push(attr)
+    },
+    md: null,
   }
-  csr.subject.addField = function (attr) {
-    _fillMissingFields([attr])
-    csr.subject.attributes.push(attr)
-  }
-  csr.subject.attributes = []
-  csr.subject.hash = null
 
   csr.publicKey = null
   csr.attributes = []
@@ -1768,12 +1782,11 @@ export function createCertificationRequest(): CertificationRequest {
    */
   csr.sign = function (key, md) {
     // TODO: get signature OID from private key
-    csr.md = md || md.sha1.create()
-    const algorithmOid = oids[`${csr.md.algorithm}WithRSAEncryption`]
+    csr.md = md || sha1.create()
+    const algorithmOid = oids[`${csr.md?.algorithm}WithRSAEncryption`]
     if (!algorithmOid) {
-      const error = new Error('Could not compute certification request digest. '
-        + 'Unknown message digest algorithm OID.')
-      error.algorithm = csr.md.algorithm
+      const error: CustomError = new Error('Could not compute certification request digest. Unknown message digest algorithm OID.')
+      error.algorithm = csr.md?.algorithm
       throw error
     }
     csr.signatureOid = csr.siginfo.algorithmOid = algorithmOid
@@ -1783,7 +1796,7 @@ export function createCertificationRequest(): CertificationRequest {
     const bytes = asn1.toDer(csr.certificationRequestInfo)
 
     // digest and sign
-    csr.md.update(bytes.getBytes())
+    csr.md?.update(bytes.getBytes())
     csr.signature = key.sign(csr.md)
   }
 
@@ -1816,7 +1829,7 @@ export function createCertificationRequest(): CertificationRequest {
     }
 
     if (md !== null) {
-      export rval = verifySignature({
+      rval = verifySignature({
         certificate: csr,
         md,
         signature: csr.signature,
@@ -1836,7 +1849,7 @@ export function createCertificationRequest(): CertificationRequest {
  *
  * @return the ASN.1 RDNSequence.
  */
-function _dnToAsn1(obj) {
+function _dnToAsn1(obj: any) {
   // create an empty RDNSequence
   const rval = asn1.create(
     asn1.Class.UNIVERSAL,
@@ -1888,7 +1901,7 @@ function _dnToAsn1(obj) {
  *
  * @return the JSON for display.
  */
-function _getAttributesAsJson(attrs) {
+function _getAttributesAsJson(attrs: RDNAttribute[]) {
   const rval = {}
   for (let i = 0; i < attrs.length; ++i) {
     const attr = attrs[i]
@@ -1919,7 +1932,7 @@ function _getAttributesAsJson(attrs) {
  *
  * @param attrs the attributes to fill missing fields in.
  */
-function _fillMissingFields(attrs) {
+function _fillMissingFields(attrs: RDNAttribute[]) {
   let attr
   for (let i = 0; i < attrs.length; ++i) {
     attr = attrs[i]
@@ -1940,7 +1953,7 @@ function _fillMissingFields(attrs) {
         attr.type = oids[attr.name]
       }
       else {
-        var error = new Error('Attribute type not specified.')
+        const error: CustomError = new Error('Attribute type not specified.')
         error.attribute = attr
         throw error
       }
@@ -1964,7 +1977,7 @@ function _fillMissingFields(attrs) {
     }
 
     if (typeof attr.value === 'undefined') {
-      var error = new Error('Attribute value not specified.')
+      const error: CustomError = new Error('Attribute value not specified.')
       error.attribute = attr
       throw error
     }
@@ -1980,7 +1993,7 @@ function _fillMissingFields(attrs) {
  *
  * @return the extension.
  */
-function _fillMissingExtensionFields(e, options) {
+function _fillMissingExtensionFields(e: CertificateExtension, options: any = {}): CertificateExtension {
   options = options || {}
 
   // populate missing name
@@ -2011,8 +2024,8 @@ function _fillMissingExtensionFields(e, options) {
   // value is a BIT STRING
   if (e.name === 'keyUsage') {
     // build flags
-    var unused = 0
-    var b2 = 0x00
+    let unused = 0
+    let b2 = 0x00
     let b3 = 0x00
     if (e.digitalSignature) {
       b2 |= 0x80
@@ -2052,13 +2065,12 @@ function _fillMissingExtensionFields(e, options) {
     }
 
     // create bit string
-    var value = String.fromCharCode(unused)
-    if (b3 !== 0) {
+    let value = String.fromCharCode(unused)
+    if (b3 !== 0)
       value += String.fromCharCode(b2) + String.fromCharCode(b3)
-    }
-    else if (b2 !== 0) {
+    else if (b2 !== 0)
       value += String.fromCharCode(b2)
-    }
+
     e.value = asn1.create(
       asn1.Class.UNIVERSAL,
       asn1.Type.BITSTRING,
@@ -2100,7 +2112,7 @@ function _fillMissingExtensionFields(e, options) {
       true,
       [],
     )
-    var seq = e.value.value
+    const seq = e.value.value
     for (const key in e) {
       if (e[key] !== true) {
         continue
@@ -2155,7 +2167,7 @@ function _fillMissingExtensionFields(e, options) {
     }
 
     // create bit string
-    var value = String.fromCharCode(unused)
+    let value = String.fromCharCode(unused)
     if (b2 !== 0) {
       value += String.fromCharCode(b2)
     }
@@ -2264,7 +2276,7 @@ function _fillMissingExtensionFields(e, options) {
   }
   else if (e.name === 'cRLDistributionPoints') {
     e.value = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
-    var seq = e.value.value
+    const seq = e.value.value
 
     // Create sub SEQUENCE of DistributionPointName
     const subSeq = asn1.create(
@@ -2339,12 +2351,12 @@ function _fillMissingExtensionFields(e, options) {
  * @param params The signature parametrs object
  * @return ASN.1 object representing signature parameters
  */
-function _signatureParametersToAsn1(oid, params) {
+function _signatureParametersToAsn1(oid: string, params: SignatureParameters) {
   switch (oid) {
     case oids['RSASSA-PSS']:
       const parts = []
 
-      if (params.hash.algorithmOid !== undefined) {
+      if (params.hash?.algorithmOid !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 0, true, [
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
             asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(params.hash.algorithmOid).getBytes()),
@@ -2353,7 +2365,7 @@ function _signatureParametersToAsn1(oid, params) {
         ]))
       }
 
-      if (params.mgf.algorithmOid !== undefined) {
+      if (params.mgf?.algorithmOid !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 1, true, [
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
             asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(params.mgf.algorithmOid).getBytes()),
@@ -2386,7 +2398,7 @@ function _signatureParametersToAsn1(oid, params) {
  *
  * @return the ASN.1 set of CRIAttributes.
  */
-function _CRIAttributesToAsn1(csr) {
+function _CRIAttributesToAsn1(csr: CertificationRequest) {
   // create an empty context-specific container
   const rval = asn1.create(asn1.Class.CONTEXT_SPECIFIC, 0, true, [])
 
@@ -2448,7 +2460,7 @@ const jan_1_2050 = new Date('2050-01-01')
  *
  * @return the ASN.1 object representing the date.
  */
-function _dateToAsn1(date) {
+function _dateToAsn1(date: Date) {
   if (date >= jan_1_1950 && date < jan_1_2050) {
     return asn1.create(
       asn1.Class.UNIVERSAL,
@@ -2548,7 +2560,7 @@ export function getTBSCertificate(cert: Certificate): any {
  *
  * @return the asn1 CertificationRequestInfo.
  */
-export function getCertificationRequestInfo(csr) {
+export function getCertificationRequestInfo(csr: CertificationRequest) {
   // CertificationRequestInfo
   const cri = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // version
@@ -2571,7 +2583,7 @@ export function getCertificationRequestInfo(csr) {
  *
  * @return the asn1 representation of a DistinguishedName.
  */
-export function distinguishedNameToAsn1(dn) {
+export function distinguishedNameToAsn1(dn: any): Asn1Object {
   return _dnToAsn1(dn)
 }
 
@@ -2582,7 +2594,7 @@ export function distinguishedNameToAsn1(dn) {
  *
  * @return the asn1 representation of an X.509v3 RSA certificate.
  */
-export function certificateToAsn1(cert) {
+export function certificateToAsn1(cert: Certificate): Asn1Object {
   // prefer cached TBSCertificate over generating one
   const tbsCertificate = cert.tbsCertificate || getTBSCertificate(cert)
 
@@ -2609,7 +2621,7 @@ export function certificateToAsn1(cert) {
  *
  * @return the extensions in ASN.1 format.
  */
-export function certificateExtensionsToAsn1(exts) {
+export function certificateExtensionsToAsn1(exts: CertificateExtension[]): Asn1Object {
   // create top-level extension container
   const rval = asn1.create(asn1.Class.CONTEXT_SPECIFIC, 3, true, [])
 
@@ -2631,7 +2643,7 @@ export function certificateExtensionsToAsn1(exts) {
  *
  * @return the extension in ASN.1 format.
  */
-export function certificateExtensionToAsn1(ext) {
+export function certificateExtensionToAsn1(ext: CertificateExtension): Asn1Object {
   // create a sequence for each extension
   const extseq = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
 
@@ -2678,7 +2690,7 @@ export function certificateExtensionToAsn1(ext) {
  *
  * @return the asn1 representation of a certification request.
  */
-export function certificationRequestToAsn1(csr: CertificationRequest): any {
+export function certificationRequestToAsn1(csr: CertificationRequest): Asn1Object {
   // prefer cached CertificationRequestInfo over generating one
   const cri = csr.certificationRequestInfo || getCertificationRequestInfo(csr)
 
@@ -2706,12 +2718,12 @@ export function certificationRequestToAsn1(csr: CertificationRequest): any {
  *
  * @return the CA store.
  */
-export function createCaStore(certs): CAStore {
+export function createCaStore(certs: Certificate[]): CAStore {
   // create CA store
   const caStore = {
     // stored certificates
     certs: {},
-    getIssuer: function (cert) {
+    getIssuer: function (cert: Certificate) {
       const rval = getBySubject(cert.issuer)
 
       // see if there are multiple matches
@@ -2725,7 +2737,7 @@ export function createCaStore(certs): CAStore {
 
       return rval
     },
-    addCertificate: function (cert) {
+    addCertificate: function (cert: Certificate) {
       // convert from pem if necessary
       if (typeof cert === 'string')
         cert = certificateFromPem(cert)
@@ -2826,17 +2838,17 @@ export function createCaStore(certs): CAStore {
     },
   }
 
-  function getBySubject(subject) {
+  function getBySubject(subject: RDNAttribute) {
     ensureSubjectHasHash(subject)
     return caStore.certs[subject.hash] || null
   }
 
-  function ensureSubjectHasHash(subject) {
+  function ensureSubjectHasHash(subject: RDNAttribute) {
     // produce subject hash if it doesn't exist
     if (!subject.hash) {
-      const md = md.sha1.create()
-      subject.attributes = RDNAttributesAsArray(_dnToAsn1(subject), md)
-      subject.hash = md.digest().toHex()
+      const sha = sha1.create()
+      subject.attributes = RDNAttributesAsArray(_dnToAsn1(subject), sha)
+      subject.hash = sha.digest().toHex()
     }
   }
 
@@ -2909,7 +2921,7 @@ export function verifyCertificateChain(
   let error: CustomError | null = null
   let depth = 0
   do {
-    let cert = chain.shift()
+    let cert: Certificate = chain.shift() as Certificate
     let parent: Certificate | null = null
     let selfSigned = false
 
@@ -2940,7 +2952,7 @@ export function verifyCertificateChain(
       if (parent) {
         // verify parent signature on cert
         try {
-          if (!parent.verify(cert)) {
+          if (!parent.verify?.(cert)) {
             error = {
               message: 'Certificate signature is invalid.',
               error: 'pki.BadCertificate',
@@ -3043,88 +3055,6 @@ function _getAttribute(obj: any, sn: string): RDNAttribute | null {
   }
   const rval = obj.attributes.filter((attr: RDNAttribute) => attr.shortName === sn)
   return rval.length > 0 ? rval[0] : null
-}
-
-function _fillMissingFields(attrs: RDNAttribute[]): void {
-  for (const attr of attrs) {
-    // populate missing name
-    if (typeof attr.name === 'undefined') {
-      if (attr.type && attr.type in oids) {
-        attr.name = oids[attr.type]
-      }
-      else if (attr.shortName && attr.shortName in _shortNames) {
-        attr.name = oids[_shortNames[attr.shortName]]
-      }
-    }
-
-    // populate missing type (OID)
-    if (typeof attr.type === 'undefined') {
-      if (attr.name && attr.name in oids) {
-        attr.type = oids[attr.name]
-      }
-      else {
-        const error = new Error('Attribute type not specified.')
-        error.attribute = attr
-        throw error
-      }
-    }
-
-    // populate missing shortName
-    if (typeof attr.shortName === 'undefined') {
-      if (attr.name && attr.name in _shortNames) {
-        attr.shortName = _shortNames[attr.name]
-      }
-    }
-
-    // convert extensions to value
-    if (attr.type === oids.extensionRequest && attr.extensions) {
-      attr.valueTagClass = asn1.Type.SEQUENCE
-      attr.valueConstructed = true
-      attr.value = []
-      for (const ext of attr.extensions) {
-        attr.value.push(certificateExtensionToAsn1(_fillMissingExtensionFields(ext)))
-      }
-    }
-
-    if (typeof attr.value === 'undefined') {
-      const error = new Error('Attribute value not specified.')
-      error.attribute = attr
-      throw error
-    }
-  }
-}
-
-function _fillMissingExtensionFields(e: CertificateExtension, options: any = {}): CertificateExtension {
-  // populate missing name
-  if (typeof e.name === 'undefined') {
-    if (e.id && e.id in oids) {
-      e.name = oids[e.id]
-    }
-  }
-
-  // populate missing id
-  if (typeof e.id === 'undefined') {
-    if (e.name && e.name in oids) {
-      e.id = oids[e.name]
-    }
-    else {
-      const error = new Error('Extension ID not specified.')
-      error.extension = e
-      throw error
-    }
-  }
-
-  // handle value
-  if (typeof e.value !== 'undefined') {
-    // TODO: validate value
-  }
-  else {
-    const error = new Error('Extension value not specified.')
-    error.extension = e
-    throw error
-  }
-
-  return e
 }
 
 function _createSignatureDigest(options: {
