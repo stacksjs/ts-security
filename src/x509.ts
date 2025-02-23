@@ -2439,7 +2439,7 @@ function _fillMissingExtensionFields(e, options) {
  * Convert signature parameters object to ASN.1
  *
  * @param {string} oid Signature algorithm OID
- * @param params The signature parametrs object
+ * @param params The signature parameters object
  * @return ASN.1 object representing signature parameters
  */
 function _signatureParametersToAsn1(oid, params) {
