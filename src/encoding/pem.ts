@@ -197,7 +197,7 @@ export function decode(str: string): PemMessage[] {
           msg.dekInfo = { algorithm: values[0], parameters: values[1] || null }
         }
         else {
-          msg.headers.push(header)
+          msg.headers?.push(header)
         }
       }
       ++li

@@ -204,7 +204,7 @@ export interface Certificate {
   isIssuer: (parent: Certificate) => boolean
   generateSubjectKeyIdentifier: () => any
   verifySubjectKeyIdentifier: () => boolean
-  verify: (cert: Certificate) => boolean
+  verify?: (cert: Certificate) => boolean
 }
 
 export interface CertificateExtension {
@@ -218,6 +218,7 @@ export interface CertificateExtension {
 export interface CertificationRequest {
   version: number
   signatureOid: string | null
+  signatureParameters?: SignatureParameters
   signature: any
   siginfo: {
     algorithmOid: string | null
@@ -1113,7 +1114,7 @@ export function certificationRequestFromPem(
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE REQUEST') {
-    const error = new Error('Could not convert certification request from PEM; PEM header type is not "CERTIFICATE REQUEST".')
+    const error: CustomError = new Error('Could not convert certification request from PEM; PEM header type is not "CERTIFICATE REQUEST".')
     error.headerType = msg.type
     throw error
   }
@@ -1593,6 +1594,18 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
   return e
 }
 
+type CertificationRequestCapture = {
+  csrVersion?: string
+  csrSignatureOid?: string
+  csrSignatureParams?: string
+  csrSignature?: string
+  certificationRequestInfo?: Asn1Object
+  publicKeyOid?: string
+  subjectPublicKeyInfo?: Asn1Object
+  certificationRequestInfoSubject?: Asn1Object
+  certificationRequestInfoAttributes?: Asn1Object[]
+}
+
 /**
  * Converts a PKCS#10 certification request (CSR) from an ASN.1 object.
  *
@@ -1612,8 +1625,7 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
   const errors: CustomError[] = []
 
   if (!asn1.validate(obj, certificationRequestValidator, capture, errors)) {
-    const error: CustomError = new Error('Cannot read PKCS#10 certificate request. '
-      + 'ASN.1 object is not a PKCS#10 CertificationRequest.')
+    const error: CustomError = new Error('Cannot read PKCS#10 certificate request. ASN.1 object is not a PKCS#10 CertificationRequest.')
     error.errors = errors
     throw error
   }

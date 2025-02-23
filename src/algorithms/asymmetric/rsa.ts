@@ -69,6 +69,7 @@ import { encode_rsa_oaep, pkcs1 } from '../../pkcs1'
 import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki'
 import util, { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
 import { BigInteger } from './jsbn'
+import { prime } from './prime'
 
 type CustomError = Error & {
   algorithm?: string
@@ -704,7 +705,7 @@ export const decrypt: (ed: string, key: any, pub: boolean, ml: boolean) => strin
  * @return the state object to use to generate the key-pair.
  */
 export const createKeyPairGenerationState: (bits: number, e?: number, options?: any) => any = function (bits: number, e?: number, options?: any) {
-  // TODO: migrate step-based prime generation code to forge.prime
+  // TODO: migrate step-based prime generation code to prime
 
   // set default bits
   if (typeof (bits) === 'string') {
@@ -766,7 +767,7 @@ export const createKeyPairGenerationState: (bits: number, e?: number, options?: 
  * var state = pki.rsa.createKeyPairGenerationState(2048);
  * var step = function() {
  *   // step key-generation, run algorithm for 100 ms, repeat
- *   if(!forge.pki.rsa.stepKeyPairGenerationState(state, 100)) {
+ *   if(!pki.rsa.stepKeyPairGenerationState(state, 100)) {
  *     setTimeout(step, 1);
  *   } else {
  *     // key-generation complete
@@ -778,8 +779,7 @@ export const createKeyPairGenerationState: (bits: number, e?: number, options?: 
  * setTimeout(step, 0);
  *
  * @param state the state to use.
- * @param n the maximum number of milliseconds to run the algorithm for, 0
- *          to run the algorithm to completion.
+ * @param n the maximum number of milliseconds to run the algorithm for, 0 to run the algorithm to completion.
  *
  * @return true if the key-generation completed, false if not.
  */
@@ -789,7 +789,7 @@ export const stepKeyPairGenerationState: (state: any, n: number) => boolean = fu
     state.algorithm = 'PRIMEINC'
   }
 
-  // TODO: migrate step-based prime generation code to forge.prime
+  // TODO: migrate step-based prime generation code to prime
   // TODO: abstract as PRIMEINC algorithm
 
   // do key generation (based on Tom Wu's rsa.js, see jsbn.js license)
@@ -1487,6 +1487,11 @@ export function privateKeyToAsn1(key: {
   ])
 }
 
+type PublicKeyCapture = {
+  publicKeyModulus?: string
+  publicKeyExponent?: Asn1Object
+}
+
 /**
  * Converts a public key from an ASN.1 SubjectPublicKeyInfo or RSAPublicKey.
  *
@@ -1494,11 +1499,11 @@ export function privateKeyToAsn1(key: {
  *
  * @return the public key.
  */
-export function publicKeyFromAsn1(obj: Asn1Object): RSAKey {
+export function publicKeyFromAsn1(obj?: Asn1Object): RSAKey {
   // get SubjectPublicKeyInfo
-  const capture = {}
-  let errors = []
-  if (asn1.validate(obj, publicKeyValidator, capture, errors)) {
+  const capture: PublicKeyCapture = {}
+  let errors: CustomError[] = []
+  if (obj && asn1.validate(obj, publicKeyValidator, capture, errors)) {
     // get oid
     const oid = asn1.derToOid(capture.publicKeyOid)
     if (oid !== oids.rsaEncryption) {
@@ -1512,8 +1517,7 @@ export function publicKeyFromAsn1(obj: Asn1Object): RSAKey {
   // get RSA params
   errors = []
   if (!asn1.validate(obj, rsaPublicKeyValidator, capture, errors)) {
-    var error = new Error('Cannot read public key. '
-      + 'ASN.1 object does not contain an RSAPublicKey.')
+    const error: CustomError = new Error('Cannot read public key. ASN.1 object does not contain an RSAPublicKey.')
     error.errors = errors
     throw error
   }
@@ -1548,7 +1552,7 @@ export function publicKeyToAsn1(key: RSAKey): Asn1Object {
     ]),
     // subjectPublicKey
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.BITSTRING, false, [
-      pki.publicKeyToRSAPublicKey(key),
+      publicKeyToRSAPublicKey(key),
     ]),
   ])
 }
@@ -1580,8 +1584,7 @@ export function publicKeyToRSAPublicKey(key: {
  *
  * @param m the message to encode.
  * @param key the RSA key to use.
- * @param bt the block type to use, i.e. either 0x01 (for signing) or 0x02
- *          (for encryption).
+ * @param bt the block type to use, i.e. either 0x01 (for signing) or 0x02 (for encryption).
  *
  * @return the padded byte buffer.
  */
@@ -1596,7 +1599,7 @@ function _encodePkcs1_v1_5(m: string, key: {
 
   /* use PKCS#1 v1.5 padding */
   if (m.length > (k - 11)) {
-    const error = new Error('Message is too long for PKCS#1 v1.5 padding.')
+    const error: CustomError = new Error('Message is too long for PKCS#1 v1.5 padding.')
     error.length = m.length
     error.max = k - 11
     throw error
@@ -1628,9 +1631,8 @@ function _encodePkcs1_v1_5(m: string, key: {
   // private key op
   if (bt === 0x00 || bt === 0x01) {
     padByte = (bt === 0x00) ? 0x00 : 0xFF
-    for (var i = 0; i < padNum; ++i) {
+    for (let i = 0; i < padNum; ++i)
       eb.putByte(padByte)
-    }
   }
   else {
     // public key op
@@ -1638,7 +1640,7 @@ function _encodePkcs1_v1_5(m: string, key: {
     while (padNum > 0) {
       let numZeros = 0
       const padBytes = random.getBytes(padNum)
-      for (var i = 0; i < padNum; ++i) {
+      for (let i = 0; i < padNum; ++i) {
         padByte = padBytes.charCodeAt(i)
         if (padByte === 0) {
           ++numZeros
@@ -1678,8 +1680,7 @@ function _decodePkcs1_v1_5(em: string, key: {
   /* It is an error if any of the following conditions occurs:
 
     1. The encryption block EB cannot be parsed unambiguously.
-    2. The padding string PS consists of fewer than eight octets
-      or is inconsisent with the block type BT.
+    2. The padding string PS consists of fewer than eight octets or is inconsistent with the block type BT.
     3. The decryption process is a public-key operation and the block
       type BT is not 00 or 01, or the decryption process is a
       private-key operation and the block type is not 02.
@@ -1731,9 +1732,8 @@ function _decodePkcs1_v1_5(em: string, key: {
 
   // zero must be 0x00 and padNum must be (k - 3 - message length)
   const zero = eb.getByte()
-  if (zero !== 0x00 || padNum !== (k - 3 - eb.length())) {
+  if (zero !== 0x00 || padNum !== (k - 3 - eb.length()))
     throw new Error('Encryption block is invalid.')
-  }
 
   return eb.getBytes()
 }
@@ -1743,13 +1743,10 @@ function _decodePkcs1_v1_5(em: string, key: {
  * via Web Workers, or using the main thread and setImmediate.
  *
  * @param state the key-pair generation state.
- * @param [options] options for key-pair generation:
- *          workerScript the worker script URL.
- *          workers the number of web workers (if supported) to use,
- *            (default: 2, -1 to use estimated cores minus one).
- *          workLoad the size of the work load, ie: number of possible prime
- *            numbers for each web worker to check per work assignment,
- *            (default: 100).
+ * @param options the options for key-pair generation:
+ * @param options.workerScript the worker script URL.
+ * @param options.workers the number of web workers (if supported) to use, (default: 2, -1 to use estimated cores minus one).
+ * @param options.workLoad the size of the work load, ie: number of possible prime numbers for each web worker to check per work assignment, (default: 100).
  * @param callback(err, keypair) called once the operation completes.
  */
 function _generateKeyPair(state: {
@@ -1802,7 +1799,7 @@ function _generateKeyPair(state: {
   }
 
   function getPrime(bits: number, callback: (err: any, num: any) => void) {
-    forge.prime.generateProbablePrime(bits, opts, callback)
+    prime.generateProbablePrime(bits, opts, callback)
   }
 
   function finish(err: any, num: any) {
