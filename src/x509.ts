@@ -901,7 +901,7 @@ export function verifySignature(options: {
 
     const hashFn = (md as unknown as HashFunctions)[hashOid].create()
     rval = options.certificate.publicKey.verify(
-      (options.md as unknown as MD).digest().getBytes(),
+      options.md.digest().getBytes(),
       options.signature,
       { mgf, hash: hashFn, saltLength: params.saltLength || 20 },
     )
@@ -2742,11 +2742,10 @@ export function createCaStore(certs: Certificate[]): CAStore {
         }
       }
     },
-    hasCertificate(cert) {
+    hasCertificate(cert: Certificate) {
       // convert from pem if necessary
-      if (typeof cert === 'string') {
+      if (typeof cert === 'string')
         cert = pki.certificateFromPem(cert)
-      }
 
       let match = getBySubject(cert.subject)
       if (!match)
@@ -2784,23 +2783,23 @@ export function createCaStore(certs: Certificate[]): CAStore {
 
       return certList
     },
-    removeCertificate(cert) {
+    removeCertificate(cert: Certificate) {
       let result
 
       // convert from pem if necessary
-      if (typeof cert === 'string') {
+      if (typeof cert === 'string')
         cert = certificateFromPem(cert)
-      }
+
       ensureSubjectHasHash(cert.subject)
-      if (!caStore.hasCertificate(cert)) {
+      if (!caStore.hasCertificate(cert))
         return null
-      }
 
       const match = getBySubject(cert.subject)
 
       if (!Array.isArray(match)) {
         result = caStore.certs[cert.subject.hash]
         delete caStore.certs[cert.subject.hash]
+
         return result
       }
 
@@ -2813,9 +2812,9 @@ export function createCaStore(certs: Certificate[]): CAStore {
           match.splice(i, 1)
         }
       }
-      if (match.length === 0) {
+
+      if (match.length === 0)
         delete caStore.certs[cert.subject.hash]
-      }
 
       return result
     },
@@ -2823,6 +2822,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
 
   function getBySubject(subject: { hash: string | null }) {
     ensureSubjectHasHash(subject)
+
     return caStore.certs[subject.hash || ''] || null
   }
 
@@ -2942,11 +2942,11 @@ export function verifyCertificateChain(
             }
           }
         }
-        catch (ex) {
+        catch (e: any) {
           error = {
             message: 'Certificate signature is invalid.',
             error: 'pki.BadCertificate',
-            details: ex.toString(),
+            details: e.toString(),
           }
         }
       }
@@ -3020,15 +3020,16 @@ export function verifyCertificateChain(
 function _containsAll(iattr: RDNAttribute[], sattr: RDNAttribute[]): boolean {
   // ensure all parent subject attributes are present in issuer
   let rval = true
+
   for (let i = 0; rval && i < sattr.length; ++i) {
     const attr = sattr[i]
     rval = false
     for (let j = 0; !rval && j < iattr.length; ++j) {
-      if (attr.type === iattr[j].type && attr.value === iattr[j].value) {
+      if (attr.type === iattr[j].type && attr.value === iattr[j].value)
         rval = true
-      }
     }
   }
+
   return rval
 }
 
