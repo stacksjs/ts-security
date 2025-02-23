@@ -145,6 +145,7 @@ interface SignatureParameters {
 interface CustomError {
   message: string
   errors?: any[]
+  error?: string
   signatureOid?: string
   oid?: string
   name?: string
@@ -832,7 +833,7 @@ interface IMessageDigest {
   algorithm: string
   update: (msg: string | ByteStringBuffer, encoding?: string) => IMessageDigest
   digest: () => ByteStringBuffer
-  create: () => IMessageDigest
+  create?: () => IMessageDigest
 }
 
 interface HashFunction {
@@ -1221,6 +1222,15 @@ export function createCertificate(): Certificate {
       }
       return false
     },
+    getExtension: function(name: string) {
+      for (let i = 0; i < cert.extensions.length; ++i) {
+        const ext = cert.extensions[i]
+        if (ext.name === name || ext.id === name) {
+          return ext
+        }
+      }
+      return null
+    }
   }
 
   return cert
@@ -1733,7 +1743,7 @@ export function createCertificationRequest(): CertificationRequest {
     getAttribute: function (sn: string) {
       return _getAttribute(csr, sn)
     },
-    addAttribute: function (attr: Attribute) {
+    addAttribute: function (attr) {
       _fillMissingFields([attr])
       csr.attributes.push(attr)
     },
@@ -1817,7 +1827,7 @@ export function createCertificationRequest(): CertificationRequest {
     let md = csr.md
     if (md === null) {
       md = _createSignatureDigest({
-        signatureOid: csr.signatureOid,
+        signatureOid: csr.signatureOid || '',
         type: 'certification request',
       })
 
@@ -2351,12 +2361,12 @@ function _fillMissingExtensionFields(e: CertificateExtension, options: any = {})
  * @param params The signature parametrs object
  * @return ASN.1 object representing signature parameters
  */
-function _signatureParametersToAsn1(oid: string, params: SignatureParameters) {
+function _signatureParametersToAsn1(oid: string, params?: SignatureParameters) {
   switch (oid) {
     case oids['RSASSA-PSS']:
       const parts = []
 
-      if (params.hash?.algorithmOid !== undefined) {
+      if (params?.hash?.algorithmOid !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 0, true, [
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
             asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(params.hash.algorithmOid).getBytes()),
@@ -2365,7 +2375,7 @@ function _signatureParametersToAsn1(oid: string, params: SignatureParameters) {
         ]))
       }
 
-      if (params.mgf?.algorithmOid !== undefined) {
+      if (params?.mgf?.algorithmOid !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 1, true, [
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
             asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(params.mgf.algorithmOid).getBytes()),
@@ -2377,7 +2387,7 @@ function _signatureParametersToAsn1(oid: string, params: SignatureParameters) {
         ]))
       }
 
-      if (params.saltLength !== undefined) {
+      if (params?.saltLength !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 2, true, [
           asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, asn1.integerToDer(params.saltLength).getBytes()),
         ]))
@@ -2560,7 +2570,7 @@ export function getTBSCertificate(cert: Certificate): any {
  *
  * @return the asn1 CertificationRequestInfo.
  */
-export function getCertificationRequestInfo(csr: CertificationRequest) {
+export function getCertificationRequestInfo(csr: CertificationRequest): Asn1Object {
   // CertificationRequestInfo
   const cri = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // version
@@ -2605,9 +2615,9 @@ export function certificateToAsn1(cert: Certificate): Asn1Object {
     // AlgorithmIdentifier (signature algorithm)
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
       // algorithm
-      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(cert.signatureOid).getBytes()),
+      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(cert.signatureOid || '').getBytes()),
       // parameters
-      _signatureParametersToAsn1(cert.signatureOid, cert.signatureParameters),
+      _signatureParametersToAsn1(cert.signatureOid || '', cert.signatureParameters),
     ]),
     // SignatureValue
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.BITSTRING, false, String.fromCharCode(0x00) + cert.signature),
@@ -2701,9 +2711,9 @@ export function certificationRequestToAsn1(csr: CertificationRequest): Asn1Objec
     // AlgorithmIdentifier (signature algorithm)
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
       // algorithm
-      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(csr.signatureOid).getBytes()),
+      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(csr.signatureOid || '').getBytes()),
       // parameters
-      _signatureParametersToAsn1(csr.signatureOid, csr.signatureParameters),
+      _signatureParametersToAsn1(csr.signatureOid || '', csr.signatureParameters),
     ]),
     // signature
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.BITSTRING, false, String.fromCharCode(0x00) + csr.signature),
@@ -2713,8 +2723,7 @@ export function certificationRequestToAsn1(csr: CertificationRequest): Asn1Objec
 /**
  * Creates a CA store.
  *
- * @param certs an optional array of certificate objects or PEM-formatted
- *          certificate strings to add to the CA store.
+ * @param certs an optional array of certificate objects or PEM-formatted certificate strings to add to the CA store.
  *
  * @return the CA store.
  */
