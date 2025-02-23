@@ -107,7 +107,6 @@
  * }
  */
 
-import type { MessageDigest } from './algorithms/hash/sha1'
 import type { Asn1Object } from './encoding/asn1'
 import { asn1 } from './encoding/asn1'
 import { md } from './md'
@@ -115,10 +114,15 @@ import { oids } from './oids'
 import { pki } from './pki'
 import { mgf as mgfImport } from './mgf'
 import { hexToBytes } from './utils'
-import pem from './encoding/pem'
-import { publicKeyToAsn1, publicKeyToRSAPublicKey } from './algorithms/asymmetric/rsa'
-import { publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
+import { pem } from './encoding/pem'
+import { publicKeyToAsn1, publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
+import { pss } from './pss'
 
+// Constants
+const DATE_1950 = new Date('1950-01-01T00:00:00Z')
+const DATE_2050 = new Date('2050-01-01T00:00:00Z')
+
+// Interfaces
 interface CaptureObject {
   [key: string]: any
 }
@@ -135,6 +139,116 @@ interface SignatureParameters {
   }
   saltLength?: number
   trailerField?: number
+}
+
+interface CustomError {
+  message: string
+  error: string
+  errors?: any[]
+  signatureOid?: string
+  oid?: string
+  name?: string
+  headerType?: string
+  algorithm?: string
+  attribute?: any
+  extension?: any
+  notBefore?: Date
+  notAfter?: Date
+  now?: Date
+  expectedIssuer?: any[]
+  actualIssuer?: any[]
+  details?: string
+}
+
+export interface RDNAttribute {
+  type: string
+  value: any
+  valueTagClass: number
+  name?: string
+  shortName?: string
+  extensions?: any[]
+}
+
+export interface Certificate {
+  version: number
+  serialNumber: string
+  signatureOid: string | null
+  signature: any
+  signatureParameters?: SignatureParameters
+  siginfo: {
+    algorithmOid: string | null
+    parameters?: any
+  }
+  validity: {
+    notBefore: Date
+    notAfter: Date
+  }
+  issuer: {
+    getField: (sn: string) => RDNAttribute | null
+    addField: (attr: RDNAttribute) => void
+    attributes: RDNAttribute[]
+    hash: string | null
+    uniqueId?: string
+  }
+  subject: {
+    getField: (sn: string) => RDNAttribute | null
+    addField: (attr: RDNAttribute) => void
+    attributes: RDNAttribute[]
+    hash: string | null
+    uniqueId?: string
+  }
+  extensions: CertificateExtension[]
+  publicKey: any
+  md: IMessageDigest | null
+  tbsCertificate?: any
+  issued: (child: Certificate) => boolean
+  isIssuer: (parent: Certificate) => boolean
+  generateSubjectKeyIdentifier: () => any
+  verifySubjectKeyIdentifier: () => boolean
+  verify: (cert: Certificate) => boolean
+}
+
+export interface CertificateExtension {
+  id: string
+  critical: boolean
+  value: any
+  name?: string
+  [key: string]: any
+}
+
+export interface CertificationRequest {
+  version: number
+  signatureOid: string | null
+  signature: any
+  siginfo: {
+    algorithmOid: string | null
+    parameters?: any
+  }
+  subject: {
+    getField: (sn: string) => RDNAttribute | null
+    addField: (attr: RDNAttribute) => void
+    attributes: RDNAttribute[]
+    hash: string | null
+  }
+  publicKey: any
+  attributes: RDNAttribute[]
+  getAttribute: (sn: string) => RDNAttribute | null
+  addAttribute: (attr: RDNAttribute) => void
+  md: IMessageDigest | null
+  certificationRequestInfo?: any
+  setSubject: (attrs: RDNAttribute[]) => void
+  setAttributes: (attrs: RDNAttribute[]) => void
+  sign: (key: any, md?: IMessageDigest) => void
+  verify: () => boolean
+}
+
+export interface CAStore {
+  certs: { [key: string]: Certificate | Certificate[] }
+  getIssuer: (cert: Certificate) => Certificate | null
+  addCertificate: (cert: Certificate | string) => void
+  hasCertificate: (cert: Certificate | string) => boolean
+  listAllCertificates: () => Certificate[]
+  removeCertificate: (cert: Certificate | string) => Certificate | null
 }
 
 // short name OID mappings
@@ -154,14 +268,6 @@ const _shortNames = {
   E: oids.emailAddress,
   emailAddress: 'E',
 } as const
-
-type CustomError = Error & {
-  errors?: any[]
-  signatureOid?: string
-  oid?: string
-  name?: string
-  headerType?: string
-}
 
 // validator for an SubjectPublicKeyInfo structure
 // Note: Currently only works with an RSA public key
@@ -513,15 +619,6 @@ export const certificationRequestValidator: Asn1Object = {
   ],
 }
 
-export interface RDNAttribute {
-  type: string
-  value: any
-  valueTagClass: number
-  name?: string
-  shortName?: string
-  extensions?: any[]
-}
-
 /**
  * Converts an RDNSequence of ASN.1 DER-encoded RelativeDistinguishedName
  * sets into an array with objects that have type and value properties.
@@ -529,36 +626,49 @@ export interface RDNAttribute {
  * @param rdn the RDNSequence to convert.
  * @param md a message digest to append type and value to if provided.
  */
-export function RDNAttributesAsArray(rdn: Asn1Object, md: MessageDigest): RDNAttribute[] {
+export function RDNAttributesAsArray(rdn: any, md?: IMessageDigest): RDNAttribute[] {
   const rval: RDNAttribute[] = []
 
-  // each value in 'rdn' in is a SET of RelativeDistinguishedName
-  let set, attr, obj
-  for (let si = 0; si < rdn.value.length; ++si) {
-    // get the RelativeDistinguishedName set
-    set = rdn.value[si]
+  // each value can be a string or array of strings
+  for (let i = 0; i < rdn.value.length; ++i) {
+    const attr = rdn.value[i]
 
-    // each value in the SET is an AttributeTypeAndValue sequence
-    // containing first a type (an OID) and second a value (defined by
-    // the OID)
-    for (let i = 0; i < set.value.length; ++i) {
-      const obj: RDNAttribute = {} as RDNAttribute
-      attr = set.value[i]
-      obj.type = asn1.derToOid(attr.value[0].value)
-      obj.value = attr.value[1].value
-      obj.valueTagClass = attr.value[1].type
-      // if the OID is known, get its name and short name
-      if (obj.type in oids) {
-        obj.name = oids[obj.type]
-        if (obj.name in _shortNames) {
-          obj.shortName = _shortNames[obj.name]
+    // handle values as an array
+    for (let vi = 0; vi < attr.value.length; ++vi) {
+      // get value
+      let value = attr.value[vi]
+
+      // handle value as an array
+      if (Array.isArray(value)) {
+        for (let n = 0; n < value.length; ++n) {
+          const obj: RDNAttribute = {
+            type: attr.type,
+            value: value[n],
+            valueTagClass: attr.valueTagClass || asn1.Class.UNIVERSAL,
+            name: undefined,
+            shortName: undefined,
+          }
+          if (md) {
+            md.update(obj.type)
+            md.update(obj.value)
+          }
+          rval.push(obj)
         }
       }
-      if (md) {
-        md.update(obj.type)
-        md.update(obj.value)
+      else {
+        const obj: RDNAttribute = {
+          type: attr.type,
+          value,
+          valueTagClass: attr.valueTagClass || asn1.Class.UNIVERSAL,
+          name: undefined,
+          shortName: undefined,
+        }
+        if (md) {
+          md.update(obj.type)
+          md.update(obj.value)
+        }
+        rval.push(obj)
       }
-      rval.push(obj)
     }
   }
 
@@ -574,27 +684,30 @@ export function RDNAttributesAsArray(rdn: Asn1Object, md: MessageDigest): RDNAtt
 export function CRIAttributesAsArray(attributes: any): RDNAttribute[] {
   const rval: RDNAttribute[] = []
 
-  // each value in 'attributes' in is a SEQUENCE with an OID and a SET
   for (let i = 0; i < attributes.length; ++i) {
-    const values = attributes[i].value[1].value
-    const type = asn1.derToOid(attributes[i].value[0].value)
+    const attr = attributes[i]
+    let value = attr.value
 
-    for (let vi = 0; vi < values.length; ++vi) {
-      const obj: RDNAttribute = {} as RDNAttribute
-      obj.type = type
-      obj.value = values[vi].value
-      obj.valueTagClass = values[vi].type
-      // if the OID is known, get its name and short name
-      if (obj.type in oids) {
-        obj.name = oids[obj.type]
-        if (obj.name in _shortNames)
-          obj.shortName = _shortNames[obj.name]
+    // handle values as an array
+    if (Array.isArray(value)) {
+      for (let n = 0; n < value.length; ++n) {
+        const obj: RDNAttribute = {
+          type: attr.type,
+          value: value[n],
+          valueTagClass: attr.valueTagClass || asn1.Class.UNIVERSAL,
+          name: undefined,
+          shortName: undefined,
+        }
+        rval.push(obj)
       }
-      // parse extensions
-      if (obj.type === oids.extensionRequest) {
-        obj.extensions = []
-        for (let ei = 0; ei < obj.value.length; ++ei)
-          obj.extensions.push(certificateExtensionFromAsn1(obj.value[ei]))
+    }
+    else {
+      const obj: RDNAttribute = {
+        type: attr.type,
+        value,
+        valueTagClass: attr.valueTagClass || asn1.Class.UNIVERSAL,
+        name: undefined,
+        shortName: undefined,
       }
       rval.push(obj)
     }
@@ -615,22 +728,20 @@ export function CRIAttributesAsArray(attributes: any): RDNAttribute[] {
  * @return the attribute.
  */
 export function getAttribute(obj: any, options: any): RDNAttribute | null {
-  if (typeof options === 'string')
+  if (typeof options === 'string') {
     options = { shortName: options }
-
-  let rval = null
-  let attr
-
-  for (let i = 0; rval === null && i < obj.attributes.length; ++i) {
-    attr = obj.attributes[i]
-    if (options.type && options.type === attr.type)
-      rval = attr
-    else if (options.name && options.name === attr.name)
-      rval = attr
-    else if (options.shortName && options.shortName === attr.shortName)
-      rval = attr
   }
 
+  let rval = null
+  const attr = obj.attributes
+  for (let i = 0; rval === null && i < attr.length; ++i) {
+    if (options.type && options.type === attr[i].type) {
+      rval = attr[i]
+    }
+    else if (options.shortName && options.shortName === attr[i].shortName) {
+      rval = attr[i]
+    }
+  }
   return rval
 }
 
@@ -662,46 +773,45 @@ export function getAttribute(obj: any, options: any): RDNAttribute | null {
  * @param fillDefaults Whether to use return default values where omitted
  * @return signature parameter object
  */
-export function readSignatureParameters(oid: string, obj: any, fillDefaults: boolean): SignatureParameters {
-  let params: SignatureParameters = {}
+export function readSignatureParameters(
+  oid: string,
+  obj: any,
+  fillDefaults: boolean
+): SignatureParameters {
+  const params: SignatureParameters = {}
 
-  if (oid !== oids['RSASSA-PSS'])
+  if (oid !== oids['RSASSA-PSS']) {
     return params
+  }
 
   if (fillDefaults) {
-    params = {
-      hash: {
-        algorithmOid: oids.sha1,
-      },
-      mgf: {
-        algorithmOid: oids.mgf1,
-        hash: {
-          algorithmOid: oids.sha1,
-        },
-      },
-      saltLength: 20,
+    params.hash = { algorithmOid: oids.sha1 }
+    params.mgf = {
+      algorithmOid: oids.mgf1,
+      hash: { algorithmOid: oids.sha1 },
     }
+    params.saltLength = 20
   }
 
   const capture: CaptureObject = {}
-  const errors: CustomError[] = []
-
+  const errors: any[] = []
   if (!asn1.validate(obj, rsassaPssParameterValidator, capture, errors)) {
-    const error: CustomError = new Error('Cannot read RSASSA-PSS parameter block.')
-    error.errors = errors
-    throw error
+    throw {
+      message: 'Cannot read RSASSA-PSS parameter block.',
+      error: 'forge.pki.BadCertificate',
+      errors
+    } as CustomError
   }
 
   if (capture.hashOid !== undefined) {
-    params.hash = params.hash || {}
-    params.hash.algorithmOid = asn1.derToOid(capture.hashOid)
+    params.hash = { algorithmOid: asn1.derToOid(capture.hashOid) }
   }
 
   if (capture.maskGenOid !== undefined) {
-    params.mgf = params.mgf || {}
-    params.mgf.algorithmOid = asn1.derToOid(capture.maskGenOid)
-    params.mgf.hash = params.mgf.hash || {}
-    params.mgf.hash.algorithmOid = asn1.derToOid(capture.maskGenHashOid)
+    params.mgf = {
+      algorithmOid: asn1.derToOid(capture.maskGenOid),
+      hash: { algorithmOid: asn1.derToOid(capture.maskGenHashOid) }
+    }
   }
 
   if (capture.saltLength !== undefined) {
@@ -711,106 +821,116 @@ export function readSignatureParameters(oid: string, obj: any, fillDefaults: boo
   return params
 }
 
-/**
- * Create signature digest for OID.
- *
- * @param options
- * @param options.signatureOid: the OID specifying the signature algorithm.
- * @param options.type: a human readable type for error messages
- * @return a created md instance. throws if unknown oid.
- */
-function _createSignatureDigest(options: {
-  signatureOid: string
-  type: string
-}): MessageDigest {
-  switch (oids[options.signatureOid]) {
-    case 'sha1WithRSAEncryption':
-      return md.sha1.create()
-    case 'md5WithRSAEncryption':
-      return md.md5.create()
-    case 'sha256WithRSAEncryption':
-      return md.sha256.create()
-    case 'sha384WithRSAEncryption':
-      return md.sha384.create()
-    case 'sha512WithRSAEncryption':
-      return md.sha512.create()
-    case 'RSASSA-PSS':
-      return md.sha256.create()
-    default:
-      const error: CustomError = new Error(`Could not compute ${options.type} digest. Unknown signature OID.`)
-      error.signatureOid = options.signatureOid
-      throw error
-  }
+interface ByteStringBuffer {
+  toHex: () => string
+  getBytes: () => string
 }
 
-/**
- * Verify signature on certificate or CSR.
- *
- * @param options the options to use.
- * @param options.certificate the certificate or CSR to verify.
- * @param options.md the signature digest.
- * @param options.signature the signature
- * @return a created md instance. throws if unknown oid.
- */
+interface IMessageDigest {
+  algorithm: string
+  update: (msg: string | ByteStringBuffer, encoding?: string) => IMessageDigest
+  digest: () => ByteStringBuffer
+  create: () => IMessageDigest
+}
+
+interface HashFunction {
+  create: () => IMessageDigest
+}
+
+interface HashFunctions {
+  [key: string]: HashFunction
+}
+
+interface MaskGenFunction {
+  create: (md: IMessageDigest) => any
+}
+
+interface MaskGenFunctions {
+  [key: string]: MaskGenFunction
+}
+
+// Add at the top of the file after imports
+interface ExtendedError extends Error {
+  headerType?: string
+  errors?: any[]
+  algorithm?: string
+  attribute?: any
+  extension?: any
+}
+
+interface PemMessage {
+  type: string
+  body: string
+  procType?: any
+  contentDomain?: any
+  dekInfo?: any
+  headers?: any[]
+}
+
+// Update verifySignature function
 export function verifySignature(options: {
-  certificate: any
-  md: MessageDigest
+  certificate: Certificate
+  md: IMessageDigest
   signature: any
 }): boolean {
-  const cert = options.certificate
-  let scheme
+  let rval = false
 
-  switch (cert.signatureOid) {
-    case oids.sha1WithRSAEncryption:
-    // deprecated alias
-    case oids.sha1WithRSASignature:
-      /* use PKCS#1 v1.5 padding scheme */
-      break
-    case oids['RSASSA-PSS']:
-      var hash, mgf
+  if (options.certificate.signatureOid === oids['RSASSA-PSS']) {
+    const params = options.certificate.signatureParameters
+    if (!params) {
+      throw {
+        message: 'Missing signature parameters',
+        error: 'forge.pki.BadCertificate'
+      } as CustomError
+    }
 
-      /* initialize mgf */
-      hash = oids[cert.signatureParameters.mgf.hash.algorithmOid]
-      if (hash === undefined || md[hash] === undefined) {
-        const error: CustomError = new Error('Unsupported MGF hash function.')
-        error.oid = cert.signatureParameters.mgf.hash.algorithmOid
-        error.name = hash
-        throw error
-      }
+    const hashAlgorithm = params.mgf?.hash?.algorithmOid
+    if (!hashAlgorithm || !((md as unknown as HashFunctions)[hashAlgorithm])) {
+      throw {
+        message: 'Unsupported MGF hash function.',
+        error: 'forge.pki.BadCertificate',
+        oid: params.mgf?.hash?.algorithmOid
+      } as CustomError
+    }
 
-      mgf = oids[cert.signatureParameters.mgf.algorithmOid]
-      if (mgf === undefined || mgfImport[mgf] === undefined) {
-        const error: CustomError = new Error('Unsupported MGF function.')
-        error.oid = cert.signatureParameters.mgf.algorithmOid
-        error.name = mgf
-        throw error
-      }
+    const mgfOid = params.mgf?.algorithmOid
+    if (!mgfOid || !((mgfImport as unknown as MaskGenFunctions)[mgfOid])) {
+      throw {
+        message: 'Unsupported MGF function.',
+        error: 'forge.pki.BadCertificate',
+        oid: mgfOid
+      } as CustomError
+    }
 
-      mgf = mgfImport[mgf].create(md[hash].create())
+    const mgf = (mgfImport as unknown as MaskGenFunctions)[mgfOid].create(
+      (md as unknown as HashFunctions)[hashAlgorithm].create()
+    )
 
-      /* initialize hash function */
-      hash = oids[cert.signatureParameters.hash.algorithmOid]
-      if (hash === undefined || md[hash] === undefined) {
-        const error: CustomError = new Error('Unsupported RSASSA-PSS hash function.')
-        error.oid = cert.signatureParameters.hash.algorithmOid
-        error.name = hash
-        throw error
-      }
+    // initialize hash function
+    const hashOid = params.hash?.algorithmOid
+    if (!hashOid || !((md as unknown as HashFunctions)[hashOid])) {
+      throw {
+        message: 'Unsupported RSASSA-PSS hash function.',
+        error: 'forge.pki.BadCertificate',
+        oid: hashOid
+      } as CustomError
+    }
 
-      scheme = pss.create(
-        md[hash].create(),
-        mgf,
-        cert.signatureParameters.saltLength,
-      )
-      break
+    const hashFn = (md as unknown as HashFunctions)[hashOid].create()
+    rval = options.certificate.publicKey.verify(
+      options.md.digest().getBytes(),
+      options.signature,
+      { mgf, hash: hashFn, saltLength: params.saltLength || 20 }
+    )
+  }
+  else {
+    rval = options.certificate.publicKey.verify(
+      options.md.digest().getBytes(),
+      options.signature
+    )
   }
 
-  // verify signature on cert using public key
-  return cert.publicKey.verify(
-    options.md.digest().getBytes(),
-    options.signature,
-    scheme,
-  )
+  return rval
 }
 
 /**
@@ -828,30 +948,18 @@ export function verifySignature(options: {
  *
  * @return the certificate.
  */
-export function certificateFromPem(pemString: string, computeHash: boolean, strict: boolean) {
+export function certificateFromPem(pemString: string, computeHash: boolean, strict: boolean): Certificate {
   const msg = pem.decode(pemString)[0]
 
-  if (msg.type !== 'CERTIFICATE'
-    && msg.type !== 'X509 CERTIFICATE'
-    && msg.type !== 'TRUSTED CERTIFICATE') {
-    const error: CustomError = new Error(
-      'Could not convert certificate from PEM; PEM header type '
-      + 'is not "CERTIFICATE", "X509 CERTIFICATE", or "TRUSTED CERTIFICATE".',
-    )
+  if (msg.type !== 'CERTIFICATE' && msg.type !== 'X509 CERTIFICATE'
+      && msg.type !== 'TRUSTED CERTIFICATE') {
+    const error = new Error('Could not convert certificate from PEM; PEM header type is not "CERTIFICATE".') as ExtendedError
     error.headerType = msg.type
     throw error
   }
 
-  if (msg.procType && msg.procType.type === 'ENCRYPTED') {
-    throw new Error(
-      'Could not convert certificate from PEM; PEM is encrypted.',
-    )
-  }
-
   // convert DER to ASN.1 object
-  const obj = asn1.fromDer(msg.body, strict)
-
-  return certificateFromAsn1(obj, computeHash)
+  return certificateFromAsn1(asn1.fromDer(msg.body), computeHash)
 }
 
 /**
@@ -862,7 +970,7 @@ export function certificateFromPem(pemString: string, computeHash: boolean, stri
  *
  * @return the PEM-formatted certificate.
  */
-export function certificateToPem(cert: any, maxline: number) {
+export function certificateToPem(cert: Certificate, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'CERTIFICATE',
@@ -879,23 +987,17 @@ export function certificateToPem(cert: any, maxline: number) {
  *
  * @return the public key.
  */
-export function publicKeyFromPem(pemString: string) {
+export function publicKeyFromPem(pemString: string): any {
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'PUBLIC KEY' && msg.type !== 'RSA PUBLIC KEY') {
-    const error: CustomError = new Error('Could not convert public key from PEM; PEM header '
-      + 'type is not "PUBLIC KEY" or "RSA PUBLIC KEY".')
+    const error = new Error('Could not convert public key from PEM; PEM header type is not "PUBLIC KEY" or "RSA PUBLIC KEY".')
     error.headerType = msg.type
     throw error
   }
 
-  if (msg.procType && msg.procType.type === 'ENCRYPTED')
-    throw new Error('Could not convert public key from PEM; PEM is encrypted.')
-
   // convert DER to ASN.1 object
-  const obj = asn1.fromDer(msg.body)
-
-  return publicKeyFromAsn1(obj)
+  return publicKeyFromAsn1(asn1.fromDer(msg.body))
 }
 
 /**
@@ -906,7 +1008,7 @@ export function publicKeyFromPem(pemString: string) {
  *
  * @return the PEM-formatted public key.
  */
-export function publicKeyToPem(key: any, maxline: number) {
+export function publicKeyToPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'PUBLIC KEY',
@@ -924,11 +1026,11 @@ export function publicKeyToPem(key: any, maxline: number) {
  *
  * @return the PEM-formatted public key.
  */
-export function publicKeyToRSAPublicKeyPem(key: any, maxline: number) {
+export function publicKeyToRSAPublicKeyPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PUBLIC KEY',
-    body: asn1.toDer(publicKeyToRSAPublicKey(key)).getBytes(),
+    body: asn1.toDer(publicKeyToAsn1(key)).getBytes(),
   }
 
   return pem.encode(msg, { maxline })
@@ -948,49 +1050,48 @@ export function publicKeyToRSAPublicKeyPem(key: any, maxline: number) {
  *
  * @return the fingerprint as a byte buffer or other encoding based on options.
  */
-export function getPublicKeyFingerprint(key: any, options: {
-  md?: MessageDigest
-  type?: string
-  encoding?: string
-  delimiter?: string
-}) {
+export function getPublicKeyFingerprint(
+  key: any,
+  options: {
+    md?: IMessageDigest
+    type?: string
+    encoding?: string
+    delimiter?: string
+  }
+): string {
   options = options || {}
-  const sha1 = options.md || md.sha1.create()
-  const type = options.type || 'RSAPublicKey'
+  options.type = options.type || 'RSAPublicKey'
 
-  let bytes
-  switch (type) {
-    case 'RSAPublicKey':
-      bytes = asn1.toDer(publicKeyToRSAPublicKey(key)).getBytes()
-      break
-    case 'SubjectPublicKeyInfo':
-      bytes = asn1.toDer(publicKeyToAsn1(key)).getBytes()
-      break
-    default:
-      throw new Error(`Unknown fingerprint type "${options.type}".`)
-  }
+  // use SHA-1 message digest by default
+  options.md = options.md || md.sha1.create()
 
-  // hash public key bytes
-  sha1.start()
-  sha1.update(bytes)
-  const digest = sha1.digest()
+  // produce DER from RSAPublicKey and digest it
+  const bytes = asn1.toDer(publicKeyToAsn1(key)).getBytes()
+  options.md.update(bytes)
 
+  const digest = options.md.digest()
+
+  // encode as hex by default
+  let rval
   if (options.encoding === 'hex') {
-    const hex = digest.toHex()
-
-    if (options.delimiter)
-      return hex.match(/.{2}/g).join(options.delimiter)
-
-    return hex
+    rval = digest.toHex()
+  }
+  else if (options.encoding === 'binary') {
+    rval = digest.getBytes()
+  }
+  else {
+    rval = digest.toHex()
   }
 
-  if (options.encoding === 'binary')
-    return digest.getBytes()
+  // add delimiter
+  if (options.delimiter) {
+    const hex = rval.match(/.{2}/g)
+    if (hex) {
+      rval = hex.join(options.delimiter)
+    }
+  }
 
-  if (options.encoding)
-    throw new Error(`Unknown encoding "${options.encoding}".`)
-
-  return digest
+  return rval
 }
 
 /**
@@ -1008,24 +1109,21 @@ export function getPublicKeyFingerprint(key: any, options: {
  *
  * @return the certification request (CSR).
  */
-export function certificationRequestFromPem(pemString: string, computeHash: boolean, strict: boolean) {
+export function certificationRequestFromPem(
+  pemString: string,
+  computeHash: boolean,
+  strict: boolean
+): CertificationRequest {
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE REQUEST') {
-    const error: CustomError = new Error('Could not convert certification request from PEM; '
-      + 'PEM header type is not "CERTIFICATE REQUEST".')
+    const error = new Error('Could not convert certification request from PEM; PEM header type is not "CERTIFICATE REQUEST".')
     error.headerType = msg.type
     throw error
   }
-  if (msg.procType && msg.procType.type === 'ENCRYPTED') {
-    throw new Error('Could not convert certification request from PEM; '
-      + 'PEM is encrypted.')
-  }
 
   // convert DER to ASN.1 object
-  const obj = asn1.fromDer(msg.body, strict)
-
-  return certificationRequestFromAsn1(obj, computeHash)
+  return certificationRequestFromAsn1(asn1.fromDer(msg.body), computeHash)
 }
 
 /**
@@ -1051,285 +1149,78 @@ pki.certificationRequestToPem = function (csr, maxline) {
  * @return the certificate.
  */
 export function createCertificate(): Certificate {
-  const cert = {}
-  cert.version = 0x02
-  cert.serialNumber = '00'
-  cert.signatureOid = null
-  cert.signature = null
-  cert.siginfo = {}
-  cert.siginfo.algorithmOid = null
-  cert.validity = {}
-  cert.validity.notBefore = new Date()
-  cert.validity.notAfter = new Date()
+  const cert: Certificate = {
+    version: 0x02,
+    serialNumber: '00',
+    signatureOid: null,
+    signature: null,
+    siginfo: {
+      algorithmOid: null
+    },
+    validity: {
+      notBefore: new Date(),
+      notAfter: new Date()
+    },
+    issuer: {
+      getField: function(sn: string) {
+        return _getAttribute(cert.issuer, sn)
+      },
+      addField: function(attr: RDNAttribute) {
+        _fillMissingFields([attr])
+        cert.issuer.attributes.push(attr)
+      },
+      attributes: [],
+      hash: null
+    },
+    subject: {
+      getField: function(sn: string) {
+        return _getAttribute(cert.subject, sn)
+      },
+      addField: function(attr: RDNAttribute) {
+        _fillMissingFields([attr])
+        cert.subject.attributes.push(attr)
+      },
+      attributes: [],
+      hash: null
+    },
+    extensions: [],
+    publicKey: null,
+    md: null,
+    issued: function(child: Certificate) {
+      return child.isIssuer(cert)
+    },
+    isIssuer: function(parent: Certificate) {
+      let rval = false
+      const i = cert.issuer
+      const s = parent.subject
 
-  cert.issuer = {}
-  cert.issuer.getField = function (sn) {
-    return _getAttribute(cert.issuer, sn)
-  }
-  cert.issuer.addField = function (attr) {
-    _fillMissingFields([attr])
-    cert.issuer.attributes.push(attr)
-  }
-  cert.issuer.attributes = []
-  cert.issuer.hash = null
+      // compare hashes if present
+      if (i.hash && s.hash)
+        rval = (i.hash === s.hash)
+      // if hashes are not present or not equal, compare attributes
+      else {
+        // ensure all parent subject attributes are present in issuer
+        const iattr = i.attributes
+        const sattr = s.attributes
+        rval = _containsAll(iattr, sattr)
+      }
 
-  cert.subject = {}
-  cert.subject.getField = function (sn) {
-    return _getAttribute(cert.subject, sn)
-  }
-  cert.subject.addField = function (attr) {
-    _fillMissingFields([attr])
-    cert.subject.attributes.push(attr)
-  }
-  cert.subject.attributes = []
-  cert.subject.hash = null
-
-  cert.extensions = []
-  cert.publicKey = null
-  cert.md = null
-
-  /**
-   * Sets the subject of this certificate.
-   *
-   * @param attrs the array of subject attributes to use.
-   * @param uniqueId an optional a unique ID to use.
-   */
-  function setSubject(attrs: any, uniqueId: any) {
-    // set new attributes, clear hash
-    _fillMissingFields(attrs)
-    cert.subject.attributes = attrs
-    delete cert.subject.uniqueId
-    if (uniqueId)
-      // TODO: support arbitrary bit length ids
-      cert.subject.uniqueId = uniqueId
-
-    cert.subject.hash = null
-  }
-
-  /**
-   * Sets the issuer of this certificate.
-   *
-   * @param attrs the array of issuer attributes to use.
-   * @param uniqueId an optional a unique ID to use.
-   */
-  function setIssuer(attrs: any, uniqueId: any) {
-    // set new attributes, clear hash
-    _fillMissingFields(attrs)
-    cert.issuer.attributes = attrs
-    delete cert.issuer.uniqueId
-    if (uniqueId) {
-      // TODO: support arbitrary bit length ids
-      cert.issuer.uniqueId = uniqueId
-    }
-    cert.issuer.hash = null
-  }
-
-  /**
-   * Sets the extensions of this certificate.
-   *
-   * @param exts the array of extensions to use.
-   */
-  function setExtensions(exts: any) {
-    for (let i = 0; i < exts.length; ++i) {
-      _fillMissingExtensionFields(exts[i], { cert })
-    }
-    // set new extensions
-    cert.extensions = exts
-  }
-
-  /**
-   * Gets an extension by its name or id.
-   *
-   * @param options the name to use or an object with:
-   * @param options.name the name to use.
-   * @param options.id the id to use.
-   *
-   * @return the extension or null if not found.
-   */
-  function getExtension(options: any) {
-    if (typeof options === 'string') {
-      options = { name: options }
-    }
-
-    let rval = null
-    let ext
-    for (let i = 0; rval === null && i < cert.extensions.length; ++i) {
-      ext = cert.extensions[i]
-      if (options.id && ext.id === options.id)
-        rval = ext
-      else if (options.name && ext.name === options.name)
-        rval = ext
-    }
-
-    return rval
-  }
-
-  /**
-   * Signs this certificate using the given private key.
-   *
-   * @param key the private key to sign with.
-   * @param md the message digest object to use (defaults to md.sha1).
-   */
-  function sign(key: any, md: any) {
-    // TODO: get signature OID from private key
-    cert.md = md || md.sha1.create()
-    const algorithmOid = oids[`${cert.md.algorithm}WithRSAEncryption`]
-    if (!algorithmOid) {
-      const error = new Error('Could not compute certificate digest. '
-        + 'Unknown message digest algorithm OID.')
-      error.algorithm = cert.md.algorithm
-      throw error
-    }
-    cert.signatureOid = cert.siginfo.algorithmOid = algorithmOid
-
-    // get TBSCertificate, convert to DER
-    cert.tbsCertificate = pki.getTBSCertificate(cert)
-    const bytes = asn1.toDer(cert.tbsCertificate)
-
-    // digest and sign
-    cert.md.update(bytes.getBytes())
-    cert.signature = key.sign(cert.md)
-  }
-
-  /**
-   * Attempts verify the signature on the passed certificate using this
-   * certificate's public key.
-   *
-   * @param child the certificate to verify.
-   *
-   * @return true if verified, false if not.
-   */
-  function verify(child) {
-    let rval = false
-
-    if (!cert.issued(child)) {
-      const issuer = child.issuer
-      const subject = cert.subject
-      const error = new Error(
-        'The parent certificate did not issue the given child '
-        + 'certificate; the child certificate\'s issuer does not match the '
-        + 'parent\'s subject.',
-      )
-      error.expectedIssuer = subject.attributes
-      error.actualIssuer = issuer.attributes
-      throw error
-    }
-
-    let md = child.md
-    if (md === null) {
-      // create digest for OID signature types
-      md = _createSignatureDigest({
-        signatureOid: child.signatureOid,
-        type: 'certificate',
-      })
-
-      // produce DER formatted TBSCertificate and digest it
-      const tbsCertificate = child.tbsCertificate || pki.getTBSCertificate(child)
-      const bytes = asn1.toDer(tbsCertificate)
-      md.update(bytes.getBytes())
-    }
-
-    if (md !== null) {
-      export rval = verifySignature({
-        certificate: cert,
-        md,
-        signature: child.signature,
-      })
-    }
-
-    return rval
-  }
-
-  /**
-   * Returns true if this certificate's issuer matches the passed
-   * certificate's subject. Note that no signature check is performed.
-   *
-   * @param parent the certificate to check.
-   *
-   * @return true if this certificate's issuer matches the passed certificate's
-   *         subject.
-   */
-  cert.isIssuer = function (parent) {
-    let rval = false
-
-    const i = cert.issuer
-    const s = parent.subject
-
-    // compare hashes if present
-    if (i.hash && s.hash) {
-      rval = (i.hash === s.hash)
-    }
-    else if (i.attributes.length === s.attributes.length) {
-      // all attributes are the same so issuer matches subject
-      rval = true
-      let iattr, sattr
-      for (let n = 0; rval && n < i.attributes.length; ++n) {
-        iattr = i.attributes[n]
-        sattr = s.attributes[n]
-        if (iattr.type !== sattr.type || iattr.value !== sattr.value) {
-          // attribute mismatch
-          rval = false
+      return rval
+    },
+    generateSubjectKeyIdentifier: function() {
+      return pki.getPublicKeyFingerprint(cert.publicKey, { type: 'RSAPublicKey' })
+    },
+    verifySubjectKeyIdentifier: function() {
+      const oid = oids.subjectKeyIdentifier
+      for (let i = 0; i < cert.extensions.length; ++i) {
+        const ext = cert.extensions[i]
+        if (ext.id === oid) {
+          const ski = cert.generateSubjectKeyIdentifier().getBytes()
+          return (hexToBytes(ext.subjectKeyIdentifier) === ski)
         }
       }
+      return false
     }
-
-    return rval
-  }
-
-  /**
-   * Returns true if this certificate's subject matches the issuer of the
-   * given certificate). Note that not signature check is performed.
-   *
-   * @param child the certificate to check.
-   *
-   * @return true if this certificate's subject matches the passed
-   *         certificate's issuer.
-   */
-  cert.issued = function (child) {
-    return child.isIssuer(cert)
-  }
-
-  /**
-   * Generates the subjectKeyIdentifier for this certificate as byte buffer.
-   *
-   * @return the subjectKeyIdentifier for this certificate as byte buffer.
-   */
-  cert.generateSubjectKeyIdentifier = function () {
-    /* See: 4.2.1.2 section of the the RFC3280, keyIdentifier is either:
-
-      (1) The keyIdentifier is composed of the 160-bit SHA-1 hash of the
-        value of the BIT STRING subjectPublicKey (excluding the tag,
-        length, and number of unused bits).
-
-      (2) The keyIdentifier is composed of a four bit type field with
-        the value 0100 followed by the least significant 60 bits of the
-        SHA-1 hash of the value of the BIT STRING subjectPublicKey
-        (excluding the tag, length, and number of unused bit string bits).
-    */
-
-    // skipping the tag, length, and number of unused bits is the same
-    // as just using the RSAPublicKey (for RSA keys, which are the
-    // only ones supported)
-    return pki.getPublicKeyFingerprint(cert.publicKey, { type: 'RSAPublicKey' })
-  }
-
-  /**
-   * Verifies the subjectKeyIdentifier extension value for this certificate
-   * against its public key. If no extension is found, false will be
-   * returned.
-   *
-   * @return true if verified, false if not.
-   */
-  cert.verifySubjectKeyIdentifier = function () {
-    const oid = oids.subjectKeyIdentifier
-    for (let i = 0; i < cert.extensions.length; ++i) {
-      const ext = cert.extensions[i]
-      if (ext.id === oid) {
-        const ski = cert.generateSubjectKeyIdentifier().getBytes()
-        return (hexToBytes(ext.subjectKeyIdentifier) === ski)
-      }
-    }
-    return false
   }
 
   return cert
@@ -1348,38 +1239,39 @@ export function createCertificate(): Certificate {
  *
  * @return the certificate.
  */
-export function certificateFromAsn1(obj: any, computeHash: any) {
+export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate {
   // validate certificate and capture data
-  const capture = {}
-  const errors = []
+  const capture: CaptureObject = {}
+  const errors: CustomError[] = []
   if (!asn1.validate(obj, x509CertificateValidator, capture, errors)) {
-    const error = new Error('Cannot read X.509 certificate. '
-      + 'ASN.1 object is not an X509v3 Certificate.')
+    const error = new Error('Cannot read X.509 certificate. ASN.1 object is not an X509v3 Certificate.')
     error.errors = errors
     throw error
   }
 
   // get oid
   const oid = asn1.derToOid(capture.publicKeyOid)
-  if (oid !== pki.oids.rsaEncryption) {
+  if (oid !== oids.rsaEncryption) {
     throw new Error('Cannot read public key. OID is not RSA.')
   }
 
   // create certificate
-  const cert = pki.createCertificate()
-  cert.version = capture.certVersion
-    ? capture.certVersion.charCodeAt(0)
-    : 0
+  const cert = createCertificate()
+  cert.version = capture.certVersion ? capture.certVersion.charCodeAt(0) : 0
   const serial = forge.util.createBuffer(capture.certSerialNumber)
   cert.serialNumber = serial.toHex()
-  cert.signatureOid = forge.asn1.derToOid(capture.certSignatureOid)
-  cert.signatureParameters = _readSignatureParameters(
+  cert.signatureOid = asn1.derToOid(capture.certSignatureOid)
+  cert.signatureParameters = readSignatureParameters(
     cert.signatureOid,
     capture.certSignatureParams,
-    true,
+    true
   )
-  cert.siginfo.algorithmOid = forge.asn1.derToOid(capture.certinfoSignatureOid)
-  cert.siginfo.parameters = _readSignatureParameters(cert.siginfo.algorithmOid, capture.certinfoSignatureParams, false)
+  cert.siginfo.algorithmOid = asn1.derToOid(capture.certinfoSignatureOid)
+  cert.siginfo.parameters = readSignatureParameters(
+    cert.siginfo.algorithmOid,
+    capture.certinfoSignatureParams,
+    false
+  )
   cert.signature = capture.certSignature
 
   const validity = []
@@ -1734,13 +1626,13 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
   const csr = createCertificationRequest()
   csr.version = capture.csrVersion ? capture.csrVersion.charCodeAt(0) : 0
   csr.signatureOid = forge.asn1.derToOid(capture.csrSignatureOid)
-  csr.signatureParameters = _readSignatureParameters(
+  csr.signatureParameters = readSignatureParameters(
     csr.signatureOid,
     capture.csrSignatureParams,
     true,
   )
   csr.siginfo.algorithmOid = forge.asn1.derToOid(capture.csrSignatureOid)
-  csr.siginfo.parameters = _readSignatureParameters(
+  csr.siginfo.parameters = readSignatureParameters(
     csr.siginfo.algorithmOid,
     capture.csrSignatureParams,
     false,
@@ -1802,7 +1694,7 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
  *
  * @return the empty certification request.
  */
-export function createCertificationRequest() {
+export function createCertificationRequest(): CertificationRequest {
   const csr = {}
   csr.version = 0x00
   csr.signatureOid = null
@@ -2049,16 +1941,12 @@ function _fillMissingFields(attrs) {
     }
 
     // convert extensions to value
-    if (attr.type === oids.extensionRequest) {
-      attr.valueConstructed = true
+    if (attr.type === oids.extensionRequest && attr.extensions) {
       attr.valueTagClass = asn1.Type.SEQUENCE
-      if (!attr.value && attr.extensions) {
-        attr.value = []
-        for (let ei = 0; ei < attr.extensions.length; ++ei) {
-          attr.value.push(pki.certificateExtensionToAsn1(
-            _fillMissingExtensionFields(attr.extensions[ei]),
-          ))
-        }
+      attr.valueConstructed = true
+      attr.value = []
+      for (const ext of attr.extensions) {
+        attr.value.push(certificateExtensionToAsn1(_fillMissingExtensionFields(ext)))
       }
     }
 
@@ -2439,7 +2327,7 @@ function _fillMissingExtensionFields(e, options) {
  * Convert signature parameters object to ASN.1
  *
  * @param {string} oid Signature algorithm OID
- * @param params The signature parameters object
+ * @param params The signature parametrs object
  * @return ASN.1 object representing signature parameters
  */
 function _signatureParametersToAsn1(oid, params) {
@@ -2539,9 +2427,6 @@ function _CRIAttributesToAsn1(csr) {
 
   return rval
 }
-
-const jan_1_1950 = new Date('1950-01-01T00:00:00Z')
-const jan_1_2050 = new Date('2050-01-01T00:00:00Z')
 
 /**
  * Converts a Date object to ASN.1
@@ -2781,12 +2666,11 @@ export function certificateExtensionToAsn1(ext) {
  *
  * @return the asn1 representation of a certification request.
  */
-export function certificationRequestToAsn1(csr) {
+export function certificationRequestToAsn1(csr: CertificationRequest): any {
   // prefer cached CertificationRequestInfo over generating one
-  const cri = csr.certificationRequestInfo
-    || getCertificationRequestInfo(csr)
+  const cri = csr.certificationRequestInfo || getCertificationRequestInfo(csr)
 
-  // Certificate
+  // CertificationRequest
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // CertificationRequestInfo
     cri,
@@ -2810,165 +2694,124 @@ export function certificationRequestToAsn1(csr) {
  *
  * @return the CA store.
  */
-export function createCaStore(certs) {
+export function createCaStore(certs): CAStore {
   // create CA store
   const caStore = {
     // stored certificates
     certs: {},
-  }
+    getIssuer: function (cert) {
+      const rval = getBySubject(cert.issuer)
 
-  /**
-   * Gets the certificate that issued the passed certificate or its
-   * 'parent'.
-   *
-   * @param cert the certificate to get the parent for.
-   *
-   * @return the parent certificate or null if none was found.
-   */
-  caStore.getIssuer = function (cert) {
-    const rval = getBySubject(cert.issuer)
+      // see if there are multiple matches
+      /* if(Array.isArray(rval)) {
+        // TODO: resolve multiple matches by checking
+        // authorityKey/subjectKey/issuerUniqueID/other identifiers, etc.
+        // FIXME: or alternatively do authority key mapping
+        // if possible (X.509v1 certs can't work?)
+        throw new Error('Resolving multiple issuer matches not implemented yet.');
+      } */
 
-    // see if there are multiple matches
-    /* if(Array.isArray(rval)) {
-      // TODO: resolve multiple matches by checking
-      // authorityKey/subjectKey/issuerUniqueID/other identifiers, etc.
-      // FIXME: or alternatively do authority key mapping
-      // if possible (X.509v1 certs can't work?)
-      throw new Error('Resolving multiple issuer matches not implemented yet.');
-    } */
+      return rval
+    },
+    addCertificate: function (cert) {
+      // convert from pem if necessary
+      if (typeof cert === 'string')
+        cert = certificateFromPem(cert)
 
-    return rval
-  }
+      ensureSubjectHasHash(cert.subject)
 
-  /**
-   * Adds a trusted certificate to the store.
-   *
-   * @param cert the certificate to add as a trusted certificate (either a
-   *          pki.certificate object or a PEM-formatted certificate).
-   */
-  caStore.addCertificate = function (cert) {
-    // convert from pem if necessary
-    if (typeof cert === 'string')
-      cert = certificateFromPem(cert)
-
-    ensureSubjectHasHash(cert.subject)
-
-    if (!caStore.hasCertificate(cert)) { // avoid duplicate certificates in store
-      if (cert.subject.hash in caStore.certs) {
-        // subject hash already exists, append to array
-        let tmp = caStore.certs[cert.subject.hash]
-        if (!Array.isArray(tmp)) {
-          tmp = [tmp]
-        }
-        tmp.push(cert)
-        caStore.certs[cert.subject.hash] = tmp
-      }
-      else {
-        caStore.certs[cert.subject.hash] = cert
-      }
-    }
-  }
-
-  /**
-   * Checks to see if the given certificate is in the store.
-   *
-   * @param cert the certificate to check (either a pki.certificate or a
-   *          PEM-formatted certificate).
-   *
-   * @return true if the certificate is in the store, false if not.
-   */
-  caStore.hasCertificate = function (cert) {
-    // convert from pem if necessary
-    if (typeof cert === 'string') {
-      cert = pki.certificateFromPem(cert)
-    }
-
-    let match = getBySubject(cert.subject)
-    if (!match)
-      return false
-
-    if (!Array.isArray(match))
-      match = [match]
-
-    // compare DER-encoding of certificates
-    const der1 = asn1.toDer(certificateToAsn1(cert)).getBytes()
-    for (let i = 0; i < match.length; ++i) {
-      const der2 = asn1.toDer(certificateToAsn1(match[i])).getBytes()
-      if (der1 === der2)
-        return true
-    }
-
-    return false
-  }
-
-  /**
-   * Lists all of the certificates kept in the store.
-   *
-   * @return an array of all of the pki.certificate objects in the store.
-   */
-  caStore.listAllCertificates = function () {
-    const certList = []
-
-    for (const hash in caStore.certs) {
-      if (caStore.certs.hasOwnProperty(hash)) {
-        const value = caStore.certs[hash]
-        if (!Array.isArray(value)) {
-          certList.push(value)
+      if (!caStore.hasCertificate(cert)) { // avoid duplicate certificates in store
+        if (cert.subject.hash in caStore.certs) {
+          // subject hash already exists, append to array
+          let tmp = caStore.certs[cert.subject.hash]
+          if (!Array.isArray(tmp)) {
+            tmp = [tmp]
+          }
+          tmp.push(cert)
+          caStore.certs[cert.subject.hash] = tmp
         }
         else {
-          for (let i = 0; i < value.length; ++i) {
-            certList.push(value[i])
+          caStore.certs[cert.subject.hash] = cert
+        }
+      }
+    },
+    hasCertificate: function (cert) {
+      // convert from pem if necessary
+      if (typeof cert === 'string') {
+        cert = pki.certificateFromPem(cert)
+      }
+
+      let match = getBySubject(cert.subject)
+      if (!match)
+        return false
+
+      if (!Array.isArray(match))
+        match = [match]
+
+      // compare DER-encoding of certificates
+      const der1 = asn1.toDer(certificateToAsn1(cert)).getBytes()
+      for (let i = 0; i < match.length; ++i) {
+        const der2 = asn1.toDer(certificateToAsn1(match[i])).getBytes()
+        if (der1 === der2)
+          return true
+      }
+
+      return false
+    },
+    listAllCertificates: function () {
+      const certList = []
+
+      for (const hash in caStore.certs) {
+        if (caStore.certs.hasOwnProperty(hash)) {
+          const value = caStore.certs[hash]
+          if (!Array.isArray(value)) {
+            certList.push(value)
+          }
+          else {
+            for (let i = 0; i < value.length; ++i) {
+              certList.push(value[i])
+            }
           }
         }
       }
-    }
 
-    return certList
-  }
+      return certList
+    },
+    removeCertificate: function (cert) {
+      let result
 
-  /**
-   * Removes a certificate from the store.
-   *
-   * @param cert the certificate to remove (either a pki.certificate or a
-   *          PEM-formatted certificate).
-   *
-   * @return the certificate that was removed or null if the certificate
-   *           wasn't in store.
-   */
-  caStore.removeCertificate = function (cert) {
-    let result
-
-    // convert from pem if necessary
-    if (typeof cert === 'string') {
-      cert = certificateFromPem(cert)
-    }
-    ensureSubjectHasHash(cert.subject)
-    if (!caStore.hasCertificate(cert)) {
-      return null
-    }
-
-    const match = getBySubject(cert.subject)
-
-    if (!Array.isArray(match)) {
-      result = caStore.certs[cert.subject.hash]
-      delete caStore.certs[cert.subject.hash]
-      return result
-    }
-
-    // compare DER-encoding of certificates
-    const der1 = asn1.toDer(pki.certificateToAsn1(cert)).getBytes()
-    for (let i = 0; i < match.length; ++i) {
-      const der2 = asn1.toDer(pki.certificateToAsn1(match[i])).getBytes()
-      if (der1 === der2) {
-        result = match[i]
-        match.splice(i, 1)
+      // convert from pem if necessary
+      if (typeof cert === 'string') {
+        cert = certificateFromPem(cert)
       }
-    }
-    if (match.length === 0) {
-      delete caStore.certs[cert.subject.hash]
-    }
+      ensureSubjectHasHash(cert.subject)
+      if (!caStore.hasCertificate(cert)) {
+        return null
+      }
 
-    return result
+      const match = getBySubject(cert.subject)
+
+      if (!Array.isArray(match)) {
+        result = caStore.certs[cert.subject.hash]
+        delete caStore.certs[cert.subject.hash]
+        return result
+      }
+
+      // compare DER-encoding of certificates
+      const der1 = asn1.toDer(pki.certificateToAsn1(cert)).getBytes()
+      for (let i = 0; i < match.length; ++i) {
+        const der2 = asn1.toDer(pki.certificateToAsn1(match[i])).getBytes()
+        if (der1 === der2) {
+          result = match[i]
+          match.splice(i, 1)
+        }
+      }
+      if (match.length === 0) {
+        delete caStore.certs[cert.subject.hash]
+      }
+
+      return result
+    },
   }
 
   function getBySubject(subject) {
@@ -3038,187 +2881,51 @@ export const certificateError = {
  *
  * @return true if successful, error thrown if not.
  */
-export function verifyCertificateChain(caStore, chain, options) {
+export function verifyCertificateChain(
+  caStore: CAStore,
+  chain: Certificate[],
+  options: {
+    verify?: (cert: Certificate, index: number, chain: Certificate[]) => boolean | CustomError
+    validityCheckDate?: Date
+  } = {}
+): boolean {
   /* From: RFC3280 - Internet X.509 Public Key Infrastructure Certificate
     Section 6: Certification Path Validation
-    See inline parentheticals related to this particular implementation.
-
-    The primary goal of path validation is to verify the binding between
-    a subject distinguished name or a subject alternative name and subject
-    public key, as represented in the end entity certificate, based on the
-    public key of the trust anchor. This requires obtaining a sequence of
-    certificates that support that binding. That sequence should be provided
-    in the passed 'chain'. The trust anchor should be in the given CA
-    store. The 'end entity' certificate is the certificate provided by the
-    end point (typically a server) and is the first in the chain.
-
-    To meet this goal, the path validation process verifies, among other
-    things, that a prospective certification path (a sequence of n
-    certificates or a 'chain') satisfies the following conditions:
-
-    (a) for all x in {1, ..., n-1}, the subject of certificate x is
-          the issuer of certificate x+1;
-
-    (b) certificate 1 is issued by the trust anchor;
-
-    (c) certificate n is the certificate to be validated; and
-
-    (d) for all x in {1, ..., n}, the certificate was valid at the
-          time in question.
-
-    Note that here 'n' is index 0 in the chain and 1 is the last certificate
-    in the chain and it must be signed by a certificate in the connection's
-    CA store.
-
-    The path validation process also determines the set of certificate
-    policies that are valid for this path, based on the certificate policies
-    extension, policy mapping extension, policy constraints extension, and
-    inhibit any-policy extension.
-
-    Note: Policy mapping extension not supported (Not Required).
-
-    Note: If the certificate has an unsupported critical extension, then it
-    must be rejected.
-
-    Note: A certificate is self-issued if the DNs that appear in the subject
-    and issuer fields are identical and are not empty.
-
-    The path validation algorithm assumes the following seven inputs are
-    provided to the path processing logic. What this specific implementation
-    will use is provided parenthetically:
-
-    (a) a prospective certification path of length n (the 'chain')
-    (b) the current date/time: ('now').
-    (c) user-initial-policy-set: A set of certificate policy identifiers
-          naming the policies that are acceptable to the certificate user.
-          The user-initial-policy-set contains the special value any-policy
-          if the user is not concerned about certificate policy
-          (Not implemented. Any policy is accepted).
-    (d) trust anchor information, describing a CA that serves as a trust
-          anchor for the certification path. The trust anchor information
-          includes:
-
-      (1)  the trusted issuer name,
-      (2)  the trusted public key algorithm,
-      (3)  the trusted public key, and
-      (4)  optionally, the trusted public key parameters associated
-             with the public key.
-
-      (Trust anchors are provided via certificates in the CA store).
-
-      The trust anchor information may be provided to the path processing
-      procedure in the form of a self-signed certificate. The trusted anchor
-      information is trusted because it was delivered to the path processing
-      procedure by some trustworthy out-of-band procedure. If the trusted
-      public key algorithm requires parameters, then the parameters are
-      provided along with the trusted public key (No parameters used in this
-      implementation).
-
-    (e) initial-policy-mapping-inhibit, which indicates if policy mapping is
-          allowed in the certification path.
-          (Not implemented, no policy checking)
-
-    (f) initial-explicit-policy, which indicates if the path must be valid
-          for at least one of the certificate policies in the user-initial-
-          policy-set.
-          (Not implemented, no policy checking)
-
-    (g) initial-any-policy-inhibit, which indicates whether the
-          anyPolicy OID should be processed if it is included in a
-          certificate.
-          (Not implemented, so any policy is valid provided that it is
-          not marked as critical) */
-
-  /* Basic Path Processing:
-
-    For each certificate in the 'chain', the following is checked:
-
-    1. The certificate validity period includes the current time.
-    2. The certificate was signed by its parent (where the parent is either
-       the next in the chain or from the CA store). Allow processing to
-       continue to the next step if no parent is found but the certificate is
-       in the CA store.
-    3. TODO: The certificate has not been revoked.
-    4. The certificate issuer name matches the parent's subject name.
-    5. TODO: If the certificate is self-issued and not the final certificate
-       in the chain, skip this step, otherwise verify that the subject name
-       is within one of the permitted subtrees of X.500 distinguished names
-       and that each of the alternative names in the subjectAltName extension
-       (critical or non-critical) is within one of the permitted subtrees for
-       that name type.
-    6. TODO: If the certificate is self-issued and not the final certificate
-       in the chain, skip this step, otherwise verify that the subject name
-       is not within one of the excluded subtrees for X.500 distinguished
-       names and none of the subjectAltName extension names are excluded for
-       that name type.
-    7. The other steps in the algorithm for basic path processing involve
-       handling the policy extension which is not presently supported in this
-       implementation. Instead, if a critical policy extension is found, the
-       certificate is rejected as not supported.
-    8. If the certificate is not the first or if its the only certificate in
-       the chain (having no parent from the CA store or is self-signed) and it
-       has a critical key usage extension, verify that the keyCertSign bit is
-       set. If the key usage extension exists, verify that the basic
-       constraints extension exists. If the basic constraints extension exists,
-       verify that the cA flag is set. If pathLenConstraint is set, ensure that
-       the number of certificates that precede in the chain (come earlier
-       in the chain as implemented below), excluding the very first in the
-       chain (typically the end-entity one), isn't greater than the
-       pathLenConstraint. This constraint limits the number of intermediate
-       CAs that may appear below a CA before only end-entity certificates
-       may be issued. */
-
-  // if a verify callback is passed as the third parameter, package it within
-  // the options object. This is to support a legacy function signature that
-  // expected the verify callback as the third parameter.
-  if (typeof options === 'function')
-    options = { verify: options }
-  options = options || {}
+    See inline parentheticals related to this particular implementation. */
 
   // copy cert chain references to another array to protect against changes
   // in verify callback
   chain = chain.slice(0)
-  const certs = chain.slice(0)
+  let validityCheckDate = options.validityCheckDate || new Date()
 
-  let validityCheckDate = options.validityCheckDate
-  // if no validityCheckDate is specified, default to the current date. Make
-  // sure to maintain the value null because it indicates that the validity
-  // period should not be checked.
-  if (typeof validityCheckDate === 'undefined') {
-    validityCheckDate = new Date()
-  }
-
-  // verify each cert in the chain using its parent, where the parent
-  // is either the next in the chain or from the CA store
+  // check each cert in chain using its parent, where parent is either
+  // the next in the chain or from the CA store
   let first = true
-  let error = null
+  let error: CustomError | null = null
   let depth = 0
   do {
-    const cert = chain.shift()
-    let parent = null
+    let cert = chain.shift()
+    let parent: Certificate | null = null
     let selfSigned = false
 
-    if (validityCheckDate) {
-      // 1. check valid time
-      if (validityCheckDate < cert.validity.notBefore
-        || validityCheckDate > cert.validity.notAfter) {
-        error = {
-          message: 'Certificate is not valid yet or has expired.',
-          error: certificateError.certificate_expired,
-          notBefore: cert.validity.notBefore,
-          notAfter: cert.validity.notAfter,
-          // TODO: we might want to reconsider renaming 'now' to
-          // 'validityCheckDate' should this API be changed in the future.
-          now: validityCheckDate,
-        }
+    // 1. verify validity period
+    if (validityCheckDate < cert.validity.notBefore || validityCheckDate > cert.validity.notAfter) {
+      error = {
+        message: 'Certificate is not valid yet or has expired.',
+        error: 'forge.pki.CertificateExpired',
+        notBefore: cert.validity.notBefore,
+        notAfter: cert.validity.notAfter,
+        now: validityCheckDate,
       }
     }
 
-    // 2. verify with parent from chain or CA store
+    // 2. verify not revoked (todo)
+
+    // 3. verify cert signature
     if (error === null) {
       parent = chain[0] || caStore.getIssuer(cert)
       if (parent === null) {
-        // check for self-signed cert
+        // check if cert is self-signed
         if (cert.isIssuer(cert)) {
           selfSigned = true
           parent = cert
@@ -3226,172 +2933,218 @@ export function verifyCertificateChain(caStore, chain, options) {
       }
 
       if (parent) {
-        // FIXME: current CA store implementation might have multiple
-        // certificates where the issuer can't be determined from the
-        // certificate (happens rarely with, eg: old certificates) so normalize
-        // by always putting parents into an array
-        // TODO: there's may be an extreme degenerate case currently uncovered
-        // where an old intermediate certificate seems to have a matching parent
-        // but none of the parents actually verify ... but the intermediate
-        // is in the CA and it should pass this check; needs investigation
-        let parents = parent
-        if (!Array.isArray(parents))
-          parents = [parents]
-
-        // try to verify with each possible parent (typically only one)
-        let verified = false
-        while (!verified && parents.length > 0) {
-          parent = parents.shift()
-          try {
-            verified = parent.verify(cert)
-          }
-          catch (ex) {
-            // failure to verify, don't care why, try next one
+        // verify parent signature on cert
+        try {
+          if (!parent.verify(cert)) {
+            error = {
+              message: 'Certificate signature is invalid.',
+              error: 'forge.pki.BadCertificate',
+            }
           }
         }
-
-        if (!verified) {
+        catch (ex) {
           error = {
             message: 'Certificate signature is invalid.',
-            error: certificateError.bad_certificate,
+            error: 'forge.pki.BadCertificate',
+            details: ex.toString(),
           }
         }
       }
 
-      if (error === null && (!parent || selfSigned)
-        && !caStore.hasCertificate(cert)) {
-        // no parent issuer and certificate itself is not trusted
+      if (error === null && (!parent || selfSigned) && !caStore.hasCertificate(cert)) {
         error = {
           message: 'Certificate is not trusted.',
-          error: certificateError.unknown_ca,
+          error: 'forge.pki.UnknownCertificateAuthority',
         }
       }
     }
 
-    // TODO: 3. check revoked
-
-    // 4. check for matching issuer/subject
-    if (error === null && parent && !cert.isIssuer(parent)) {
-      // parent is not issuer
-      error = {
-        message: 'Certificate issuer is invalid.',
-        error: certificateError.bad_certificate,
-      }
-    }
-
-    // 5. TODO: check names with permitted names tree
-
-    // 6. TODO: check names against excluded names tree
-
-    // 7. check for unsupported critical extensions
-    if (error === null) {
-      // supported extensions
-      const se = {
-        keyUsage: true,
-        basicConstraints: true,
-      }
-      for (let i = 0; error === null && i < cert.extensions.length; ++i) {
-        const ext = cert.extensions[i]
-        if (ext.critical && !(ext.name in se)) {
-          error = {
-            message: 'Certificate has an unsupported critical extension.',
-            error: certificateError.unsupported_certificate,
-          }
-        }
-      }
-    }
-
-    // 8. check for CA if cert is not first or is the only certificate
-    // remaining in chain with no parent or is self-signed
-    if (error === null
-      && (!first || (chain.length === 0 && (!parent || selfSigned)))) {
-      // first check keyUsage extension and then basic constraints
+    // 4. verify certificate extensions
+    if (error === null && !first && cert.extensions) {
+      // verify certificate basic constraints
       const bcExt = cert.getExtension('basicConstraints')
-      const keyUsageExt = cert.getExtension('keyUsage')
-      if (keyUsageExt !== null) {
-        // keyCertSign must be true and there must be a basic
-        // constraints extension
-        if (!keyUsageExt.keyCertSign || bcExt === null) {
-          // bad certificate
+      if (bcExt) {
+        if (!bcExt.cA) {
           error = {
             message:
-              'Certificate keyUsage or basicConstraints conflict '
-              + 'or indicate that the certificate is not a CA. '
-              + 'If the certificate is the only one in the chain or '
-              + 'isn\'t the first then the certificate must be a '
-              + 'valid CA.',
-            error: certificateError.bad_certificate,
+              'Certificate keyUsage or basicConstraints conflict or indicate certificate is not a CA. ' +
+              'Certificate cannot be used for certification.',
+            error: 'forge.pki.BadCertificate',
           }
         }
-      }
-      // basic constraints cA flag must be set
-      if (error === null && bcExt !== null && !bcExt.cA) {
-        // bad certificate
-        error = {
-          message: 'Certificate basicConstraints indicates the certificate is not a CA.',
-          error: certificateError.bad_certificate,
-        }
-      }
-      // if error is not null and keyUsage is available, then we know it
-      // has keyCertSign and there is a basic constraints extension too,
-      // which means we can check pathLenConstraint (if it exists)
-      if (error === null && keyUsageExt !== null && 'pathLenConstraint' in bcExt) {
-        // pathLen is the maximum # of intermediate CA certs that can be
-        // found between the current certificate and the end-entity (depth 0)
-        // certificate; this number does not include the end-entity (depth 0,
-        // last in the chain) even if it happens to be a CA certificate itself
-        const pathLen = depth - 1
-        if (pathLen > bcExt.pathLenConstraint) {
-          // pathLenConstraint violated, bad certificate
-          error = {
-            message: 'Certificate basicConstraints pathLenConstraint violated.',
-            error: certificateError.bad_certificate,
+        else if ('pathLenConstraint' in bcExt && bcExt.pathLenConstraint >= 0) {
+          if (depth > bcExt.pathLenConstraint) {
+            error = {
+              message: 'Certificate path is too long; path length constraint violated.',
+              error: 'forge.pki.BadCertificate',
+            }
           }
         }
       }
     }
 
     // call application callback
-    const vfd = (error === null) ? true : error.error
-    const ret = options.verify ? options.verify(vfd, depth, certs) : vfd
-    if (ret === true) {
-      // clear any set error
-      error = null
-    }
-    else {
-      // if passed basic tests, set default message and alert
-      if (vfd === true) {
+    if (error === null && options.verify) {
+      const ret = options.verify(cert, depth, chain)
+      if (ret === false) {
         error = {
           message: 'The application rejected the certificate.',
-          error: certificateError.bad_certificate,
+          error: 'forge.pki.BadCertificate',
         }
       }
-
-      // check for custom error info
-      if (ret || ret === 0) {
-        // set custom message and error
-        if (typeof ret === 'object' && !Array.isArray(ret)) {
-          if (ret.message) {
-            error.message = ret.message
-          }
-          if (ret.error) {
-            error.error = ret.error
-          }
+      else if (typeof ret === 'object' && !Array.isArray(ret)) {
+        if (ret.message) {
+          error = ret
         }
-        else if (typeof ret === 'string') {
-          // set custom error
-          error.error = ret
+        if (ret.error) {
+          error = ret
         }
       }
-
-      // throw error
-      throw error
+      else if (typeof ret === 'string') {
+        error = {
+          message: 'The application rejected the certificate.',
+          error: ret,
+        }
+      }
     }
 
     // no longer first cert in chain
     first = false
     ++depth
-  } while (chain.length > 0)
+  } while (error === null && chain.length > 0)
+
+  if (error !== null) {
+    throw error
+  }
 
   return true
+}
+
+function _containsAll(iattr: RDNAttribute[], sattr: RDNAttribute[]): boolean {
+  // ensure all parent subject attributes are present in issuer
+  let rval = true
+  for (let i = 0; rval && i < sattr.length; ++i) {
+    const attr = sattr[i]
+    rval = false
+    for (let j = 0; !rval && j < iattr.length; ++j) {
+      if (attr.type === iattr[j].type && attr.value === iattr[j].value) {
+        rval = true
+      }
+    }
+  }
+  return rval
+}
+
+function _getAttribute(obj: any, sn: string): RDNAttribute | null {
+  if (sn in _shortNames) {
+    sn = _shortNames[sn]
+  }
+  const rval = obj.attributes.filter((attr: RDNAttribute) => attr.shortName === sn)
+  return rval.length > 0 ? rval[0] : null
+}
+
+function _fillMissingFields(attrs: RDNAttribute[]): void {
+  for (const attr of attrs) {
+    // populate missing name
+    if (typeof attr.name === 'undefined') {
+      if (attr.type && attr.type in oids) {
+        attr.name = oids[attr.type]
+      }
+      else if (attr.shortName && attr.shortName in _shortNames) {
+        attr.name = oids[_shortNames[attr.shortName]]
+      }
+    }
+
+    // populate missing type (OID)
+    if (typeof attr.type === 'undefined') {
+      if (attr.name && attr.name in oids) {
+        attr.type = oids[attr.name]
+      }
+      else {
+        const error = new Error('Attribute type not specified.')
+        error.attribute = attr
+        throw error
+      }
+    }
+
+    // populate missing shortName
+    if (typeof attr.shortName === 'undefined') {
+      if (attr.name && attr.name in _shortNames) {
+        attr.shortName = _shortNames[attr.name]
+      }
+    }
+
+    // convert extensions to value
+    if (attr.type === oids.extensionRequest && attr.extensions) {
+      attr.valueTagClass = asn1.Type.SEQUENCE
+      attr.valueConstructed = true
+      attr.value = []
+      for (const ext of attr.extensions) {
+        attr.value.push(certificateExtensionToAsn1(_fillMissingExtensionFields(ext)))
+      }
+    }
+
+    if (typeof attr.value === 'undefined') {
+      const error = new Error('Attribute value not specified.')
+      error.attribute = attr
+      throw error
+    }
+  }
+}
+
+function _fillMissingExtensionFields(e: CertificateExtension, options: any = {}): CertificateExtension {
+  // populate missing name
+  if (typeof e.name === 'undefined') {
+    if (e.id && e.id in oids) {
+      e.name = oids[e.id]
+    }
+  }
+
+  // populate missing id
+  if (typeof e.id === 'undefined') {
+    if (e.name && e.name in oids) {
+      e.id = oids[e.name]
+    }
+    else {
+      const error = new Error('Extension ID not specified.')
+      error.extension = e
+      throw error
+    }
+  }
+
+  // handle value
+  if (typeof e.value !== 'undefined') {
+    // TODO: validate value
+  }
+  else {
+    const error = new Error('Extension value not specified.')
+    error.extension = e
+    throw error
+  }
+
+  return e
+}
+
+function _createSignatureDigest(options: {
+  signatureOid: string
+  type: string
+}): IMessageDigest {
+  switch (options.signatureOid) {
+    case oids.sha1WithRSAEncryption:
+      return md.sha1.create()
+    case oids.sha256WithRSAEncryption:
+      return md.sha256.create()
+    case oids.sha384WithRSAEncryption:
+      return md.sha384.create()
+    case oids.sha512WithRSAEncryption:
+      return md.sha512.create()
+    case oids['RSASSA-PSS']:
+      return md.sha256.create()
+    default:
+      throw {
+        message: `Could not compute ${options.type} digest. Unknown signature OID.`,
+        error: 'forge.pki.BadCertificate',
+        signatureOid: options.signatureOid
+      } as CustomError
+  }
 }
