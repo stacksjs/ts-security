@@ -244,3 +244,13 @@ export function createPSS(options: {
 
   return pssobj
 }
+
+interface PSS {
+  create: typeof createPSS
+}
+
+export const pss: PSS = {
+  create: createPSS
+}
+
+export default pss

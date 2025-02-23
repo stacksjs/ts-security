@@ -1,10 +1,9 @@
 /**
- * Javascript implementation of X.509 and related components (such as
+ * TypeScript implementation of X.509 and related components (such as
  * Certification Signing Requests) of a Public Key Infrastructure.
  *
  * @author Dave Longley
- *
- * Copyright (c) 2010-2014 Digital Bazaar, Inc.
+ * @author Chris Breuer
  *
  * The ASN.1 representation of an X.509v3 certificate is as follows
  * (see RFC 2459):
@@ -117,6 +116,8 @@ import { pki } from './pki'
 import { mgf as mgfImport } from './mgf'
 import { hexToBytes } from './utils'
 import pem from './encoding/pem'
+import { publicKeyToAsn1, publicKeyToRSAPublicKey } from './algorithms/asymmetric/rsa'
+import { publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
 
 interface CaptureObject {
   [key: string]: any
@@ -683,7 +684,7 @@ export function readSignatureParameters(oid: string, obj: any, fillDefaults: boo
   }
 
   const capture: CaptureObject = {}
-  const errors: any[] = []
+  const errors: CustomError[] = []
 
   if (!asn1.validate(obj, rsassaPssParameterValidator, capture, errors)) {
     const error: CustomError = new Error('Cannot read RSASSA-PSS parameter block.')
@@ -796,7 +797,7 @@ export function verifySignature(options: {
         throw error
       }
 
-      scheme = forge.pss.create(
+      scheme = pss.create(
         md[hash].create(),
         mgf,
         cert.signatureParameters.saltLength,
@@ -840,6 +841,7 @@ export function certificateFromPem(pemString: string, computeHash: boolean, stri
     error.headerType = msg.type
     throw error
   }
+
   if (msg.procType && msg.procType.type === 'ENCRYPTED') {
     throw new Error(
       'Could not convert certificate from PEM; PEM is encrypted.',
@@ -860,13 +862,14 @@ export function certificateFromPem(pemString: string, computeHash: boolean, stri
  *
  * @return the PEM-formatted certificate.
  */
-pki.certificateToPem = function (cert, maxline) {
+export function certificateToPem(cert: any, maxline: number) {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'CERTIFICATE',
-    body: asn1.toDer(pki.certificateToAsn1(cert)).getBytes(),
+    body: asn1.toDer(certificateToAsn1(cert)).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }
 
 /**
@@ -876,23 +879,23 @@ pki.certificateToPem = function (cert, maxline) {
  *
  * @return the public key.
  */
-pki.publicKeyFromPem = function (pem) {
-  const msg = forge.pem.decode(pem)[0]
+export function publicKeyFromPem(pemString: string) {
+  const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'PUBLIC KEY' && msg.type !== 'RSA PUBLIC KEY') {
-    const error = new Error('Could not convert public key from PEM; PEM header '
+    const error: CustomError = new Error('Could not convert public key from PEM; PEM header '
       + 'type is not "PUBLIC KEY" or "RSA PUBLIC KEY".')
     error.headerType = msg.type
     throw error
   }
-  if (msg.procType && msg.procType.type === 'ENCRYPTED') {
+
+  if (msg.procType && msg.procType.type === 'ENCRYPTED')
     throw new Error('Could not convert public key from PEM; PEM is encrypted.')
-  }
 
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body)
 
-  return pki.publicKeyFromAsn1(obj)
+  return publicKeyFromAsn1(obj)
 }
 
 /**
@@ -903,13 +906,14 @@ pki.publicKeyFromPem = function (pem) {
  *
  * @return the PEM-formatted public key.
  */
-pki.publicKeyToPem = function (key, maxline) {
+export function publicKeyToPem(key: any, maxline: number) {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'PUBLIC KEY',
-    body: asn1.toDer(pki.publicKeyToAsn1(key)).getBytes(),
+    body: asn1.toDer(publicKeyToAsn1(key)).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }
 
 /**
@@ -920,63 +924,72 @@ pki.publicKeyToPem = function (key, maxline) {
  *
  * @return the PEM-formatted public key.
  */
-pki.publicKeyToRSAPublicKeyPem = function (key, maxline) {
+export function publicKeyToRSAPublicKeyPem(key: any, maxline: number) {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PUBLIC KEY',
-    body: asn1.toDer(pki.publicKeyToRSAPublicKey(key)).getBytes(),
+    body: asn1.toDer(publicKeyToRSAPublicKey(key)).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }
 
 /**
  * Gets a fingerprint for the given public key.
  *
  * @param options the options to use.
- *          [md] the message digest object to use (defaults to md.sha1).
- *          [type] the type of fingerprint, such as 'RSAPublicKey',
+ * @param options.md the message digest object to use (defaults to md.sha1).
+ * @param options.type the type of fingerprint, such as 'RSAPublicKey',
  *            'SubjectPublicKeyInfo' (defaults to 'RSAPublicKey').
- *          [encoding] an alternative output encoding, such as 'hex'
+ * @param options.encoding an alternative output encoding, such as 'hex'
  *            (defaults to none, outputs a byte buffer).
- *          [delimiter] the delimiter to use between bytes for 'hex' encoded
+ * @param options.delimiter the delimiter to use between bytes for 'hex' encoded
  *            output, eg: ':' (defaults to none).
  *
  * @return the fingerprint as a byte buffer or other encoding based on options.
  */
-pki.getPublicKeyFingerprint = function (key, options) {
+export function getPublicKeyFingerprint(key: any, options: {
+  md?: MessageDigest
+  type?: string
+  encoding?: string
+  delimiter?: string
+}) {
   options = options || {}
-  const md = options.md || md.sha1.create()
+  const sha1 = options.md || md.sha1.create()
   const type = options.type || 'RSAPublicKey'
 
   let bytes
   switch (type) {
     case 'RSAPublicKey':
-      bytes = asn1.toDer(pki.publicKeyToRSAPublicKey(key)).getBytes()
+      bytes = asn1.toDer(publicKeyToRSAPublicKey(key)).getBytes()
       break
     case 'SubjectPublicKeyInfo':
-      bytes = asn1.toDer(pki.publicKeyToAsn1(key)).getBytes()
+      bytes = asn1.toDer(publicKeyToAsn1(key)).getBytes()
       break
     default:
       throw new Error(`Unknown fingerprint type "${options.type}".`)
   }
 
   // hash public key bytes
-  md.start()
-  md.update(bytes)
-  const digest = md.digest()
+  sha1.start()
+  sha1.update(bytes)
+  const digest = sha1.digest()
+
   if (options.encoding === 'hex') {
     const hex = digest.toHex()
-    if (options.delimiter) {
+
+    if (options.delimiter)
       return hex.match(/.{2}/g).join(options.delimiter)
-    }
+
     return hex
   }
-  else if (options.encoding === 'binary') {
+
+  if (options.encoding === 'binary')
     return digest.getBytes()
-  }
-  else if (options.encoding) {
+
+  if (options.encoding)
     throw new Error(`Unknown encoding "${options.encoding}".`)
-  }
+
   return digest
 }
 
@@ -995,11 +1008,11 @@ pki.getPublicKeyFingerprint = function (key, options) {
  *
  * @return the certification request (CSR).
  */
-pki.certificationRequestFromPem = function (pem, computeHash, strict) {
-  const msg = forge.pem.decode(pem)[0]
+export function certificationRequestFromPem(pemString: string, computeHash: boolean, strict: boolean) {
+  const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE REQUEST') {
-    const error = new Error('Could not convert certification request from PEM; '
+    const error: CustomError = new Error('Could not convert certification request from PEM; '
       + 'PEM header type is not "CERTIFICATE REQUEST".')
     error.headerType = msg.type
     throw error
@@ -1012,7 +1025,7 @@ pki.certificationRequestFromPem = function (pem, computeHash, strict) {
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body, strict)
 
-  return pki.certificationRequestFromAsn1(obj, computeHash)
+  return certificationRequestFromAsn1(obj, computeHash)
 }
 
 /**
@@ -1455,7 +1468,7 @@ export function certificateFromAsn1(obj: any, computeHash: any) {
   }
 
   // convert RSA public key from ASN.1
-  cert.publicKey = pki.publicKeyFromAsn1(capture.subjectPublicKeyInfo)
+  cert.publicKey = publicKeyFromAsn1(capture.subjectPublicKeyInfo)
 
   return cert
 }
@@ -1701,12 +1714,12 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
  *
  * @return the certification request (CSR).
  */
-pki.certificationRequestFromAsn1 = function (obj, computeHash) {
+export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boolean) {
   // validate certification request and capture data
   const capture = {}
-  const errors = []
+  const errors: CustomError[] = []
   if (!asn1.validate(obj, certificationRequestValidator, capture, errors)) {
-    const error = new Error('Cannot read PKCS#10 certificate request. '
+    const error: CustomError = new Error('Cannot read PKCS#10 certificate request. '
       + 'ASN.1 object is not a PKCS#10 CertificationRequest.')
     error.errors = errors
     throw error
@@ -1714,12 +1727,11 @@ pki.certificationRequestFromAsn1 = function (obj, computeHash) {
 
   // get oid
   const oid = asn1.derToOid(capture.publicKeyOid)
-  if (oid !== pki.oids.rsaEncryption) {
+  if (oid !== oids.rsaEncryption)
     throw new Error('Cannot read public key. OID is not RSA.')
-  }
 
   // create certification request
-  const csr = pki.createCertificationRequest()
+  const csr = createCertificationRequest()
   csr.version = capture.csrVersion ? capture.csrVersion.charCodeAt(0) : 0
   csr.signatureOid = forge.asn1.derToOid(capture.csrSignatureOid)
   csr.signatureParameters = _readSignatureParameters(
@@ -1766,7 +1778,7 @@ pki.certificationRequestFromAsn1 = function (obj, computeHash) {
   csr.subject.hash = smd.digest().toHex()
 
   // convert RSA public key from ASN.1
-  csr.publicKey = pki.publicKeyFromAsn1(capture.subjectPublicKeyInfo)
+  csr.publicKey = publicKeyFromAsn1(capture.subjectPublicKeyInfo)
 
   // convert attributes from ASN.1
   csr.getAttribute = function (sn) {
@@ -1790,7 +1802,7 @@ pki.certificationRequestFromAsn1 = function (obj, computeHash) {
  *
  * @return the empty certification request.
  */
-pki.createCertificationRequest = function () {
+export function createCertificationRequest() {
   const csr = {}
   csr.version = 0x00
   csr.signatureOid = null
@@ -2988,14 +3000,14 @@ export function createCaStore(certs) {
 /**
  * Certificate verification errors, based on TLS.
  */
-pki.certificateError = {
+export const certificateError = {
   bad_certificate: 'forge.pki.BadCertificate',
   unsupported_certificate: 'forge.pki.UnsupportedCertificate',
   certificate_revoked: 'forge.pki.CertificateRevoked',
   certificate_expired: 'forge.pki.CertificateExpired',
   certificate_unknown: 'forge.pki.CertificateUnknown',
   unknown_ca: 'forge.pki.UnknownCertificateAuthority',
-}
+} as const
 
 /**
  * Verifies a certificate chain against the given Certificate Authority store
@@ -3015,18 +3027,18 @@ pki.certificateError = {
  * The verify callback has the following signature:
  *
  * verified - Set to true if certificate was verified, otherwise the
- *   pki.certificateError for why the certificate failed.
+ *   certificateError for why the certificate failed.
  * depth - The current index in the chain, where 0 is the end point's cert.
  * certs - The certificate chain, *NOTE* an empty chain indicates an anonymous
  *   end point.
  *
  * The function returns true on success and on failure either the appropriate
- * pki.certificateError or an object with 'error' set to the appropriate
- * pki.certificateError and 'message' set to a custom error message.
+ * certificateError or an object with 'error' set to the appropriate
+ * certificateError and 'message' set to a custom error message.
  *
  * @return true if successful, error thrown if not.
  */
-pki.verifyCertificateChain = function (caStore, chain, options) {
+export function verifyCertificateChain(caStore, chain, options) {
   /* From: RFC3280 - Internet X.509 Public Key Infrastructure Certificate
     Section 6: Certification Path Validation
     See inline parentheticals related to this particular implementation.
@@ -3159,9 +3171,8 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
   // if a verify callback is passed as the third parameter, package it within
   // the options object. This is to support a legacy function signature that
   // expected the verify callback as the third parameter.
-  if (typeof options === 'function') {
+  if (typeof options === 'function')
     options = { verify: options }
-  }
   options = options || {}
 
   // copy cert chain references to another array to protect against changes
@@ -3193,7 +3204,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         || validityCheckDate > cert.validity.notAfter) {
         error = {
           message: 'Certificate is not valid yet or has expired.',
-          error: pki.certificateError.certificate_expired,
+          error: certificateError.certificate_expired,
           notBefore: cert.validity.notBefore,
           notAfter: cert.validity.notAfter,
           // TODO: we might want to reconsider renaming 'now' to
@@ -3224,9 +3235,8 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         // but none of the parents actually verify ... but the intermediate
         // is in the CA and it should pass this check; needs investigation
         let parents = parent
-        if (!Array.isArray(parents)) {
+        if (!Array.isArray(parents))
           parents = [parents]
-        }
 
         // try to verify with each possible parent (typically only one)
         let verified = false
@@ -3243,7 +3253,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         if (!verified) {
           error = {
             message: 'Certificate signature is invalid.',
-            error: pki.certificateError.bad_certificate,
+            error: certificateError.bad_certificate,
           }
         }
       }
@@ -3253,7 +3263,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         // no parent issuer and certificate itself is not trusted
         error = {
           message: 'Certificate is not trusted.',
-          error: pki.certificateError.unknown_ca,
+          error: certificateError.unknown_ca,
         }
       }
     }
@@ -3265,7 +3275,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
       // parent is not issuer
       error = {
         message: 'Certificate issuer is invalid.',
-        error: pki.certificateError.bad_certificate,
+        error: certificateError.bad_certificate,
       }
     }
 
@@ -3284,9 +3294,8 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         const ext = cert.extensions[i]
         if (ext.critical && !(ext.name in se)) {
           error = {
-            message:
-              'Certificate has an unsupported critical extension.',
-            error: pki.certificateError.unsupported_certificate,
+            message: 'Certificate has an unsupported critical extension.',
+            error: certificateError.unsupported_certificate,
           }
         }
       }
@@ -3311,7 +3320,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
               + 'If the certificate is the only one in the chain or '
               + 'isn\'t the first then the certificate must be a '
               + 'valid CA.',
-            error: pki.certificateError.bad_certificate,
+            error: certificateError.bad_certificate,
           }
         }
       }
@@ -3319,17 +3328,14 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
       if (error === null && bcExt !== null && !bcExt.cA) {
         // bad certificate
         error = {
-          message:
-            'Certificate basicConstraints indicates the certificate '
-            + 'is not a CA.',
-          error: pki.certificateError.bad_certificate,
+          message: 'Certificate basicConstraints indicates the certificate is not a CA.',
+          error: certificateError.bad_certificate,
         }
       }
       // if error is not null and keyUsage is available, then we know it
       // has keyCertSign and there is a basic constraints extension too,
       // which means we can check pathLenConstraint (if it exists)
-      if (error === null && keyUsageExt !== null
-        && 'pathLenConstraint' in bcExt) {
+      if (error === null && keyUsageExt !== null && 'pathLenConstraint' in bcExt) {
         // pathLen is the maximum # of intermediate CA certs that can be
         // found between the current certificate and the end-entity (depth 0)
         // certificate; this number does not include the end-entity (depth 0,
@@ -3338,9 +3344,8 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         if (pathLen > bcExt.pathLenConstraint) {
           // pathLenConstraint violated, bad certificate
           error = {
-            message:
-              'Certificate basicConstraints pathLenConstraint violated.',
-            error: pki.certificateError.bad_certificate,
+            message: 'Certificate basicConstraints pathLenConstraint violated.',
+            error: certificateError.bad_certificate,
           }
         }
       }
@@ -3358,7 +3363,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
       if (vfd === true) {
         error = {
           message: 'The application rejected the certificate.',
-          error: pki.certificateError.bad_certificate,
+          error: certificateError.bad_certificate,
         }
       }
 
