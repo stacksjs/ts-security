@@ -114,6 +114,9 @@ import { asn1 } from './encoding/asn1'
 import { md } from './md'
 import { oids } from './oids'
 import { pki } from './pki'
+import { mgf as mgfImport } from './mgf'
+import { hexToBytes } from './utils'
+import pem from './encoding/pem'
 
 interface CaptureObject {
   [key: string]: any
@@ -156,6 +159,7 @@ type CustomError = Error & {
   signatureOid?: string
   oid?: string
   name?: string
+  headerType?: string
 }
 
 // validator for an SubjectPublicKeyInfo structure
@@ -163,7 +167,7 @@ type CustomError = Error & {
 const publicKeyValidator = pki.rsa.publicKeyValidator
 
 // validator for an X.509v3 certificate
-export const x509CertificateValidator = {
+export const x509CertificateValidator: Asn1Object = {
   name: 'Certificate',
   tagClass: asn1.Class.UNIVERSAL,
   type: asn1.Type.SEQUENCE,
@@ -582,16 +586,14 @@ export function CRIAttributesAsArray(attributes: any): RDNAttribute[] {
       // if the OID is known, get its name and short name
       if (obj.type in oids) {
         obj.name = oids[obj.type]
-        if (obj.name in _shortNames) {
+        if (obj.name in _shortNames)
           obj.shortName = _shortNames[obj.name]
-        }
       }
       // parse extensions
       if (obj.type === oids.extensionRequest) {
         obj.extensions = []
-        for (let ei = 0; ei < obj.value.length; ++ei) {
+        for (let ei = 0; ei < obj.value.length; ++ei)
           obj.extensions.push(certificateExtensionFromAsn1(obj.value[ei]))
-        }
       }
       rval.push(obj)
     }
@@ -649,7 +651,7 @@ export function getAttribute(obj: any, options: any): RDNAttribute | null {
  *
  * MaskGenAlgorithm  ::=  AlgorithmIdentifier
  *
- * AlgorithmIdentifer ::= SEQUENCE {
+ * AlgorithmIdentifier ::= SEQUENCE {
  *   algorithm OBJECT IDENTIFIER,
  *   parameters ANY DEFINED BY algorithm OPTIONAL
  * }
@@ -722,8 +724,6 @@ function _createSignatureDigest(options: {
 }): MessageDigest {
   switch (oids[options.signatureOid]) {
     case 'sha1WithRSAEncryption':
-    // deprecated alias
-    case 'sha1WithRSASignature':
       return md.sha1.create()
     case 'md5WithRSAEncryption':
       return md.md5.create()
@@ -745,13 +745,13 @@ function _createSignatureDigest(options: {
 /**
  * Verify signature on certificate or CSR.
  *
- * @param options:
- *   certificate the certificate or CSR to verify.
- *   md the signature digest.
- *   signature the signature
+ * @param options the options to use.
+ * @param options.certificate the certificate or CSR to verify.
+ * @param options.md the signature digest.
+ * @param options.signature the signature
  * @return a created md instance. throws if unknown oid.
  */
-function _verifySignature(options: {
+export function verifySignature(options: {
   certificate: any
   md: MessageDigest
   signature: any
@@ -778,19 +778,19 @@ function _verifySignature(options: {
       }
 
       mgf = oids[cert.signatureParameters.mgf.algorithmOid]
-      if (mgf === undefined || forge.mgf[mgf] === undefined) {
+      if (mgf === undefined || mgfImport[mgf] === undefined) {
         const error: CustomError = new Error('Unsupported MGF function.')
         error.oid = cert.signatureParameters.mgf.algorithmOid
         error.name = mgf
         throw error
       }
 
-      mgf = forge.mgf[mgf].create(md[hash].create())
+      mgf = mgfImport[mgf].create(md[hash].create())
 
       /* initialize hash function */
       hash = oids[cert.signatureParameters.hash.algorithmOid]
       if (hash === undefined || md[hash] === undefined) {
-        const error = new Error('Unsupported RSASSA-PSS hash function.')
+        const error: CustomError = new Error('Unsupported RSASSA-PSS hash function.')
         error.oid = cert.signatureParameters.hash.algorithmOid
         error.name = hash
         throw error
@@ -827,13 +827,13 @@ function _verifySignature(options: {
  *
  * @return the certificate.
  */
-pki.certificateFromPem = function (pem, computeHash, strict) {
-  const msg = forge.pem.decode(pem)[0]
+export function certificateFromPem(pemString: string, computeHash: boolean, strict: boolean) {
+  const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE'
     && msg.type !== 'X509 CERTIFICATE'
     && msg.type !== 'TRUSTED CERTIFICATE') {
-    const error = new Error(
+    const error: CustomError = new Error(
       'Could not convert certificate from PEM; PEM header type '
       + 'is not "CERTIFICATE", "X509 CERTIFICATE", or "TRUSTED CERTIFICATE".',
     )
@@ -849,7 +849,7 @@ pki.certificateFromPem = function (pem, computeHash, strict) {
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body, strict)
 
-  return pki.certificateFromAsn1(obj, computeHash)
+  return certificateFromAsn1(obj, computeHash)
 }
 
 /**
@@ -1037,7 +1037,7 @@ pki.certificationRequestToPem = function (csr, maxline) {
  *
  * @return the certificate.
  */
-pki.createCertificate = function () {
+export function createCertificate(): Certificate {
   const cert = {}
   cert.version = 0x02
   cert.serialNumber = '00'
@@ -1081,15 +1081,15 @@ pki.createCertificate = function () {
    * @param attrs the array of subject attributes to use.
    * @param uniqueId an optional a unique ID to use.
    */
-  cert.setSubject = function (attrs, uniqueId) {
+  function setSubject(attrs: any, uniqueId: any) {
     // set new attributes, clear hash
     _fillMissingFields(attrs)
     cert.subject.attributes = attrs
     delete cert.subject.uniqueId
-    if (uniqueId) {
+    if (uniqueId)
       // TODO: support arbitrary bit length ids
       cert.subject.uniqueId = uniqueId
-    }
+
     cert.subject.hash = null
   }
 
@@ -1099,7 +1099,7 @@ pki.createCertificate = function () {
    * @param attrs the array of issuer attributes to use.
    * @param uniqueId an optional a unique ID to use.
    */
-  cert.setIssuer = function (attrs, uniqueId) {
+  function setIssuer(attrs: any, uniqueId: any) {
     // set new attributes, clear hash
     _fillMissingFields(attrs)
     cert.issuer.attributes = attrs
@@ -1116,7 +1116,7 @@ pki.createCertificate = function () {
    *
    * @param exts the array of extensions to use.
    */
-  cert.setExtensions = function (exts) {
+  function setExtensions(exts: any) {
     for (let i = 0; i < exts.length; ++i) {
       _fillMissingExtensionFields(exts[i], { cert })
     }
@@ -1128,12 +1128,12 @@ pki.createCertificate = function () {
    * Gets an extension by its name or id.
    *
    * @param options the name to use or an object with:
-   *          name the name to use.
-   *          id the id to use.
+   * @param options.name the name to use.
+   * @param options.id the id to use.
    *
    * @return the extension or null if not found.
    */
-  cert.getExtension = function (options) {
+  function getExtension(options: any) {
     if (typeof options === 'string') {
       options = { name: options }
     }
@@ -1142,13 +1142,12 @@ pki.createCertificate = function () {
     let ext
     for (let i = 0; rval === null && i < cert.extensions.length; ++i) {
       ext = cert.extensions[i]
-      if (options.id && ext.id === options.id) {
+      if (options.id && ext.id === options.id)
         rval = ext
-      }
-      else if (options.name && ext.name === options.name) {
+      else if (options.name && ext.name === options.name)
         rval = ext
-      }
     }
+
     return rval
   }
 
@@ -1158,7 +1157,7 @@ pki.createCertificate = function () {
    * @param key the private key to sign with.
    * @param md the message digest object to use (defaults to md.sha1).
    */
-  cert.sign = function (key, md) {
+  function sign(key: any, md: any) {
     // TODO: get signature OID from private key
     cert.md = md || md.sha1.create()
     const algorithmOid = oids[`${cert.md.algorithm}WithRSAEncryption`]
@@ -1187,7 +1186,7 @@ pki.createCertificate = function () {
    *
    * @return true if verified, false if not.
    */
-  cert.verify = function (child) {
+  function verify(child) {
     let rval = false
 
     if (!cert.issued(child)) {
@@ -1218,7 +1217,7 @@ pki.createCertificate = function () {
     }
 
     if (md !== null) {
-      rval = _verifySignature({
+      export rval = verifySignature({
         certificate: cert,
         md,
         signature: child.signature,
@@ -1314,7 +1313,7 @@ pki.createCertificate = function () {
       const ext = cert.extensions[i]
       if (ext.id === oid) {
         const ski = cert.generateSubjectKeyIdentifier().getBytes()
-        return (forge.util.hexToBytes(ext.subjectKeyIdentifier) === ski)
+        return (hexToBytes(ext.subjectKeyIdentifier) === ski)
       }
     }
     return false
@@ -1900,7 +1899,7 @@ pki.createCertificationRequest = function () {
     }
 
     if (md !== null) {
-      rval = _verifySignature({
+      export rval = verifySignature({
         certificate: csr,
         md,
         signature: csr.signature,
@@ -1987,7 +1986,7 @@ function _getAttributesAsJson(attrs) {
       if (!(attr.shortName in rval)) {
         rval[attr.shortName] = value
       }
-      else if (forge.util.isArray(rval[attr.shortName])) {
+      else if (Array.isArray(rval[attr.shortName])) {
         rval[attr.shortName].push(value)
       }
       else {
@@ -2344,7 +2343,7 @@ function _fillMissingExtensionFields(e, options) {
     }
 
     if (e.serialNumber) {
-      const serialNumber = forge.util.hexToBytes(e.serialNumber === true
+      const serialNumber = hexToBytes(e.serialNumber === true
         ? options.cert.serialNumber
         : e.serialNumber)
       seq.push(
@@ -2566,7 +2565,7 @@ function _dateToAsn1(date) {
  *
  * @return the asn1 TBSCertificate.
  */
-pki.getTBSCertificate = function (cert) {
+export function getTBSCertificate(cert) {
   // TBSCertificate
   const notBefore = _dateToAsn1(cert.validity.notBefore)
   const notAfter = _dateToAsn1(cert.validity.notAfter)
@@ -2577,7 +2576,7 @@ pki.getTBSCertificate = function (cert) {
       asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, asn1.integerToDer(cert.version).getBytes()),
     ]),
     // serialNumber
-    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, forge.util.hexToBytes(cert.serialNumber)),
+    asn1.create(asn1.Class.UNIVERSAL, asn1.Type.INTEGER, false, hexToBytes(cert.serialNumber)),
     // signature
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
       // algorithm
@@ -2640,7 +2639,7 @@ pki.getTBSCertificate = function (cert) {
  *
  * @return the asn1 CertificationRequestInfo.
  */
-pki.getCertificationRequestInfo = function (csr) {
+export function getCertificationRequestInfo(csr) {
   // CertificationRequestInfo
   const cri = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
     // version
@@ -2663,7 +2662,7 @@ pki.getCertificationRequestInfo = function (csr) {
  *
  * @return the asn1 representation of a DistinguishedName.
  */
-pki.distinguishedNameToAsn1 = function (dn) {
+export function distinguishedNameToAsn1(dn) {
   return _dnToAsn1(dn)
 }
 
@@ -2674,9 +2673,9 @@ pki.distinguishedNameToAsn1 = function (dn) {
  *
  * @return the asn1 representation of an X.509v3 RSA certificate.
  */
-pki.certificateToAsn1 = function (cert) {
+export function certificateToAsn1(cert) {
   // prefer cached TBSCertificate over generating one
-  const tbsCertificate = cert.tbsCertificate || pki.getTBSCertificate(cert)
+  const tbsCertificate = cert.tbsCertificate || getTBSCertificate(cert)
 
   // Certificate
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
@@ -2701,7 +2700,7 @@ pki.certificateToAsn1 = function (cert) {
  *
  * @return the extensions in ASN.1 format.
  */
-pki.certificateExtensionsToAsn1 = function (exts) {
+export function certificateExtensionsToAsn1(exts) {
   // create top-level extension container
   const rval = asn1.create(asn1.Class.CONTEXT_SPECIFIC, 3, true, [])
 
@@ -2710,7 +2709,7 @@ pki.certificateExtensionsToAsn1 = function (exts) {
   rval.value.push(seq)
 
   for (let i = 0; i < exts.length; ++i) {
-    seq.value.push(pki.certificateExtensionToAsn1(exts[i]))
+    seq.value.push(certificateExtensionToAsn1(exts[i]))
   }
 
   return rval
@@ -2723,7 +2722,7 @@ pki.certificateExtensionsToAsn1 = function (exts) {
  *
  * @return the extension in ASN.1 format.
  */
-pki.certificateExtensionToAsn1 = function (ext) {
+export function certificateExtensionToAsn1(ext) {
   // create a sequence for each extension
   const extseq = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
 
@@ -2770,10 +2769,10 @@ pki.certificateExtensionToAsn1 = function (ext) {
  *
  * @return the asn1 representation of a certification request.
  */
-pki.certificationRequestToAsn1 = function (csr) {
+export function certificationRequestToAsn1(csr) {
   // prefer cached CertificationRequestInfo over generating one
   const cri = csr.certificationRequestInfo
-    || pki.getCertificationRequestInfo(csr)
+    || getCertificationRequestInfo(csr)
 
   // Certificate
   return asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
@@ -2799,7 +2798,7 @@ pki.certificationRequestToAsn1 = function (csr) {
  *
  * @return the CA store.
  */
-pki.createCaStore = function (certs) {
+export function createCaStore(certs) {
   // create CA store
   const caStore = {
     // stored certificates
@@ -2818,7 +2817,7 @@ pki.createCaStore = function (certs) {
     const rval = getBySubject(cert.issuer)
 
     // see if there are multiple matches
-    /* if(forge.util.isArray(rval)) {
+    /* if(Array.isArray(rval)) {
       // TODO: resolve multiple matches by checking
       // authorityKey/subjectKey/issuerUniqueID/other identifiers, etc.
       // FIXME: or alternatively do authority key mapping
@@ -2837,9 +2836,8 @@ pki.createCaStore = function (certs) {
    */
   caStore.addCertificate = function (cert) {
     // convert from pem if necessary
-    if (typeof cert === 'string') {
-      cert = forge.pki.certificateFromPem(cert)
-    }
+    if (typeof cert === 'string')
+      cert = certificateFromPem(cert)
 
     ensureSubjectHasHash(cert.subject)
 
@@ -2847,7 +2845,7 @@ pki.createCaStore = function (certs) {
       if (cert.subject.hash in caStore.certs) {
         // subject hash already exists, append to array
         let tmp = caStore.certs[cert.subject.hash]
-        if (!forge.util.isArray(tmp)) {
+        if (!Array.isArray(tmp)) {
           tmp = [tmp]
         }
         tmp.push(cert)
@@ -2870,24 +2868,24 @@ pki.createCaStore = function (certs) {
   caStore.hasCertificate = function (cert) {
     // convert from pem if necessary
     if (typeof cert === 'string') {
-      cert = forge.pki.certificateFromPem(cert)
+      cert = pki.certificateFromPem(cert)
     }
 
     let match = getBySubject(cert.subject)
-    if (!match) {
+    if (!match)
       return false
-    }
-    if (!forge.util.isArray(match)) {
+
+    if (!Array.isArray(match))
       match = [match]
-    }
+
     // compare DER-encoding of certificates
-    const der1 = asn1.toDer(pki.certificateToAsn1(cert)).getBytes()
+    const der1 = asn1.toDer(certificateToAsn1(cert)).getBytes()
     for (let i = 0; i < match.length; ++i) {
-      const der2 = asn1.toDer(pki.certificateToAsn1(match[i])).getBytes()
-      if (der1 === der2) {
+      const der2 = asn1.toDer(certificateToAsn1(match[i])).getBytes()
+      if (der1 === der2)
         return true
-      }
     }
+
     return false
   }
 
@@ -2902,7 +2900,7 @@ pki.createCaStore = function (certs) {
     for (const hash in caStore.certs) {
       if (caStore.certs.hasOwnProperty(hash)) {
         const value = caStore.certs[hash]
-        if (!forge.util.isArray(value)) {
+        if (!Array.isArray(value)) {
           certList.push(value)
         }
         else {
@@ -2930,7 +2928,7 @@ pki.createCaStore = function (certs) {
 
     // convert from pem if necessary
     if (typeof cert === 'string') {
-      cert = forge.pki.certificateFromPem(cert)
+      cert = certificateFromPem(cert)
     }
     ensureSubjectHasHash(cert.subject)
     if (!caStore.hasCertificate(cert)) {
@@ -2939,7 +2937,7 @@ pki.createCaStore = function (certs) {
 
     const match = getBySubject(cert.subject)
 
-    if (!forge.util.isArray(match)) {
+    if (!Array.isArray(match)) {
       result = caStore.certs[cert.subject.hash]
       delete caStore.certs[cert.subject.hash]
       return result
@@ -3226,7 +3224,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
         // but none of the parents actually verify ... but the intermediate
         // is in the CA and it should pass this check; needs investigation
         let parents = parent
-        if (!forge.util.isArray(parents)) {
+        if (!Array.isArray(parents)) {
           parents = [parents]
         }
 
@@ -3367,7 +3365,7 @@ pki.verifyCertificateChain = function (caStore, chain, options) {
       // check for custom error info
       if (ret || ret === 0) {
         // set custom message and error
-        if (typeof ret === 'object' && !forge.util.isArray(ret)) {
+        if (typeof ret === 'object' && !Array.isArray(ret)) {
           if (ret.message) {
             error.message = ret.message
           }

@@ -23,6 +23,7 @@ destructurable
 diversifier
 dnsx
 dtsx
+EMSA
 Encs
 entrypoints
 epki
@@ -62,10 +63,12 @@ postcompile
 prefetch
 preinstall
 primeinc
+pssobj
 quickfix
 rootca
 RSAES
 rsapss
+RSASSA
 scalarbase
 scalarmult
 shikijs

@@ -1045,6 +1045,7 @@ export interface Util {
   createBuffer: typeof createBuffer
   _checkBitsParam: typeof _checkBitsParam
   xorBytes: typeof xorBytes
+  ByteBuffer: typeof ByteBuffer
 }
 
 export const util: Util = {
@@ -1073,6 +1074,7 @@ export const util: Util = {
   createBuffer,
   _checkBitsParam,
   xorBytes,
+  ByteBuffer,
 }
 
 export default util

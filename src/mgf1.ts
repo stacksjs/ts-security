@@ -6,7 +6,8 @@
  * @author Chris Breuer
  */
 
-import { ByteBuffer, ByteStringBuffer } from './utils'
+import type { ByteStringBuffer } from './utils'
+import { ByteBuffer } from './utils'
 
 interface MessageDigest {
   start: () => void
@@ -54,7 +55,7 @@ export function create(md: MessageDigest) {
   }
 
   return {
-    generate: generate
+    generate,
   } as { generate: (seed: string, maskLen: number) => string }
 }
 
