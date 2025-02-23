@@ -1049,6 +1049,120 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
   const key = {
     n,
     e,
+
+    /**
+     * Verifies the given signature against the given digest.
+     *
+     * PKCS#1 supports multiple (currently two) signature schemes:
+     * RSASSA-PKCS1-V1_5 and RSASSA-PSS.
+     *
+     * By default this implementation uses the "old scheme", i.e.
+     * RSASSA-PKCS1-V1_5, in which case once RSA-decrypted, the
+     * signature is an OCTET STRING that holds a DigestInfo.
+     *
+     * DigestInfo ::= SEQUENCE {
+     *   digestAlgorithm DigestAlgorithmIdentifier,
+     *   digest Digest
+     * }
+     * DigestAlgorithmIdentifier ::= AlgorithmIdentifier
+     * Digest ::= OCTET STRING
+     *
+     * To perform PSS signature verification, provide an instance
+     * of Forge PSS object as the scheme parameter.
+     *
+     * @param digest the message digest hash to compare against the signature, as a binary-encoded string.
+     * @param signature the signature to verify, as a binary-encoded string.
+     * @param scheme signature verification scheme to use:
+     *          'RSASSA-PKCS1-V1_5' or undefined for RSASSA PKCS#1 v1.5, a Forge PSS object for RSASSA-PSS,
+     *          'NONE' or null for none, DigestInfo will not be expected, but PKCS#1 v1.5 padding will still be used.
+     * @param options optional verify options
+     *          _parseAllDigestBytes testing flag to control parsing of all digest bytes. Unsupported and not for general usage. (default: true)
+     *
+     * @return true if the signature was verified, false if not.
+     */
+    verify: (digest: string, signature: string, scheme: string, options: any) => {
+      if (typeof scheme === 'string')
+        scheme = scheme.toUpperCase()
+      else if (scheme === undefined)
+        scheme = 'RSASSA-PKCS1-V1_5'
+
+      if (options === undefined) {
+        options = {
+          _parseAllDigestBytes: true,
+        }
+      }
+
+      if (!('_parseAllDigestBytes' in options))
+        options._parseAllDigestBytes = true
+
+      if (scheme === 'RSASSA-PKCS1-V1_5') {
+        scheme = {
+          verify(digest, d) {
+            // remove padding
+            d = _decodePkcs1_v1_5(d, key, true)
+            // d is ASN.1 BER-encoded DigestInfo
+            const obj = asn1.fromDer(d, {
+              parseAllBytes: options._parseAllDigestBytes,
+            })
+
+            // validate DigestInfo
+            const capture = {}
+            const errors: CustomError[] = []
+            if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
+              const error: CustomError = new Error(
+                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.',
+              )
+              error.errors = errors
+              throw error
+            }
+            // check hash algorithm identifier
+            // see PKCS1-v1-5DigestAlgorithms in RFC 8017
+            // FIXME: add support to vaidator for strict value choices
+            const oid = asn1.derToOid(capture.algorithmIdentifier)
+            if (!(oid === oids.md2
+              || oid === oids.md5
+              || oid === oids.sha1
+              || oid === oids.sha224
+              || oid === oids.sha256
+              || oid === oids.sha384
+              || oid === oids.sha512
+              || oid === oids['sha512-224']
+              || oid === oids['sha512-256'])) {
+              const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
+              error.oid = oid
+              throw error
+            }
+
+            // special check for md2 and md5 that NULL parameters exist
+            if (oid === oids.md2 || oid === oids.md5) {
+              if (!('parameters' in capture)) {
+                throw new Error(
+                  'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value. '
+                  + 'Missing algorithm identifier NULL parameters.',
+                )
+              }
+            }
+
+            // compare the given digest to the decrypted one
+            return digest === capture.digest
+          },
+        }
+      }
+      else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+        scheme = {
+          verify(digest, d) {
+            // remove padding
+            d = _decodePkcs1_v1_5(d, key, true)
+            return digest === d
+          },
+        }
+      }
+
+      // do rsa decryption w/o any decoding, then verify -- which does decoding
+      const d = decrypt(signature, key, true, false)
+
+      return scheme.verify(digest, d, key.n.bitLength())
+    }
   }
 
   /**
@@ -1103,127 +1217,6 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
     return encrypt(e, key, true)
   }
 
-  /**
-   * Verifies the given signature against the given digest.
-   *
-   * PKCS#1 supports multiple (currently two) signature schemes:
-   * RSASSA-PKCS1-V1_5 and RSASSA-PSS.
-   *
-   * By default this implementation uses the "old scheme", i.e.
-   * RSASSA-PKCS1-V1_5, in which case once RSA-decrypted, the
-   * signature is an OCTET STRING that holds a DigestInfo.
-   *
-   * DigestInfo ::= SEQUENCE {
-   *   digestAlgorithm DigestAlgorithmIdentifier,
-   *   digest Digest
-   * }
-   * DigestAlgorithmIdentifier ::= AlgorithmIdentifier
-   * Digest ::= OCTET STRING
-   *
-   * To perform PSS signature verification, provide an instance
-   * of Forge PSS object as the scheme parameter.
-   *
-   * @param digest the message digest hash to compare against the signature, as a binary-encoded string.
-   * @param signature the signature to verify, as a binary-encoded string.
-   * @param scheme signature verification scheme to use:
-   *          'RSASSA-PKCS1-V1_5' or undefined for RSASSA PKCS#1 v1.5,
-   *          a Forge PSS object for RSASSA-PSS,
-   *          'NONE' or null for none, DigestInfo will not be expected, but
-   *            PKCS#1 v1.5 padding will still be used.
-   * @param options optional verify options
-   *          _parseAllDigestBytes testing flag to control parsing of all
-   *            digest bytes. Unsupported and not for general usage.
-   *            (default: true)
-   *
-   * @return true if the signature was verified, false if not.
-   */
-  key.verify = function (digest: string, signature: string, scheme: string, options: any) {
-    if (typeof scheme === 'string') {
-      scheme = scheme.toUpperCase()
-    }
-    else if (scheme === undefined) {
-      scheme = 'RSASSA-PKCS1-V1_5'
-    }
-    if (options === undefined) {
-      options = {
-        _parseAllDigestBytes: true,
-      }
-    }
-    if (!('_parseAllDigestBytes' in options)) {
-      options._parseAllDigestBytes = true
-    }
-
-    if (scheme === 'RSASSA-PKCS1-V1_5') {
-      scheme = {
-        verify(digest, d) {
-          // remove padding
-          d = _decodePkcs1_v1_5(d, key, true)
-          // d is ASN.1 BER-encoded DigestInfo
-          const obj = asn1.fromDer(d, {
-            parseAllBytes: options._parseAllDigestBytes,
-          })
-
-          // validate DigestInfo
-          const capture = {}
-          const errors = []
-          if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-            const error = new Error(
-              'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
-              + 'DigestInfo value.',
-            )
-            error.errors = errors
-            throw error
-          }
-          // check hash algorithm identifier
-          // see PKCS1-v1-5DigestAlgorithms in RFC 8017
-          // FIXME: add support to vaidator for strict value choices
-          const oid = asn1.derToOid(capture.algorithmIdentifier)
-          if (!(oid === oids.md2
-            || oid === oids.md5
-            || oid === oids.sha1
-            || oid === oids.sha224
-            || oid === oids.sha256
-            || oid === oids.sha384
-            || oid === oids.sha512
-            || oid === oids['sha512-224']
-            || oid === oids['sha512-256'])) {
-            const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
-            error.oid = oid
-            throw error
-          }
-
-          // special check for md2 and md5 that NULL parameters exist
-          if (oid === oids.md2 || oid === oids.md5) {
-            if (!('parameters' in capture)) {
-              throw new Error(
-                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
-                + 'DigestInfo value. '
-                + 'Missing algorithm identifier NULL parameters.',
-              )
-            }
-          }
-
-          // compare the given digest to the decrypted one
-          return digest === capture.digest
-        },
-      }
-    }
-    else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
-      scheme = {
-        verify(digest, d) {
-          // remove padding
-          d = _decodePkcs1_v1_5(d, key, true)
-          return digest === d
-        },
-      }
-    }
-
-    // do rsa decryption w/o any decoding, then verify -- which does decoding
-    const d = decrypt(signature, key, true, false)
-
-    return scheme.verify(digest, d, key.n.bitLength())
-  }
-
   return key
 }
 
@@ -1270,9 +1263,53 @@ export function setPrivateKey(
     dP,
     dQ,
     qInv,
-  }
+    /**
+     * Signs the given digest, producing a signature.
+     *
+     * PKCS#1 supports multiple (currently two) signature schemes:
+     * RSASSA-PKCS1-V1_5 and RSASSA-PSS.
+     *
+     * By default this implementation uses the "old scheme", i.e.
+     * RSASSA-PKCS1-V1_5. In order to generate a PSS signature, provide
+     * an instance of Forge PSS object as the scheme parameter.
+     *
+     * @param md the message digest object with the hash to sign.
+     * @param scheme the signature scheme to use:
+     *          'RSASSA-PKCS1-V1_5' or undefined for RSASSA PKCS#1 v1.5,
+     *          a Forge PSS object for RSASSA-PSS,
+     *          'NONE' or null for none, DigestInfo will not be used but
+     *            PKCS#1 v1.5 padding will still be used.
+     *
+     * @return the signature as a byte string.
+     */
+    sign: function (md: any, scheme: any) {
+      /* Note: The internal implementation of RSA operations is being
+        transitioned away from a PKCS#1 v1.5 hard-coded scheme. Some legacy
+        code like the use of an encoding block identifier 'bt' will eventually
+        be removed. */
 
-  /**
+      // private key operation
+      let bt = false
+
+      if (typeof scheme === 'string')
+        scheme = scheme.toUpperCase()
+
+      if (scheme === undefined || scheme === 'RSASSA-PKCS1-V1_5') {
+        scheme = { encode: emsaPkcs1v15encode }
+        bt = 0x01
+      }
+      else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+        scheme = { encode() { return md } }
+        bt = 0x01
+      }
+
+      // encode and then encrypt
+      const d = scheme.encode(md, key.n.bitLength())
+
+      return rsa.encrypt(d, key, bt)
+    },
+
+    /**
    * Decrypts the given data with this private key. The decryption scheme
    * must match the one used to encrypt the data.
    *
@@ -1285,83 +1322,38 @@ export function setPrivateKey(
    *
    * @return the decrypted byte string.
    */
-  function decrypt(data: string, scheme: string, schemeOptions: any) {
-    if (typeof scheme === 'string') {
-      scheme = scheme.toUpperCase()
-    }
-
-    else if (scheme === undefined) {
-      scheme = 'RSAES-PKCS1-V1_5'
-    }
-
-    // do rsa decryption w/o any decoding
-    const d = decrypt(data, key, false, false)
-
-    if (scheme === 'RSAES-PKCS1-V1_5') {
-      scheme = { decode: _decodePkcs1_v1_5 }
-    }
-    else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
-      scheme = {
-        decode(d: string, key: any) {
-          return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
-        },
+    decrypt: function (data: string, scheme: string, schemeOptions: any) {
+      if (typeof scheme === 'string') {
+        scheme = scheme.toUpperCase()
       }
-    }
-    else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-      scheme = { decode(d) { return d } }
-    }
-    else {
-      throw new Error(`Unsupported encryption scheme: "${scheme}".`)
-    }
 
-    // decode according to scheme
-    return scheme.decode(d, key, false)
-  }
+        else if (scheme === undefined) {
+        scheme = 'RSAES-PKCS1-V1_5'
+      }
 
-  /**
-   * Signs the given digest, producing a signature.
-   *
-   * PKCS#1 supports multiple (currently two) signature schemes:
-   * RSASSA-PKCS1-V1_5 and RSASSA-PSS.
-   *
-   * By default this implementation uses the "old scheme", i.e.
-   * RSASSA-PKCS1-V1_5. In order to generate a PSS signature, provide
-   * an instance of Forge PSS object as the scheme parameter.
-   *
-   * @param md the message digest object with the hash to sign.
-   * @param scheme the signature scheme to use:
-   *          'RSASSA-PKCS1-V1_5' or undefined for RSASSA PKCS#1 v1.5,
-   *          a Forge PSS object for RSASSA-PSS,
-   *          'NONE' or null for none, DigestInfo will not be used but
-   *            PKCS#1 v1.5 padding will still be used.
-   *
-   * @return the signature as a byte string.
-   */
-  key.sign = function (md, scheme) {
-    /* Note: The internal implementation of RSA operations is being
-      transitioned away from a PKCS#1 v1.5 hard-coded scheme. Some legacy
-      code like the use of an encoding block identifier 'bt' will eventually
-      be removed. */
+      // do rsa decryption w/o any decoding
+      const d = decrypt(data, key, false, false)
 
-    // private key operation
-    let bt = false
+      if (scheme === 'RSAES-PKCS1-V1_5') {
+        scheme = { decode: _decodePkcs1_v1_5 }
+      }
+      else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+        scheme = {
+          decode(d: string, key: any) {
+            return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
+          },
+        }
+      }
+      else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+        scheme = { decode(d) { return d } }
+      }
+      else {
+        throw new Error(`Unsupported encryption scheme: "${scheme}".`)
+      }
 
-    if (typeof scheme === 'string') {
-      scheme = scheme.toUpperCase()
+      // decode according to scheme
+      return scheme.decode(d, key, false)
     }
-
-    if (scheme === undefined || scheme === 'RSASSA-PKCS1-V1_5') {
-      scheme = { encode: emsaPkcs1v15encode }
-      bt = 0x01
-    }
-    else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
-      scheme = { encode() { return md } }
-      bt = 0x01
-    }
-
-    // encode and then encrypt
-    const d = scheme.encode(md, key.n.bitLength())
-    return pki.rsa.encrypt(d, key, bt)
   }
 
   return key
@@ -1406,7 +1398,7 @@ export function wrapRsaPrivateKey(rsaKey: Asn1Object): Asn1Object {
 export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   // get PrivateKeyInfo
   let capture = {}
-  let errors = []
+  let errors: CustomError[] = []
   if (asn1.validate(obj, privateKeyValidator, capture, errors)) {
     obj = asn1.fromDer(createBuffer(capture.privateKey))
   }
@@ -1415,8 +1407,7 @@ export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   capture = {}
   errors = []
   if (!asn1.validate(obj, rsaPrivateKeyValidator, capture, errors)) {
-    const error = new Error('Cannot read private key. '
-      + 'ASN.1 object does not contain an RSAPrivateKey.')
+    const error: CustomError = new Error('Cannot read private key. ASN.1 object does not contain an RSAPrivateKey.')
     error.errors = errors
     throw error
   }
@@ -1721,11 +1712,13 @@ function _decodePkcs1_v1_5(em: string, key: {
   else if (bt === 0x02) {
     // look for 0x00 byte
     padNum = 0
+
     while (eb.length() > 1) {
       if (eb.getByte() === 0x00) {
         --eb.read
         break
       }
+
       ++padNum
     }
   }
@@ -1776,9 +1769,9 @@ function _generateKeyPair(state: {
       },
     },
   }
-  if ('prng' in options) {
+
+  if ('prng' in options)
     opts.prng = options.prng
-  }
 
   generate()
 
@@ -1960,7 +1953,9 @@ export function detectNodeCrypto(fn: string): boolean {
 export function detectSubtleCrypto(fn: string): boolean {
   return (typeof util.globalScope !== 'undefined'
     && typeof util.globalScope.crypto === 'object'
+    // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.crypto.subtle === 'object'
+    // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.crypto.subtle[fn] === 'function')
 }
 
@@ -1975,8 +1970,11 @@ export function detectSubtleCrypto(fn: string): boolean {
  */
 export function detectSubtleMsCrypto(fn: string): boolean {
   return (typeof util.globalScope !== 'undefined'
+    // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.msCrypto === 'object'
+    // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.msCrypto.subtle === 'object'
+    // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.msCrypto.subtle[fn] === 'function')
 }
 
@@ -2008,14 +2006,14 @@ export function privateKeyFromJwk(jwk: {
     )
   }
   return setRsaPrivateKey(
-    _base64ToBigInt(jwk.n),
-    _base64ToBigInt(jwk.e),
-    _base64ToBigInt(jwk.d),
-    _base64ToBigInt(jwk.p),
-    _base64ToBigInt(jwk.q),
-    _base64ToBigInt(jwk.dp),
-    _base64ToBigInt(jwk.dq),
-    _base64ToBigInt(jwk.qi),
+    base64ToBigInt(jwk.n),
+    base64ToBigInt(jwk.e),
+    base64ToBigInt(jwk.d),
+    base64ToBigInt(jwk.p),
+    base64ToBigInt(jwk.q),
+    base64ToBigInt(jwk.dp),
+    base64ToBigInt(jwk.dq),
+    base64ToBigInt(jwk.qi),
   )
 }
 
@@ -2028,8 +2026,8 @@ export function publicKeyFromJwk(jwk: {
     throw new Error('Key algorithm must be "RSA".')
   }
   return setRsaPublicKey(
-    _base64ToBigInt(jwk.n),
-    _base64ToBigInt(jwk.e),
+    base64ToBigInt(jwk.n),
+    base64ToBigInt(jwk.e),
   )
 }
 
@@ -2111,6 +2109,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
 
     // do scheme-based signing then rsa encryption
     const d = signScheme.encode(md, key.n.bitLength())
+
     return encrypt(d, key, true)
   }
 
@@ -2144,10 +2143,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
           const capture = {}
           const errors: CustomError[] = []
           if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-            const error: CustomError = new Error(
-              'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
-              + 'DigestInfo value.',
-            )
+            const error: CustomError = new Error('ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.')
             error.errors = errors
             throw error
           }
@@ -2164,9 +2160,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
             || oid === oids.sha512
             || oid === oids['sha512-224']
             || oid === oids['sha512-256'])) {
-            const error: CustomError = new Error(
-              'Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.',
-            )
+            const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
             error.oid = oid
             throw error
           }
@@ -2212,6 +2206,8 @@ export interface RSA {
   privateKeyToPem: typeof privateKeyToPem
   privateKeyInfoToPem: typeof privateKeyInfoToPem
   publicKeyValidator: typeof publicKeyValidator
+  encrypt: typeof encrypt
+  decrypt: typeof decrypt
 }
 
 export const rsa: RSA = {
@@ -2220,4 +2216,6 @@ export const rsa: RSA = {
   privateKeyToPem,
   privateKeyInfoToPem,
   publicKeyValidator,
+  encrypt,
+  decrypt,
 }
