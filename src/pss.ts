@@ -1,3 +1,4 @@
+import type { ByteStringBuffer } from './utils'
 /**
  * Javascript implementation of PKCS#1 PSS signature padding.
  *
@@ -6,7 +7,6 @@
  */
 import { random } from './utils'
 import { util } from './utils'
-import { ByteStringBuffer } from './utils'
 
 interface MessageDigest {
   digestLength: number
@@ -48,9 +48,9 @@ export function createPSS(options: {
   prng?: PRNG
   salt?: string | ByteStringBuffer
 }): {
-  encode: (md: MessageDigest, modBits: number) => string
-  verify: (mHash: string, em: string, modBits: number) => boolean
-} {
+    encode: (md: MessageDigest, modBits: number) => string
+    verify: (mHash: string, em: string, modBits: number) => boolean
+  } {
   // backwards compatibility w/legacy args: hash, mgf, sLen
   if (arguments.length === 3) {
     options = {
@@ -186,7 +186,6 @@ export function createPSS(options: {
       if (em.charCodeAt(emLen - 1) !== 0xBC)
         throw new Error('Encoded message does not end in 0xBC.')
 
-
       // 5. Let maskedDB be the leftmost emLen - hLen - 1 octets of EM, and
       //    let H be the next hLen octets.
       const maskLen = emLen - hLen - 1
@@ -216,9 +215,10 @@ export function createPSS(options: {
       //     position is "position 1") does not have hexadecimal value 0x01,
       //     output "inconsistent" and stop.
       const checkLen = emLen - hLen - sLen - 2
-      for (i = 0; i < checkLen; i++)
+      for (i = 0; i < checkLen; i++) {
         if (db.charCodeAt(i) !== 0x00)
           throw new Error('Leftmost octets not zero as expected')
+      }
 
       if (db.charCodeAt(checkLen) !== 0x01)
         throw new Error('Inconsistent PSS signature, 0x01 marker not found')
@@ -239,7 +239,7 @@ export function createPSS(options: {
 
       // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
       return h === h_
-    }
+    },
   }
 
   return pssobj
@@ -250,7 +250,7 @@ interface PSS {
 }
 
 export const pss: PSS = {
-  create: createPSS
+  create: createPSS,
 }
 
 export default pss

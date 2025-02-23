@@ -113,7 +113,7 @@ import { md } from './md'
 import { oids } from './oids'
 import { pki } from './pki'
 import { mgf as mgfImport } from './mgf'
-import { hexToBytes } from './utils'
+import util, { hexToBytes } from './utils'
 import { pem } from './encoding/pem'
 import { publicKeyToAsn1, publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
 import { pss } from './pss'
@@ -143,7 +143,6 @@ interface SignatureParameters {
 
 interface CustomError {
   message: string
-  error: string
   errors?: any[]
   signatureOid?: string
   oid?: string
@@ -991,7 +990,7 @@ export function publicKeyFromPem(pemString: string): any {
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'PUBLIC KEY' && msg.type !== 'RSA PUBLIC KEY') {
-    const error = new Error('Could not convert public key from PEM; PEM header type is not "PUBLIC KEY" or "RSA PUBLIC KEY".')
+    const error: CustomError = new Error('Could not convert public key from PEM; PEM header type is not "PUBLIC KEY" or "RSA PUBLIC KEY".')
     error.headerType = msg.type
     throw error
   }
@@ -1041,12 +1040,9 @@ export function publicKeyToRSAPublicKeyPem(key: any, maxline: number): string {
  *
  * @param options the options to use.
  * @param options.md the message digest object to use (defaults to md.sha1).
- * @param options.type the type of fingerprint, such as 'RSAPublicKey',
- *            'SubjectPublicKeyInfo' (defaults to 'RSAPublicKey').
- * @param options.encoding an alternative output encoding, such as 'hex'
- *            (defaults to none, outputs a byte buffer).
- * @param options.delimiter the delimiter to use between bytes for 'hex' encoded
- *            output, eg: ':' (defaults to none).
+ * @param options.type the type of fingerprint, such as 'RSAPublicKey', 'SubjectPublicKeyInfo' (defaults to 'RSAPublicKey').
+ * @param options.encoding an alternative output encoding, such as 'hex' (defaults to none, outputs a byte buffer).
+ * @param options.delimiter the delimiter to use between bytes for 'hex' encoded output, eg: ':' (defaults to none).
  *
  * @return the fingerprint as a byte buffer or other encoding based on options.
  */
@@ -1063,7 +1059,7 @@ export function getPublicKeyFingerprint(
   options.type = options.type || 'RSAPublicKey'
 
   // use SHA-1 message digest by default
-  options.md = options.md || md.sha1.create()
+  options.md = options.md || (md.sha1.create() as unknown as IMessageDigest)
 
   // produce DER from RSAPublicKey and digest it
   const bytes = asn1.toDer(publicKeyToAsn1(key)).getBytes()
@@ -1134,13 +1130,14 @@ export function certificationRequestFromPem(
  *
  * @return the PEM-formatted certification request.
  */
-pki.certificationRequestToPem = function (csr, maxline) {
+export function certificationRequestToPem(csr: CertificationRequest, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'CERTIFICATE REQUEST',
-    body: asn1.toDer(pki.certificationRequestToAsn1(csr)).getBytes(),
+    body: asn1.toDer(certificationRequestToAsn1(csr)).getBytes(),
   }
-  return forge.pem.encode(msg, { maxline })
+
+  return pem.encode(msg, { maxline })
 }
 
 /**
@@ -1208,7 +1205,7 @@ export function createCertificate(): Certificate {
       return rval
     },
     generateSubjectKeyIdentifier: function() {
-      return pki.getPublicKeyFingerprint(cert.publicKey, { type: 'RSAPublicKey' })
+      return getPublicKeyFingerprint(cert.publicKey, { type: 'RSAPublicKey' })
     },
     verifySubjectKeyIdentifier: function() {
       const oid = oids.subjectKeyIdentifier
@@ -1244,7 +1241,7 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
   const capture: CaptureObject = {}
   const errors: CustomError[] = []
   if (!asn1.validate(obj, x509CertificateValidator, capture, errors)) {
-    const error = new Error('Cannot read X.509 certificate. ASN.1 object is not an X509v3 Certificate.')
+    const error: CustomError = new Error('Cannot read X.509 certificate. ASN.1 object is not an X509v3 Certificate.')
     error.errors = errors
     throw error
   }
@@ -1258,7 +1255,7 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
   // create certificate
   const cert = createCertificate()
   cert.version = capture.certVersion ? capture.certVersion.charCodeAt(0) : 0
-  const serial = forge.util.createBuffer(capture.certSerialNumber)
+  const serial = util.createBuffer(capture.certSerialNumber)
   cert.serialNumber = serial.toHex()
   cert.signatureOid = asn1.derToOid(capture.certSignatureOid)
   cert.signatureParameters = readSignatureParameters(
@@ -1291,14 +1288,11 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
       capture.certValidity4GeneralizedTime,
     ))
   }
-  if (validity.length > 2) {
-    throw new Error('Cannot read notBefore/notAfter validity times; more '
-      + 'than two times were provided in the certificate.')
-  }
-  if (validity.length < 2) {
-    throw new Error('Cannot read notBefore/notAfter validity times; they '
-      + 'were not provided as either UTCTime or GeneralizedTime.')
-  }
+  if (validity.length > 2)
+    throw new Error('Cannot read notBefore/notAfter validity times; more than two times were provided in the certificate.')
+  if (validity.length < 2)
+    throw new Error('Cannot read notBefore/notAfter validity times; they were not provided as either UTCTime or GeneralizedTime.')
+
   cert.validity.notBefore = validity[0]
   cert.validity.notAfter = validity[1]
 
@@ -1328,7 +1322,7 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
     _fillMissingFields([attr])
     cert.issuer.attributes.push(attr)
   }
-  cert.issuer.attributes = pki.RDNAttributesAsArray(capture.certIssuer)
+  cert.issuer.attributes = RDNAttributesAsArray(capture.certIssuer)
   if (capture.certIssuerUniqueId) {
     cert.issuer.uniqueId = capture.certIssuerUniqueId
   }
@@ -1345,15 +1339,15 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
     _fillMissingFields([attr])
     cert.subject.attributes.push(attr)
   }
-  cert.subject.attributes = pki.RDNAttributesAsArray(capture.certSubject)
-  if (capture.certSubjectUniqueId) {
+  cert.subject.attributes = RDNAttributesAsArray(capture.certSubject)
+  if (capture.certSubjectUniqueId)
     cert.subject.uniqueId = capture.certSubjectUniqueId
-  }
+
   cert.subject.hash = smd.digest().toHex()
 
   // handle extensions
   if (capture.certExtensions) {
-    cert.extensions = pki.certificateExtensionsFromAsn1(capture.certExtensions)
+    cert.extensions = certificateExtensionsFromAsn1(capture.certExtensions)
   }
   else {
     cert.extensions = []
@@ -1420,13 +1414,14 @@ export function certificateFromAsn1(obj: any, computeHash: boolean): Certificate
  *
  * @return the array.
  */
-pki.certificateExtensionsFromAsn1 = function (exts) {
+export function certificateExtensionsFromAsn1(exts: Asn1Object): CertificateExtension[] {
   const rval = []
+
   for (let i = 0; i < exts.value.length; ++i) {
     // get extension sequence
     const extseq = exts.value[i]
     for (let ei = 0; ei < extseq.value.length; ++ei) {
-      rval.push(pki.certificateExtensionFromAsn1(extseq.value[ei]))
+      rval.push(certificateExtensionFromAsn1(extseq.value[ei]))
     }
   }
 
@@ -1445,9 +1440,12 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
   // [0] extnID      OBJECT IDENTIFIER
   // [1] critical    BOOLEAN DEFAULT FALSE
   // [2] extnValue   OCTET STRING
-  const e = {}
-  e.id = asn1.derToOid(ext.value[0].value)
-  e.critical = false
+  const e: CertificateExtension = {
+    id: asn1.derToOid(ext.value[0].value),
+    critical: false,
+    value: null
+  }
+
   if (ext.value[1].type === asn1.Type.BOOLEAN) {
     e.critical = (ext.value[1].value.charCodeAt(0) !== 0x00)
     e.value = ext.value[2].value
@@ -1572,7 +1570,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
           // IPAddress
           case 7:
             // convert to IPv4/IPv6 string representation
-            altName.ip = forge.util.bytesToIP(gn.value)
+            altName.ip = util.bytesToIP(gn.value)
             break
           // registeredID
           case 8:
@@ -1663,7 +1661,7 @@ export function certificationRequestFromAsn1(obj: Asn1Object, computeHash: boole
     _fillMissingFields([attr])
     csr.subject.attributes.push(attr)
   }
-  csr.subject.attributes = pki.RDNAttributesAsArray(
+  csr.subject.attributes = RDNAttributesAsArray(
     capture.certificationRequestInfoSubject,
     smd,
   )
@@ -2823,7 +2821,7 @@ export function createCaStore(certs): CAStore {
     // produce subject hash if it doesn't exist
     if (!subject.hash) {
       const md = md.sha1.create()
-      subject.attributes = pki.RDNAttributesAsArray(_dnToAsn1(subject), md)
+      subject.attributes = RDNAttributesAsArray(_dnToAsn1(subject), md)
       subject.hash = md.digest().toHex()
     }
   }

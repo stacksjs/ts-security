@@ -44,11 +44,11 @@ export interface PemHeader {
 
 export interface PemMessage {
   type: string
-  procType: ProcType | null
-  contentDomain: string | null
-  dekInfo: DekInfo | null
-  headers: PemHeader[]
   body: string
+  procType?: ProcType | null
+  contentDomain?: string | null
+  dekInfo?: DekInfo | null
+  headers?: PemHeader[]
 }
 
 export interface PemOptions {

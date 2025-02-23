@@ -1005,8 +1005,8 @@ export function estimateCores(options: any, callback: any): void {
  */
 export function xorBytes(s1: string, s2: string, n: number): string {
   let s3 = ''
-  let b = ''
   let t = ''
+  let b = 0
   let i = 0
   let c = 0
 
@@ -1028,6 +1028,176 @@ export function xorBytes(s1: string, s2: string, n: number): string {
   return s3
 };
 
+/**
+ * Converts an IPv4 or IPv6 string representation into bytes (in network order).
+ *
+ * @param ip the IPv4 or IPv6 address to convert.
+ *
+ * @return the 4-byte IPv6 or 16-byte IPv6 address or null if the address can't
+ *         be parsed.
+ */
+export function bytesFromIP(ip: string): string | null {
+  if (ip.includes('.'))
+    return bytesFromIPv4(ip)
+
+  if (ip.includes(':'))
+    return bytesFromIPv6(ip)
+
+  return null
+}
+
+/**
+ * Converts an IPv4 string representation into bytes (in network order).
+ *
+ * @param ip the IPv4 address to convert.
+ *
+ * @return the 4-byte address or null if the address can't be parsed.
+ */
+export function bytesFromIPv4(ip: string): string | null {
+  const ipParts = ip.split('.')
+
+  if (ipParts.length !== 4)
+    return null
+
+  const b = createBuffer()
+
+  for (let i = 0; i < ipParts.length; ++i) {
+    const num = Number.parseInt(ipParts[i], 10)
+
+    if (Number.isNaN(num))
+      return null
+
+    b.putByte(num)
+  }
+
+  return b.getBytes()
+};
+
+/**
+ * Converts an IPv6 string representation into bytes (in network order).
+ *
+ * @param ip the IPv6 address to convert.
+ *
+ * @return the 16-byte address or null if the address can't be parsed.
+ */
+export function bytesFromIPv6(ip: string): string | null {
+  let blanks = 0
+  const ipParts = ip.split(':').filter((e) => {
+    if (e.length === 0)
+      ++blanks
+    return true
+  })
+
+  let zeros = (8 - ipParts.length + blanks) * 2
+  const b = createBuffer()
+
+  for (let i = 0; i < 8; ++i) {
+    if (!ipParts[i] || ipParts[i].length === 0) {
+      b.fillWithByte(0, zeros)
+      zeros = 0
+      continue
+    }
+    const bytes = hexToBytes(ipParts[i])
+    if (bytes.length < 2)
+      b.putByte(0)
+    b.putBytes(bytes)
+  }
+
+  return b.getBytes()
+};
+
+/**
+ * Converts 4-bytes into an IPv4 string representation. The bytes must be
+ * in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv4 string representation or null for an invalid # of bytes.
+ */
+export function bytesToIPv4(bytes: string): string | null {
+  if (bytes.length !== 4)
+    return null
+
+  const ip: number[] = []
+  for (let i = 0; i < bytes.length; ++i) {
+    ip.push(bytes.charCodeAt(i))
+  }
+
+  return ip.join('.')
+};
+
+/**
+ * Converts 4-bytes into an IPv4 string representation or 16-bytes into
+ * an IPv6 string representation. The bytes must be in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv4 or IPv6 string representation if 4 or 16 bytes, respectively, are given, otherwise null.
+ */
+export function bytesToIP(bytes: string): string | null {
+  if (bytes.length === 4)
+    return bytesToIPv4(bytes)
+
+  if (bytes.length === 16)
+    return bytesToIPv6(bytes)
+
+  return null
+};
+
+/**
+ * Converts 16-bytes into an IPv16 string representation. The bytes must be
+ * in network order.
+ *
+ * @param bytes the bytes to convert.
+ *
+ * @return the IPv16 string representation or null for an invalid # of bytes.
+ */
+export function bytesToIPv6(bytes: string): string | null {
+  if (bytes.length !== 16)
+    return null
+
+  const ip: string[] = []
+  const zeroGroups: { start: number, end: number }[] = []
+  let zeroMaxGroup = 0
+
+  for (let i = 0; i < bytes.length; i += 2) {
+    let hex = bytesToHex(bytes[i] + bytes[i + 1])
+    // canonicalize zero representation
+    while (hex[0] === '0' && hex !== '0') {
+      hex = hex.substr(1)
+    }
+    if (hex === '0') {
+      const last = zeroGroups[zeroGroups.length - 1]
+      const idx = ip.length
+      if (!last || idx !== last.end + 1) {
+        zeroGroups.push({ start: idx, end: idx })
+      } else {
+        last.end = idx
+        if ((last.end - last.start) >
+          (zeroGroups[zeroMaxGroup].end - zeroGroups[zeroMaxGroup].start)) {
+          zeroMaxGroup = zeroGroups.length - 1
+        }
+      }
+    }
+    ip.push(hex);
+  }
+  if (zeroGroups.length > 0) {
+    const group = zeroGroups[zeroMaxGroup]
+    // only shorten group of length > 0
+    if (group.end - group.start > 0) {
+      ip.splice(group.start, group.end - group.start + 1, '')
+      if (group.start === 0) {
+        ip.unshift('');
+      }
+      if (group.end === 7) {
+        ip.push('');
+      }
+    }
+  }
+
+  return ip.join(':');
+};
+
 export interface Util {
   cores?: number
   isServer: boolean
@@ -1046,6 +1216,13 @@ export interface Util {
   _checkBitsParam: typeof _checkBitsParam
   xorBytes: typeof xorBytes
   ByteBuffer: typeof ByteBuffer
+  bytesToIP: typeof bytesToIP
+  bytesToIPv4: typeof bytesToIPv4
+  bytesToIPv6: typeof bytesToIPv6
+  int32ToBytes: typeof int32ToBytes
+  bytesFromIP: typeof bytesFromIP
+  bytesFromIPv4: typeof bytesFromIPv4
+  bytesFromIPv6: typeof bytesFromIPv6
 }
 
 export const util: Util = {
@@ -1075,22 +1252,33 @@ export const util: Util = {
   _checkBitsParam,
   xorBytes,
   ByteBuffer,
+  bytesToIP,
+  bytesToIPv4,
+  bytesToIPv6,
+  int32ToBytes,
+  bytesFromIP,
+  bytesFromIPv4,
+  bytesFromIPv6,
 }
 
 export default util
 
 // Add proper type declarations for global objects
 declare global {
+  // @ts-expect-error unsure how to better handle this
   var self: WorkerGlobalScope
+  // @ts-expect-error unsure how to better handle this
   var window: Window
 
   interface Window {
+    // @ts-expect-error unsure how to better handle this
     msCrypto?: {
       subtle: {
         generateKey: Function
         exportKey: Function
       }
     }
+    // @ts-expect-error unsure how to better handle this
     crypto: {
       subtle: {
         generateKey: Function
