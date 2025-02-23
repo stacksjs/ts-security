@@ -92,7 +92,7 @@ export interface RSAKey {
 }
 
 export interface RSAKeyWithOps extends RSAKey {
-  encrypt: (data: string | Uint8Array, scheme: string, schemeOptions?: any) => string
+  encrypt: (data: string | Uint8Array, scheme: string, schemeOptions?: any) => string | Uint8Array
   decrypt: (data: string | Uint8Array, scheme: string, schemeOptions?: any) => string
   verify: (digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options?: any) => boolean
   sign: (md: string | Uint8Array, scheme?: string) => string
@@ -2039,11 +2039,12 @@ export function base64ToBigInt(b64: string): BigInteger {
 
 export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
   const keyWithOps = key as RSAKeyWithOps
+  let encodeScheme: EncodeScheme
+
   keyWithOps.encrypt = function (data: string | Uint8Array, scheme: string, schemeOptions?: any) {
-    let encodeScheme: EncodeScheme
     if (scheme === 'RSAES-PKCS1-V1_5') {
       encodeScheme = {
-        encode(m: string | Uint8Array, key: RSAKey, pub: boolean) {
+        encode(m: string | Uint8Array, key: RSAKey, pub: boolean): string | Uint8Array {
           return _encodePkcs1_v1_5(m as string, key, 0x02).getBytes()
         },
       }
@@ -2141,9 +2142,9 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
 
           // validate DigestInfo
           const capture = {}
-          const errors = []
+          const errors: CustomError[] = []
           if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-            var error = new Error(
+            const error: CustomError = new Error(
               'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
               + 'DigestInfo value.',
             )
@@ -2163,7 +2164,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
             || oid === oids.sha512
             || oid === oids['sha512-224']
             || oid === oids['sha512-256'])) {
-            var error = new Error(
+            const error: CustomError = new Error(
               'Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.',
             )
             error.oid = oid
@@ -2218,4 +2219,5 @@ export const rsa: RSA = {
   privateKeyFromPem,
   privateKeyToPem,
   privateKeyInfoToPem,
+  publicKeyValidator,
 }
