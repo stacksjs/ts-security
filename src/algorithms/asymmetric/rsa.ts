@@ -1199,13 +1199,13 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
     }
     else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
       scheme = {
-        encode(m, key) {
+        encode(m: string, key: any) {
           return encode_rsa_oaep(key, m, schemeOptions)
         },
       }
     }
     else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-      scheme = { encode(e) { return e } }
+      scheme = { encode(e: string) { return e } }
     }
     else if (typeof scheme === 'string') {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
@@ -1345,7 +1345,7 @@ export function setPrivateKey(
         }
       }
       else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-        scheme = { decode(d) { return d } }
+        scheme = { decode(d: string) { return d } }
       }
       else {
         throw new Error(`Unsupported encryption scheme: "${scheme}".`)
@@ -1388,6 +1388,21 @@ export function wrapRsaPrivateKey(rsaKey: Asn1Object): Asn1Object {
   ])
 }
 
+interface PrivateKeyInfoCapture {
+  privateKey?: string
+  privateKeyVersion?: string
+  privateKeyModulus?: string
+  privateKeyPublicExponent?: string
+  privateKeyPrivateExponent?: string
+  privateKeyPrime1?: string
+  privateKeyPrime2?: string
+  privateKeyExponent1?: string
+  privateKeyExponent2?: string
+  privateKeyCoefficient?: string
+  algorithmIdentifier?: string
+  digest?: string
+}
+
 /**
  * Converts a private key from an ASN.1 object.
  *
@@ -1397,7 +1412,7 @@ export function wrapRsaPrivateKey(rsaKey: Asn1Object): Asn1Object {
  */
 export function privateKeyFromAsn1(obj: Asn1Object): RSAKey {
   // get PrivateKeyInfo
-  let capture = {}
+  let capture: PrivateKeyInfoCapture = {}
   let errors: CustomError[] = []
   if (asn1.validate(obj, privateKeyValidator, capture, errors)) {
     obj = asn1.fromDer(createBuffer(capture.privateKey))
@@ -1480,7 +1495,8 @@ export function privateKeyToAsn1(key: {
 
 interface PublicKeyCapture {
   publicKeyModulus?: string
-  publicKeyExponent?: Asn1Object
+  publicKeyExponent?: string
+  publicKeyOid?: string
 }
 
 /**
@@ -1631,14 +1647,13 @@ function _encodePkcs1_v1_5(m: string, key: {
     while (padNum > 0) {
       let numZeros = 0
       const padBytes = random.getBytes(padNum)
+      if (!padBytes) continue
       for (let i = 0; i < padNum; ++i) {
         padByte = padBytes.charCodeAt(i)
-        if (padByte === 0) {
+        if (padByte === 0)
           ++numZeros
-        }
-        else {
+        else
           eb.putByte(padByte)
-        }
       }
       padNum = numZeros
     }
@@ -1687,6 +1702,9 @@ function _decodePkcs1_v1_5(em: string, key: {
     || (pub && bt === 0x00 && typeof (ml) === 'undefined')) {
     throw new Error('Encryption block is invalid.')
   }
+
+  if (!ml)
+    ml = eb.length() - k
 
   let padNum = 0
   if (bt === 0x00) {
@@ -1747,6 +1765,8 @@ function _generateKeyPair(state: {
   qBits: number
   bits: number
   e: BigInteger
+  p: BigInteger
+  q: BigInteger
 }, options: {
   algorithm?: string
   workers?: number
@@ -2131,7 +2151,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
 
     if (scheme === 'RSASSA-PKCS1-V1_5') {
       scheme = {
-        verify(digest, d) {
+        verify(digest: string | Uint8Array, d: string) {
           // remove padding
           d = _decodePkcs1_v1_5(d, key, true)
           // d is ASN.1 BER-encoded DigestInfo
@@ -2140,7 +2160,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
           })
 
           // validate DigestInfo
-          const capture = {}
+          const capture: PrivateKeyInfoCapture = {}
           const errors: CustomError[] = []
           if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
             const error: CustomError = new Error('ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.')
@@ -2183,7 +2203,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     }
     else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
       scheme = {
-        verify(digest, d) {
+        verify(digest: string | Uint8Array, d: string) {
           // remove padding
           d = _decodePkcs1_v1_5(d, key, true)
           return digest === d
