@@ -1162,7 +1162,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
       const d = decrypt(signature, key, true, false)
 
       return scheme.verify(digest, d, key.n.bitLength())
-    }
+    },
   }
 
   /**
@@ -1282,7 +1282,7 @@ export function setPrivateKey(
      *
      * @return the signature as a byte string.
      */
-    sign: function (md: any, scheme: any) {
+    sign(md: any, scheme: any) {
       /* Note: The internal implementation of RSA operations is being
         transitioned away from a PKCS#1 v1.5 hard-coded scheme. Some legacy
         code like the use of an encoding block identifier 'bt' will eventually
@@ -1310,24 +1310,24 @@ export function setPrivateKey(
     },
 
     /**
-   * Decrypts the given data with this private key. The decryption scheme
-   * must match the one used to encrypt the data.
-   *
-   * @param data the byte string to decrypt.
-   * @param scheme the decryption scheme to use:
-   *          'RSAES-PKCS1-V1_5' (default),
-   *          'RSA-OAEP',
-   *          'RAW', 'NONE', or null to perform raw RSA decryption.
-   * @param schemeOptions any scheme-specific options.
-   *
-   * @return the decrypted byte string.
-   */
-    decrypt: function (data: string, scheme: string, schemeOptions: any) {
+     * Decrypts the given data with this private key. The decryption scheme
+     * must match the one used to encrypt the data.
+     *
+     * @param data the byte string to decrypt.
+     * @param scheme the decryption scheme to use:
+     *          'RSAES-PKCS1-V1_5' (default),
+     *          'RSA-OAEP',
+     *          'RAW', 'NONE', or null to perform raw RSA decryption.
+     * @param schemeOptions any scheme-specific options.
+     *
+     * @return the decrypted byte string.
+     */
+    decrypt(data: string, scheme: string, schemeOptions: any) {
       if (typeof scheme === 'string') {
         scheme = scheme.toUpperCase()
       }
 
-        else if (scheme === undefined) {
+      else if (scheme === undefined) {
         scheme = 'RSAES-PKCS1-V1_5'
       }
 
@@ -1353,7 +1353,7 @@ export function setPrivateKey(
 
       // decode according to scheme
       return scheme.decode(d, key, false)
-    }
+    },
   }
 
   return key
@@ -1478,7 +1478,7 @@ export function privateKeyToAsn1(key: {
   ])
 }
 
-type PublicKeyCapture = {
+interface PublicKeyCapture {
   publicKeyModulus?: string
   publicKeyExponent?: Asn1Object
 }
@@ -1498,7 +1498,7 @@ export function publicKeyFromAsn1(obj?: Asn1Object): RSAKey {
     // get oid
     const oid = asn1.derToOid(capture.publicKeyOid)
     if (oid !== oids.rsaEncryption) {
-      var error = new Error('Cannot read public key. Unknown OID.')
+      const error = new Error('Cannot read public key. Unknown OID.')
       error.oid = oid
       throw error
     }

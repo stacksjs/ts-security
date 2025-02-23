@@ -107,17 +107,18 @@
  * }
  */
 
+import type { MessageDigest } from './algorithms/hash/sha1'
 import type { Asn1Object } from './encoding/asn1'
+import type { MessageDigest as MD } from './md'
+import { publicKeyFromAsn1, publicKeyToAsn1 } from './algorithms/asymmetric/rsa'
+import { sha1 } from './algorithms/hash/sha1'
 import { asn1 } from './encoding/asn1'
+import { pem } from './encoding/pem'
 import { md } from './md'
+import { mgf as mgfImport } from './mgf'
 import { oids } from './oids'
 import { pki } from './pki'
-import { mgf as mgfImport } from './mgf'
 import util, { hexToBytes } from './utils'
-import { pem } from './encoding/pem'
-import { publicKeyToAsn1, publicKeyFromAsn1 } from './algorithms/asymmetric/rsa'
-import { pss } from './pss'
-import { sha1 } from './algorithms/hash/sha1'
 
 // Constants
 const DATE_1950 = new Date('1950-01-01T00:00:00Z')
@@ -200,7 +201,7 @@ export interface Certificate {
   }
   extensions: CertificateExtension[]
   publicKey: any
-  md: IMessageDigest | null
+  md: MessageDigest | null
   tbsCertificate?: any
   issued: (child: Certificate) => boolean
   isIssuer: (parent: Certificate) => boolean
@@ -237,11 +238,11 @@ export interface CertificationRequest {
   attributes: RDNAttribute[]
   getAttribute: (sn: string) => RDNAttribute | null
   addAttribute: (attr: RDNAttribute) => void
-  md: IMessageDigest | null
+  md: MessageDigest | null
   certificationRequestInfo?: any
   setSubject: (attrs: RDNAttribute[]) => void
   setAttributes: (attrs: RDNAttribute[]) => void
-  sign: (key: any, md?: IMessageDigest) => void
+  sign: (key: any, md?: MessageDigest) => void
   verify: () => boolean
 }
 
@@ -629,7 +630,7 @@ export const certificationRequestValidator: Asn1Object = {
  * @param rdn the RDNSequence to convert.
  * @param md a message digest to append type and value to if provided.
  */
-export function RDNAttributesAsArray(rdn: any, md?: IMessageDigest): RDNAttribute[] {
+export function RDNAttributesAsArray(rdn: any, md?: MessageDigest): RDNAttribute[] {
   const rval: RDNAttribute[] = []
 
   // each value can be a string or array of strings
@@ -639,7 +640,7 @@ export function RDNAttributesAsArray(rdn: any, md?: IMessageDigest): RDNAttribut
     // handle values as an array
     for (let vi = 0; vi < attr.value.length; ++vi) {
       // get value
-      let value = attr.value[vi]
+      const value = attr.value[vi]
 
       // handle value as an array
       if (Array.isArray(value)) {
@@ -689,7 +690,7 @@ export function CRIAttributesAsArray(attributes: any): RDNAttribute[] {
 
   for (let i = 0; i < attributes.length; ++i) {
     const attr = attributes[i]
-    let value = attr.value
+    const value = attr.value
 
     // handle values as an array
     if (Array.isArray(value)) {
@@ -779,7 +780,7 @@ export function getAttribute(obj: any, options: any): RDNAttribute | null {
 export function readSignatureParameters(
   oid: string,
   obj: any,
-  fillDefaults: boolean
+  fillDefaults: boolean,
 ): SignatureParameters {
   const params: SignatureParameters = {}
 
@@ -802,7 +803,7 @@ export function readSignatureParameters(
     throw {
       message: 'Cannot read RSASSA-PSS parameter block.',
       error: 'pki.BadCertificate',
-      errors
+      errors,
     } as CustomError
   }
 
@@ -813,7 +814,7 @@ export function readSignatureParameters(
   if (capture.maskGenOid !== undefined) {
     params.mgf = {
       algorithmOid: asn1.derToOid(capture.maskGenOid),
-      hash: { algorithmOid: asn1.derToOid(capture.maskGenHashOid) }
+      hash: { algorithmOid: asn1.derToOid(capture.maskGenHashOid) },
     }
   }
 
@@ -824,20 +825,8 @@ export function readSignatureParameters(
   return params
 }
 
-interface ByteStringBuffer {
-  toHex: () => string
-  getBytes: () => string
-}
-
-interface IMessageDigest {
-  algorithm: string
-  update: (msg: string | ByteStringBuffer, encoding?: string) => IMessageDigest
-  digest: () => ByteStringBuffer
-  create?: () => IMessageDigest
-}
-
 interface HashFunction {
-  create: () => IMessageDigest
+  create: () => MessageDigest
 }
 
 interface HashFunctions {
@@ -845,7 +834,7 @@ interface HashFunctions {
 }
 
 interface MaskGenFunction {
-  create: (md: IMessageDigest) => any
+  create: (md: MessageDigest) => any
 }
 
 interface MaskGenFunctions {
@@ -861,19 +850,10 @@ interface ExtendedError extends Error {
   extension?: any
 }
 
-interface PemMessage {
-  type: string
-  body: string
-  procType?: any
-  contentDomain?: any
-  dekInfo?: any
-  headers?: any[]
-}
-
 // Update verifySignature function
 export function verifySignature(options: {
   certificate: Certificate
-  md: IMessageDigest
+  md: MD
   signature: any
 }): boolean {
   let rval = false
@@ -883,7 +863,7 @@ export function verifySignature(options: {
     if (!params) {
       throw {
         message: 'Missing signature parameters',
-        error: 'pki.BadCertificate'
+        error: 'pki.BadCertificate',
       } as CustomError
     }
 
@@ -892,7 +872,7 @@ export function verifySignature(options: {
       throw {
         message: 'Unsupported MGF hash function.',
         error: 'pki.BadCertificate',
-        oid: params.mgf?.hash?.algorithmOid
+        oid: params.mgf?.hash?.algorithmOid,
       } as CustomError
     }
 
@@ -901,12 +881,12 @@ export function verifySignature(options: {
       throw {
         message: 'Unsupported MGF function.',
         error: 'pki.BadCertificate',
-        oid: mgfOid
+        oid: mgfOid,
       } as CustomError
     }
 
     const mgf = (mgfImport as unknown as MaskGenFunctions)[mgfOid].create(
-      (md as unknown as HashFunctions)[hashAlgorithm].create()
+      (md as unknown as HashFunctions)[hashAlgorithm].create(),
     )
 
     // initialize hash function
@@ -915,21 +895,21 @@ export function verifySignature(options: {
       throw {
         message: 'Unsupported RSASSA-PSS hash function.',
         error: 'pki.BadCertificate',
-        oid: hashOid
+        oid: hashOid,
       } as CustomError
     }
 
     const hashFn = (md as unknown as HashFunctions)[hashOid].create()
     rval = options.certificate.publicKey.verify(
-      options.md.digest().getBytes(),
+      (options.md as unknown as MD).digest().getBytes(),
       options.signature,
-      { mgf, hash: hashFn, saltLength: params.saltLength || 20 }
+      { mgf, hash: hashFn, saltLength: params.saltLength || 20 },
     )
   }
   else {
     rval = options.certificate.publicKey.verify(
       options.md.digest().getBytes(),
-      options.signature
+      options.signature,
     )
   }
 
@@ -955,7 +935,7 @@ export function certificateFromPem(pemString: string, computeHash?: boolean, str
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE' && msg.type !== 'X509 CERTIFICATE'
-      && msg.type !== 'TRUSTED CERTIFICATE') {
+    && msg.type !== 'TRUSTED CERTIFICATE') {
     const error = new Error('Could not convert certificate from PEM; PEM header type is not "CERTIFICATE".') as ExtendedError
     error.headerType = msg.type
     throw error
@@ -1053,17 +1033,17 @@ export function publicKeyToRSAPublicKeyPem(key: any, maxline: number): string {
 export function getPublicKeyFingerprint(
   key: any,
   options: {
-    md?: IMessageDigest
+    md?: MessageDigest
     type?: string
     encoding?: string
     delimiter?: string
-  }
+  },
 ): string {
   options = options || {}
   options.type = options.type || 'RSAPublicKey'
 
   // use SHA-1 message digest by default
-  options.md = options.md || (md.sha1.create() as unknown as IMessageDigest)
+  options.md = options.md || (md.sha1.create() as unknown as MessageDigest)
 
   // produce DER from RSAPublicKey and digest it
   const bytes = asn1.toDer(publicKeyToAsn1(key)).getBytes()
@@ -1112,7 +1092,7 @@ export function getPublicKeyFingerprint(
 export function certificationRequestFromPem(
   pemString: string,
   computeHash: boolean,
-  strict: boolean
+  strict: boolean,
 ): CertificationRequest {
   const msg = pem.decode(pemString)[0]
 
@@ -1156,48 +1136,49 @@ export function createCertificate(): Certificate {
     signatureOid: null,
     signature: null,
     siginfo: {
-      algorithmOid: null
+      algorithmOid: null,
     },
     validity: {
       notBefore: new Date(),
-      notAfter: new Date()
+      notAfter: new Date(),
     },
     issuer: {
-      getField: function(sn: string) {
+      getField(sn: string) {
         return _getAttribute(cert.issuer, sn)
       },
-      addField: function(attr: RDNAttribute) {
+      addField(attr: RDNAttribute) {
         _fillMissingFields([attr])
         cert.issuer.attributes.push(attr)
       },
       attributes: [],
-      hash: null
+      hash: null,
     },
     subject: {
-      getField: function(sn: string) {
+      getField(sn: string) {
         return _getAttribute(cert.subject, sn)
       },
-      addField: function(attr: RDNAttribute) {
+      addField(attr: RDNAttribute) {
         _fillMissingFields([attr])
         cert.subject.attributes.push(attr)
       },
       attributes: [],
-      hash: null
+      hash: null,
     },
     extensions: [],
     publicKey: null,
     md: null,
-    issued: function(child: Certificate) {
+    issued(child: Certificate) {
       return child.isIssuer(cert)
     },
-    isIssuer: function(parent: Certificate) {
+    isIssuer(parent: Certificate) {
       let rval = false
       const i = cert.issuer
       const s = parent.subject
 
       // compare hashes if present
-      if (i.hash && s.hash)
+      if (i.hash && s.hash) {
         rval = (i.hash === s.hash)
+      }
       // if hashes are not present or not equal, compare attributes
       else {
         // ensure all parent subject attributes are present in issuer
@@ -1208,10 +1189,10 @@ export function createCertificate(): Certificate {
 
       return rval
     },
-    generateSubjectKeyIdentifier: function() {
+    generateSubjectKeyIdentifier() {
       return getPublicKeyFingerprint(cert.publicKey, { type: 'RSAPublicKey' })
     },
-    verifySubjectKeyIdentifier: function() {
+    verifySubjectKeyIdentifier() {
       const oid = oids.subjectKeyIdentifier
       for (let i = 0; i < cert.extensions.length; ++i) {
         const ext = cert.extensions[i]
@@ -1222,7 +1203,7 @@ export function createCertificate(): Certificate {
       }
       return false
     },
-    getExtension: function(name: string) {
+    getExtension(name: string) {
       for (let i = 0; i < cert.extensions.length; ++i) {
         const ext = cert.extensions[i]
         if (ext.name === name || ext.id === name) {
@@ -1230,7 +1211,7 @@ export function createCertificate(): Certificate {
         }
       }
       return null
-    }
+    },
   }
 
   return cert
@@ -1273,13 +1254,13 @@ export function certificateFromAsn1(obj: any, computeHash?: boolean): Certificat
   cert.signatureParameters = readSignatureParameters(
     cert.signatureOid,
     capture.certSignatureParams,
-    true
+    true,
   )
   cert.siginfo.algorithmOid = asn1.derToOid(capture.certinfoSignatureOid)
   cert.siginfo.parameters = readSignatureParameters(
     cert.siginfo.algorithmOid,
     capture.certinfoSignatureParams,
-    false
+    false,
   )
   cert.signature = capture.certSignature
 
@@ -1457,7 +1438,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
   const e: CertificateExtension = {
     id: asn1.derToOid(ext.value[0].value),
     critical: false,
-    value: null
+    value: null,
   }
 
   if (ext.value[1].type === asn1.Type.BOOLEAN) {
@@ -1606,7 +1587,7 @@ export function certificateExtensionFromAsn1(ext: Asn1Object): CertificateExtens
   return e
 }
 
-type CertificationRequestCapture = {
+interface CertificationRequestCapture {
   csrVersion?: string
   csrSignatureOid?: string
   csrSignatureParams?: string
@@ -1728,10 +1709,10 @@ export function createCertificationRequest(): CertificationRequest {
       algorithmOid: null,
     },
     subject: {
-      getField: function (sn: string) {
+      getField(sn: string) {
         return _getAttribute(csr.subject, sn)
       },
-      addField: function (attr: Attribute) {
+      addField(attr: Attribute) {
         _fillMissingFields([attr])
         csr.subject.attributes.push(attr)
       },
@@ -1740,10 +1721,10 @@ export function createCertificationRequest(): CertificationRequest {
     },
     publicKey: null,
     attributes: [],
-    getAttribute: function (sn: string) {
+    getAttribute(sn: string) {
       return _getAttribute(csr, sn)
     },
-    addAttribute: function (attr) {
+    addAttribute(attr) {
       _fillMissingFields([attr])
       csr.attributes.push(attr)
     },
@@ -1883,7 +1864,7 @@ function _dnToAsn1(obj: any) {
       if (valueTagClass === asn1.Type.UTF8)
         value = util.encodeUtf8(value)
 
-      // FIXME: handle more encodings
+      // TODO: handle more encodings
     }
 
     // create a RelativeDistinguishedName set
@@ -1912,7 +1893,7 @@ function _dnToAsn1(obj: any) {
  * @return the JSON for display.
  */
 function _getAttributesAsJson(attrs: RDNAttribute[]) {
-  const rval = {}
+  const rval: Record<string, string[]> = {}
   for (let i = 0; i < attrs.length; ++i) {
     const attr = attrs[i]
     if (attr.shortName && (
@@ -1920,20 +1901,17 @@ function _getAttributesAsJson(attrs: RDNAttribute[]) {
       || attr.valueTagClass === asn1.Type.PRINTABLESTRING
       || attr.valueTagClass === asn1.Type.IA5STRING)) {
       let value = attr.value
-      if (attr.valueTagClass === asn1.Type.UTF8) {
+      if (attr.valueTagClass === asn1.Type.UTF8)
         value = util.encodeUtf8(attr.value)
-      }
-      if (!(attr.shortName in rval)) {
+      if (!(attr.shortName in rval))
         rval[attr.shortName] = value
-      }
-      else if (Array.isArray(rval[attr.shortName])) {
+      else if (Array.isArray(rval[attr.shortName]))
         rval[attr.shortName].push(value)
-      }
-      else {
+      else
         rval[attr.shortName] = [rval[attr.shortName], value]
-      }
     }
   }
+
   return rval
 }
 
@@ -1943,7 +1921,7 @@ function _getAttributesAsJson(attrs: RDNAttribute[]) {
  * @param attrs the attributes to fill missing fields in.
  */
 function _fillMissingFields(attrs: RDNAttribute[]) {
-  let attr
+  let attr: RDNAttribute
   for (let i = 0; i < attrs.length; ++i) {
     attr = attrs[i]
 
@@ -1953,7 +1931,7 @@ function _fillMissingFields(attrs: RDNAttribute[]) {
         attr.name = oids[attr.type]
       }
       else if (attr.shortName && attr.shortName in _shortNames) {
-        attr.name = oids[_shortNames[attr.shortName]]
+        attr.name = oids[_shortNames[attr.shortName as keyof typeof _shortNames]]
       }
     }
 
@@ -1972,7 +1950,7 @@ function _fillMissingFields(attrs: RDNAttribute[]) {
     // populate missing shortname
     if (typeof attr.shortName === 'undefined') {
       if (attr.name && attr.name in _shortNames) {
-        attr.shortName = _shortNames[attr.name]
+        attr.shortName = _shortNames[attr.name as keyof typeof _shortNames]
       }
     }
 
@@ -2459,9 +2437,6 @@ function _CRIAttributesToAsn1(csr: CertificationRequest) {
   return rval
 }
 
-const jan_1_1950 = new Date('1950-01-01')
-const jan_1_2050 = new Date('2050-01-01')
-
 /**
  * Converts a Date object to ASN.1
  * Handles the different format before and after 1st January 2050
@@ -2471,7 +2446,7 @@ const jan_1_2050 = new Date('2050-01-01')
  * @return the ASN.1 object representing the date.
  */
 function _dateToAsn1(date: Date) {
-  if (date >= jan_1_1950 && date < jan_1_2050) {
+  if (date >= DATE_1950 && date < DATE_2050) {
     return asn1.create(
       asn1.Class.UNIVERSAL,
       asn1.Type.UTCTIME,
@@ -2511,10 +2486,10 @@ export function getTBSCertificate(cert: Certificate): any {
     // signature
     asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
       // algorithm
-      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(cert.siginfo.algorithmOid).getBytes()),
+      asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, asn1.oidToDer(cert.siginfo.algorithmOid || '').getBytes()),
       // parameters
       _signatureParametersToAsn1(
-        cert.siginfo.algorithmOid,
+        cert.siginfo.algorithmOid || '',
         cert.siginfo.parameters,
       ),
     ]),
@@ -2556,7 +2531,7 @@ export function getTBSCertificate(cert: Certificate): any {
 
   if (cert.extensions.length > 0) {
     // extensions (optional)
-    tbs.value.push(pki.certificateExtensionsToAsn1(cert.extensions))
+    tbs.value.push(certificateExtensionsToAsn1(cert.extensions))
   }
 
   return tbs
@@ -2639,9 +2614,8 @@ export function certificateExtensionsToAsn1(exts: CertificateExtension[]): Asn1O
   const seq = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
   rval.value.push(seq)
 
-  for (let i = 0; i < exts.length; ++i) {
+  for (let i = 0; i < exts.length; ++i)
     seq.value.push(certificateExtensionToAsn1(exts[i]))
-  }
 
   return rval
 }
@@ -2732,7 +2706,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
   const caStore = {
     // stored certificates
     certs: {},
-    getIssuer: function (cert: Certificate) {
+    getIssuer(cert: Certificate) {
       const rval = getBySubject(cert.issuer)
 
       // see if there are multiple matches
@@ -2746,7 +2720,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
 
       return rval
     },
-    addCertificate: function (cert: Certificate) {
+    addCertificate(cert: Certificate) {
       // convert from pem if necessary
       if (typeof cert === 'string')
         cert = certificateFromPem(cert)
@@ -2768,7 +2742,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
         }
       }
     },
-    hasCertificate: function (cert) {
+    hasCertificate(cert) {
       // convert from pem if necessary
       if (typeof cert === 'string') {
         cert = pki.certificateFromPem(cert)
@@ -2791,7 +2765,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
 
       return false
     },
-    listAllCertificates: function () {
+    listAllCertificates() {
       const certList = []
 
       for (const hash in caStore.certs) {
@@ -2810,7 +2784,7 @@ export function createCaStore(certs: Certificate[]): CAStore {
 
       return certList
     },
-    removeCertificate: function (cert) {
+    removeCertificate(cert) {
       let result
 
       // convert from pem if necessary
@@ -2913,7 +2887,7 @@ export function verifyCertificateChain(
   options: {
     verify?: (cert: Certificate, index: number, chain: Certificate[]) => boolean | CustomError
     validityCheckDate?: Date
-  } = {}
+  } = {},
 ): boolean {
   /* From: RFC3280 - Internet X.509 Public Key Infrastructure Certificate
     Section 6: Certification Path Validation
@@ -2922,7 +2896,7 @@ export function verifyCertificateChain(
   // copy cert chain references to another array to protect against changes
   // in verify callback
   chain = chain.slice(0)
-  let validityCheckDate = options.validityCheckDate || new Date()
+  const validityCheckDate = options.validityCheckDate || new Date()
 
   // check each cert in chain using its parent, where parent is either
   // the next in the chain or from the CA store
@@ -2930,7 +2904,7 @@ export function verifyCertificateChain(
   let error: CustomError | null = null
   let depth = 0
   do {
-    let cert: Certificate = chain.shift() as Certificate
+    const cert: Certificate = chain.shift() as Certificate
     let parent: Certificate | null = null
     let selfSigned = false
 
@@ -2993,8 +2967,8 @@ export function verifyCertificateChain(
         if (!bcExt.cA) {
           error = {
             message:
-              'Certificate keyUsage or basicConstraints conflict or indicate certificate is not a CA. ' +
-              'Certificate cannot be used for certification.',
+              'Certificate keyUsage or basicConstraints conflict or indicate certificate is not a CA. '
+              + 'Certificate cannot be used for certification.',
             error: 'pki.BadCertificate',
           }
         }
@@ -3060,7 +3034,7 @@ function _containsAll(iattr: RDNAttribute[], sattr: RDNAttribute[]): boolean {
 
 function _getAttribute(obj: any, sn: string): RDNAttribute | null {
   if (sn in _shortNames) {
-    sn = _shortNames[sn]
+    sn = _shortNames[sn as keyof typeof _shortNames]
   }
   const rval = obj.attributes.filter((attr: RDNAttribute) => attr.shortName === sn)
   return rval.length > 0 ? rval[0] : null
@@ -3069,7 +3043,7 @@ function _getAttribute(obj: any, sn: string): RDNAttribute | null {
 function _createSignatureDigest(options: {
   signatureOid: string
   type: string
-}): IMessageDigest {
+}): MessageDigest {
   switch (options.signatureOid) {
     case oids.sha1WithRSAEncryption:
       return md.sha1.create()
@@ -3085,7 +3059,7 @@ function _createSignatureDigest(options: {
       throw {
         message: `Could not compute ${options.type} digest. Unknown signature OID.`,
         error: 'pki.BadCertificate',
-        signatureOid: options.signatureOid
+        signatureOid: options.signatureOid,
       } as CustomError
   }
 }

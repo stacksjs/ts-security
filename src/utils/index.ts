@@ -1171,15 +1171,16 @@ export function bytesToIPv6(bytes: string): string | null {
       const idx = ip.length
       if (!last || idx !== last.end + 1) {
         zeroGroups.push({ start: idx, end: idx })
-      } else {
+      }
+      else {
         last.end = idx
-        if ((last.end - last.start) >
-          (zeroGroups[zeroMaxGroup].end - zeroGroups[zeroMaxGroup].start)) {
+        if ((last.end - last.start)
+          > (zeroGroups[zeroMaxGroup].end - zeroGroups[zeroMaxGroup].start)) {
           zeroMaxGroup = zeroGroups.length - 1
         }
       }
     }
-    ip.push(hex);
+    ip.push(hex)
   }
   if (zeroGroups.length > 0) {
     const group = zeroGroups[zeroMaxGroup]
@@ -1187,15 +1188,15 @@ export function bytesToIPv6(bytes: string): string | null {
     if (group.end - group.start > 0) {
       ip.splice(group.start, group.end - group.start + 1, '')
       if (group.start === 0) {
-        ip.unshift('');
+        ip.unshift('')
       }
       if (group.end === 7) {
-        ip.push('');
+        ip.push('')
       }
     }
   }
 
-  return ip.join(':');
+  return ip.join(':')
 };
 
 export interface Util {

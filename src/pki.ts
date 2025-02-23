@@ -1,5 +1,4 @@
 import type { RSA } from './algorithms/asymmetric/rsa'
-import type { PemMessage } from './encoding/pem'
 import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetric/rsa'
 /**
  * TypeScript implementation of a basic Public Key Infrastructure, including
@@ -10,7 +9,7 @@ import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetr
  */
 import { asn1 } from './encoding/asn1'
 import { pem } from './encoding/pem'
-import { certificateToAsn1, CRIAttributesAsArray, getCertificationRequestInfo } from './x509'
+import { certificateExtensionsToAsn1, certificateToAsn1, CRIAttributesAsArray, getCertificationRequestInfo } from './x509'
 
 interface CustomError extends Error {
   headerType?: string
@@ -78,6 +77,7 @@ export function privateKeyInfoToPem(pki: any, maxline: number = 64): string {
 }
 
 export interface Pki {
+  certificateExtensionsToAsn1: typeof certificateExtensionsToAsn1
   certificateToAsn1: typeof certificateToAsn1
   CRIAttributesAsArray: typeof CRIAttributesAsArray
   getCertificationRequestInfo: typeof getCertificationRequestInfo
@@ -88,6 +88,7 @@ export interface Pki {
 }
 
 export const pki: Pki = {
+  certificateExtensionsToAsn1,
   certificateToAsn1,
   getCertificationRequestInfo,
   CRIAttributesAsArray,
