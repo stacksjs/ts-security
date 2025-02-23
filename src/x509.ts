@@ -1914,18 +1914,18 @@ function _fillMissingFields(attrs) {
 
     // populate missing name
     if (typeof attr.name === 'undefined') {
-      if (attr.type && attr.type in pki.oids) {
-        attr.name = pki.oids[attr.type]
+      if (attr.type && attr.type in oids) {
+        attr.name = oids[attr.type]
       }
       else if (attr.shortName && attr.shortName in _shortNames) {
-        attr.name = pki.oids[_shortNames[attr.shortName]]
+        attr.name = oids[_shortNames[attr.shortName]]
       }
     }
 
     // populate missing type (OID)
     if (typeof attr.type === 'undefined') {
-      if (attr.name && attr.name in pki.oids) {
-        attr.type = pki.oids[attr.name]
+      if (attr.name && attr.name in oids) {
+        attr.type = oids[attr.name]
       }
       else {
         var error = new Error('Attribute type not specified.')
@@ -1973,18 +1973,18 @@ function _fillMissingExtensionFields(e, options) {
 
   // populate missing name
   if (typeof e.name === 'undefined') {
-    if (e.id && e.id in pki.oids) {
-      e.name = pki.oids[e.id]
+    if (e.id && e.id in oids) {
+      e.name = oids[e.id]
     }
   }
 
   // populate missing id
   if (typeof e.id === 'undefined') {
-    if (e.name && e.name in pki.oids) {
-      e.id = pki.oids[e.name]
+    if (e.name && e.name in oids) {
+      e.id = oids[e.name]
     }
     else {
-      var error = new Error('Extension ID not specified.')
+      const error: CustomError = new Error('Extension ID not specified.')
       error.extension = e
       throw error
     }
@@ -2106,8 +2106,8 @@ function _fillMissingExtensionFields(e, options) {
   else if (e.name === 'nsCertType') {
     // nsCertType is a BIT STRING
     // build flags
-    var unused = 0
-    var b2 = 0x00
+    let unused = 0
+    let b2 = 0x00
 
     if (e.client) {
       b2 |= 0x80
@@ -2158,17 +2158,15 @@ function _fillMissingExtensionFields(e, options) {
     // SYNTAX SEQUENCE
     e.value = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
 
-    var altName
-    for (var n = 0; n < e.altNames.length; ++n) {
+    let altName
+    for (let n = 0; n < e.altNames.length; ++n) {
       altName = e.altNames[n]
-      var value = altName.value
+      let value = altName.value
       // handle IP
       if (altName.type === 7 && altName.ip) {
         value = util.bytesFromIP(altName.ip)
         if (value === null) {
-          var error = new Error(
-            'Extension "ip" value is not a valid IPv4 or IPv6 address.',
-          )
+          const error: CustomError = new Error('Extension "ip" value is not a valid IPv4 or IPv6 address.')
           error.extension = e
           throw error
         }
@@ -2219,7 +2217,7 @@ function _fillMissingExtensionFields(e, options) {
   else if (e.name === 'authorityKeyIdentifier' && options.cert) {
     // SYNTAX SEQUENCE
     e.value = asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [])
-    var seq = e.value.value
+    const seq = e.value.value
 
     if (e.keyIdentifier) {
       const keyIdentifier = (e.keyIdentifier === true
@@ -2271,17 +2269,15 @@ function _fillMissingExtensionFields(e, options) {
       true,
       [],
     )
-    var altName
-    for (var n = 0; n < e.altNames.length; ++n) {
+    let altName
+    for (let n = 0; n < e.altNames.length; ++n) {
       altName = e.altNames[n]
-      var value = altName.value
+      let value = altName.value
       // handle IP
       if (altName.type === 7 && altName.ip) {
         value = util.bytesFromIP(altName.ip)
         if (value === null) {
-          var error = new Error(
-            'Extension "ip" value is not a valid IPv4 or IPv6 address.',
-          )
+          const error: CustomError = new Error('Extension "ip" value is not a valid IPv4 or IPv6 address.')
           error.extension = e
           throw error
         }
@@ -2316,7 +2312,7 @@ function _fillMissingExtensionFields(e, options) {
 
   // ensure value has been defined by now
   if (typeof e.value === 'undefined') {
-    var error = new Error('Extension value not specified.')
+    const error: CustomError = new Error('Extension value not specified.')
     error.extension = e
     throw error
   }
@@ -2334,7 +2330,7 @@ function _fillMissingExtensionFields(e, options) {
 function _signatureParametersToAsn1(oid, params) {
   switch (oid) {
     case oids['RSASSA-PSS']:
-      var parts = []
+      const parts = []
 
       if (params.hash.algorithmOid !== undefined) {
         parts.push(asn1.create(asn1.Class.CONTEXT_SPECIFIC, 0, true, [
@@ -2429,6 +2425,9 @@ function _CRIAttributesToAsn1(csr) {
   return rval
 }
 
+const jan_1_1950 = new Date('1950-01-01')
+const jan_1_2050 = new Date('2050-01-01')
+
 /**
  * Converts a Date object to ASN.1
  * Handles the different format before and after 1st January 2050
@@ -2463,7 +2462,7 @@ function _dateToAsn1(date) {
  *
  * @return the asn1 TBSCertificate.
  */
-export function getTBSCertificate(cert) {
+export function getTBSCertificate(cert: Certificate): any {
   // TBSCertificate
   const notBefore = _dateToAsn1(cert.validity.notBefore)
   const notAfter = _dateToAsn1(cert.validity.notAfter)
@@ -2495,7 +2494,7 @@ export function getTBSCertificate(cert) {
     // subject
     _dnToAsn1(cert.subject),
     // SubjectPublicKeyInfo
-    pki.publicKeyToAsn1(cert.publicKey),
+    publicKeyToAsn1(cert.publicKey),
   ])
 
   if (cert.issuer.uniqueId) {
@@ -2545,7 +2544,7 @@ export function getCertificationRequestInfo(csr) {
     // subject
     _dnToAsn1(csr.subject),
     // SubjectPublicKeyInfo
-    pki.publicKeyToAsn1(csr.publicKey),
+    publicKeyToAsn1(csr.publicKey),
     // attributes
     _CRIAttributesToAsn1(csr),
   ])
@@ -2987,12 +2986,10 @@ export function verifyCertificateChain(
         }
       }
       else if (typeof ret === 'object' && !Array.isArray(ret)) {
-        if (ret.message) {
+        if (ret.message)
           error = ret
-        }
-        if (ret.error) {
+        if (ret.error)
           error = ret
-        }
       }
       else if (typeof ret === 'string') {
         error = {
@@ -3007,9 +3004,8 @@ export function verifyCertificateChain(
     ++depth
   } while (error === null && chain.length > 0)
 
-  if (error !== null) {
+  if (error !== null)
     throw error
-  }
 
   return true
 }
