@@ -1097,7 +1097,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
 
       if (scheme === 'RSASSA-PKCS1-V1_5') {
         scheme = {
-          verify(digest, d) {
+          verify(digest: string | Uint8Array, d: string) {
             // remove padding
             d = _decodePkcs1_v1_5(d, key, true)
             // d is ASN.1 BER-encoded DigestInfo
@@ -1106,7 +1106,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
             })
 
             // validate DigestInfo
-            const capture = {}
+            const capture: PrivateKeyInfoCapture = {}
             const errors: CustomError[] = []
             if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
               const error: CustomError = new Error(
@@ -1150,7 +1150,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
       }
       else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
         scheme = {
-          verify(digest, d) {
+          verify(digest: string | Uint8Array, d: string) {
             // remove padding
             d = _decodePkcs1_v1_5(d, key, true)
             return digest === d
@@ -1192,7 +1192,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
 
     if (scheme === 'RSAES-PKCS1-V1_5') {
       scheme = {
-        encode(m, key, pub) {
+        encode(m: string, key: any, pub: any) {
           return _encodePkcs1_v1_5(m, key, 0x02).getBytes()
         },
       }
@@ -1289,7 +1289,7 @@ export function setPrivateKey(
         be removed. */
 
       // private key operation
-      let bt = false
+      let bt: number | null = null
 
       if (typeof scheme === 'string')
         scheme = scheme.toUpperCase()
@@ -1765,8 +1765,12 @@ function _generateKeyPair(state: {
   qBits: number
   bits: number
   e: BigInteger
-  p: BigInteger
-  q: BigInteger
+  p: BigInteger | null
+  q: BigInteger | null
+  p1: BigInteger | null
+  q1: BigInteger | null
+  phi: BigInteger | null
+  n: BigInteger | null
 }, options: {
   algorithm?: string
   workers?: number
@@ -1824,29 +1828,29 @@ function _generateKeyPair(state: {
     state.q = num
 
     // ensure p is larger than q (swap them if not)
-    if (state.p.compareTo(state.q) < 0) {
+    if (state.p?.compareTo(state.q || BigInteger.ZERO) || 0 < 0) {
       const tmp = state.p
       state.p = state.q
       state.q = tmp
     }
 
     // ensure p is coprime with e
-    if (state.p.subtract(BigInteger.ONE).gcd(state.e).compareTo(BigInteger.ONE) !== 0) {
+    if (state.p?.subtract(BigInteger.ONE).gcd(state.e).compareTo(BigInteger.ONE) !== 0) {
       state.p = null
       generate()
       return
     }
 
     // ensure q is coprime with e
-    if (state.q.subtract(BigInteger.ONE).gcd(state.e).compareTo(BigInteger.ONE) !== 0) {
+    if (state.q?.subtract(BigInteger.ONE).gcd(state.e).compareTo(BigInteger.ONE) !== 0) {
       state.q = null
       getPrime(state.qBits, finish)
       return
     }
 
     // compute phi: (p - 1)(q - 1) (Euler's totient function)
-    state.p1 = state.p.subtract(BigInteger.ONE)
-    state.q1 = state.q.subtract(BigInteger.ONE)
+    state.p1 = state.p?.subtract(BigInteger.ONE)
+    state.q1 = state.q?.subtract(BigInteger.ONE)
     state.phi = state.p1.multiply(state.q1)
 
     // ensure e and phi are coprime
