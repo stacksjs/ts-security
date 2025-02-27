@@ -13,7 +13,7 @@ import type { ByteStringBuffer } from '../../utils'
 import { createBuffer, fillString } from '../../utils'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
-interface SHA512State {
+export interface SHA512State {
   h0: [number, number]
   h1: [number, number]
   h2: [number, number]
@@ -39,7 +39,7 @@ interface MessageDigest {
 }
 
 // SHA-512 algorithm type
-type SHA512Algorithm = 'SHA-512' | 'SHA-384' | 'SHA-512/256' | 'SHA-512/224'
+export type SHA512Algorithm = 'SHA-512' | 'SHA-384' | 'SHA-512/256' | 'SHA-512/224'
 
 // Internal state
 let _initialized = false

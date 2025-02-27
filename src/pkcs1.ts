@@ -44,7 +44,7 @@
  */
 
 import type { ByteStringBuffer } from './utils'
-import { sha1 } from './sha1'
+import { sha1 } from './algorithms/hash/sha1'
 
 // Extended Error interface for PKCS1 specific errors
 interface PKCS1Error extends Error {

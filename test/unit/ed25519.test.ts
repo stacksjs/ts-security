@@ -1,34 +1,25 @@
-import { describe, it } from 'bun:test'
-import ASSERT from 'node:assert'
+import { describe, it, expect } from 'bun:test'
 import { ed25519 } from '../../src/algorithms/asymmetric/ed25519'
-import { SHA256 } from '../../src/sha256'
+import { sha256 } from '../../src/algorithms/hash/sha256'
 import { ByteBuffer, decode64, encode64, hexToBytes } from '../../src/utils'
 
-const b64PrivateKey
-  = 'XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtjE20/RjGhpDRDhAKkH'
-    + 'fQjKciEW7zmJamO56uXdT4rr+g=='
+const b64PrivateKey = 'XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtjE20/RjGhpDRDhAKkHfQjKciEW7zmJamO56uXdT4rr+g=='
 const b64PublicKey = 'xNtP0YxoaQ0Q4QCpB30IynIhFu85iWpjuerl3U+K6/o='
-const b64Signature
-  = 'DttvMHiwblQQ+f5uvqebITsJ5YFnDdoU7j4liFaynZeQB65Zs+MkQ2PxA978'
-    + 'ALonGdIhCr2chw/sP53pDQVMCw=='
-const b64BadSignature
-  = 'AttvMHiwblQQ+f5uvqebITsJ5YFnDdoU7j4liFaynZeQB65Zs+MkQ2PxA978'
-    + 'ALonGdIhCr2chw/sP53pDQVMCw=='
-const b64Sha256Signature
-  = 'sJwlB2ODjzFPe5mlyJHPkryCJDE6r5oVDGGtyPY/eomBKhAogWow/AYuZ9fZ'
-    + '/gGg4Jd2ub3SzLnzhkaUPUxQDA=='
+const b64Signature = 'DttvMHiwblQQ+f5uvqebITsJ5YFnDdoU7j4liFaynZeQB65Zs+MkQ2PxA978ALonGdIhCr2chw/sP53pDQVMCw=='
+const b64BadSignature = 'AttvMHiwblQQ+f5uvqebITsJ5YFnDdoU7j4liFaynZeQB65Zs+MkQ2PxA978ALonGdIhCr2chw/sP53pDQVMCw=='
+const b64Sha256Signature = 'sJwlB2ODjzFPe5mlyJHPkryCJDE6r5oVDGGtyPY/eomBKhAogWow/AYuZ9fZ/gGg4Jd2ub3SzLnzhkaUPUxQDA=='
 
 describe('ed25519', () => {
   it('should generate a key pair from a seed', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
     const privateKey = eb64(kp.privateKey)
     const publicKey = eb64(kp.publicKey)
-    ASSERT.equal(privateKey, b64PrivateKey)
-    ASSERT.equal(publicKey, b64PublicKey)
+    expect(privateKey).toBe(b64PrivateKey)
+    expect(publicKey).toBe(b64PublicKey)
   })
 
   it('should get a public key from a private key', () => {
@@ -36,49 +27,49 @@ describe('ed25519', () => {
     const publicKey = ed25519.publicKeyFromPrivateKey({
       privateKey,
     })
-    ASSERT.equal(eb64(publicKey), b64PublicKey)
+    expect(eb64(publicKey)).toBe(b64PublicKey)
   })
 
   it('should generate a random key pair', () => {
     const kp = ed25519.generateKeyPair()
-    ASSERT.ok(kp.privateKey)
-    ASSERT.ok(kp.publicKey)
+    expect(kp.privateKey).toBeTruthy()
+    expect(kp.publicKey).toBeTruthy()
   })
 
   it('should sign a SHA-256 digest of an UTF-8 message', () => {
     const pwd = 'password'
-    let md = SHA256.create()
+    let md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
-    md = SHA256.create()
+    md = sha256.create()
     md.update('test', 'utf8')
     const signature = ed25519.sign({
       md,
       privateKey: kp.privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Sha256Signature)
+    expect(eb64(signature)).toBe(b64Sha256Signature)
   })
 
   it('should sign a digest given 32 private key bytes', () => {
     const pwd = 'password'
-    let md = SHA256.create()
+    let md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
-    md = SHA256.create()
+    md = sha256.create()
     md.update('test', 'utf8')
     const privateKey = kp.privateKey.slice(0, 32)
     const signature = ed25519.sign({
       md,
       privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Sha256Signature)
+    expect(eb64(signature)).toBe(b64Sha256Signature)
   })
 
   it('should sign a UTF-8 message', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -87,12 +78,12 @@ describe('ed25519', () => {
       encoding: 'utf8',
       privateKey: kp.privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Signature)
+    expect(eb64(signature)).toBe(b64Signature)
   })
 
   it('should sign a binary message', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -101,12 +92,12 @@ describe('ed25519', () => {
       encoding: 'binary',
       privateKey: kp.privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Signature)
+    expect(eb64(signature)).toBe(b64Signature)
   })
 
   it('should sign a forge ByteBuffer message', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -114,12 +105,12 @@ describe('ed25519', () => {
       message: new ByteBuffer('test', 'utf8'),
       privateKey: kp.privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Signature)
+    expect(eb64(signature)).toBe(b64Signature)
   })
 
   it('should sign a Uint8Array message', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -132,13 +123,13 @@ describe('ed25519', () => {
       message,
       privateKey: kp.privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Signature)
+    expect(eb64(signature)).toBe(b64Signature)
   })
 
   if (typeof Buffer !== 'undefined') {
     it('should sign a node.js Buffer message', () => {
       const pwd = 'password'
-      const md = SHA256.create()
+      const md = sha256.create()
       md.update(pwd, 'utf8')
       const seed = md.digest().getBytes()
       const kp = ed25519.generateKeyPair({ seed })
@@ -146,13 +137,13 @@ describe('ed25519', () => {
         message: Buffer.from('test', 'utf8'),
         privateKey: kp.privateKey,
       })
-      ASSERT.equal(eb64(signature), b64Signature)
+      expect(eb64(signature)).toBe(b64Signature)
     })
   }
 
   it('should verify a signature', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -165,18 +156,18 @@ describe('ed25519', () => {
       signature,
       publicKey: kp.publicKey,
     })
-    ASSERT.equal(verified, true)
+    expect(verified).toBe(true)
   })
 
   it('should verify a SHA-256 digest signature', () => {
     const pwd = 'password'
-    let md = SHA256.create()
+    let md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
 
     const signature = db64(b64Sha256Signature)
-    md = SHA256.create()
+    md = sha256.create()
     md.update('test', 'utf8')
 
     const verified = ed25519.verify({
@@ -184,13 +175,13 @@ describe('ed25519', () => {
       signature,
       publicKey: kp.publicKey,
     })
-    ASSERT.equal(verified, true)
+    expect(verified).toBe(true)
   })
 
   if (typeof Buffer !== 'undefined') {
     it('should verify a node.js Buffer signature', () => {
       const pwd = 'password'
-      const md = SHA256.create()
+      const md = sha256.create()
       md.update(pwd, 'utf8')
       const seed = md.digest().getBytes()
       const kp = ed25519.generateKeyPair({ seed })
@@ -203,14 +194,14 @@ describe('ed25519', () => {
         signature,
         publicKey: kp.publicKey,
       })
-      ASSERT.equal(verified, true)
+      expect(verified).toBe(true)
     })
   }
 
   it('should generate a random key pair and sign and verify', () => {
     const kp = ed25519.generateKeyPair()
-    ASSERT.ok(kp.privateKey)
-    ASSERT.ok(kp.publicKey)
+    expect(kp.privateKey).toBeTruthy()
+    expect(kp.publicKey).toBeTruthy()
 
     const signature = ed25519.sign({
       message: 'test',
@@ -225,12 +216,12 @@ describe('ed25519', () => {
       publicKey: kp.publicKey,
     })
 
-    ASSERT.equal(verified, true)
+    expect(verified).toBe(true)
   })
 
   it('should fail to verify a signature', () => {
     const pwd = 'password'
-    const md = SHA256.create()
+    const md = sha256.create()
     md.update(pwd, 'utf8')
     const seed = md.digest().getBytes()
     const kp = ed25519.generateKeyPair({ seed })
@@ -243,7 +234,7 @@ describe('ed25519', () => {
       signature,
       publicKey: kp.publicKey,
     })
-    ASSERT.equal(verified, false)
+    expect(verified).toBe(false)
   })
 
   it('should sign and verify with a base64-decoded key pair', () => {
@@ -253,7 +244,7 @@ describe('ed25519', () => {
       encoding: 'utf8',
       privateKey,
     })
-    ASSERT.equal(eb64(signature), b64Signature)
+    expect(eb64(signature)).toBe(b64Signature)
 
     const publicKey = db64(b64PublicKey)
     const verified = ed25519.verify({
@@ -262,7 +253,7 @@ describe('ed25519', () => {
       signature,
       publicKey,
     })
-    ASSERT.equal(verified, true)
+    expect(verified).toBe(true)
   })
 
   it('should pass test vector 1', () => {
@@ -289,23 +280,15 @@ describe('ed25519', () => {
       signature,
       publicKey,
     })
-    ASSERT.equal(hex(signature), expectedSignature)
-    ASSERT.equal(verified, true)
+    expect(hex(signature)).toBe(expectedSignature)
+    expect(verified).toBe(true)
   })
 
   it('should pass test vector 2', () => {
-    let privateKey = hexToBytes(
-      '4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb',
-    )
-    const publicKey = hexToBytes(
-      '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c',
-    )
+    let privateKey = hexToBytes('4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb')
+    const publicKey = hexToBytes('3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c')
     privateKey += publicKey
-    const expectedSignature
-      = '92a009a9f0d4cab8720e820b5f642540'
-        + 'a2b27b5416503f8fb3762223ebdb69da'
-        + '085ac1e43e15996e458f3613d0f11d8c'
-        + '387b2eaeb4302aeeb00d291612bb0c00'
+    const expectedSignature = '92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00'
 
     const message = new ByteBuffer()
     message.putByte(0x72)
@@ -318,17 +301,13 @@ describe('ed25519', () => {
       signature,
       publicKey,
     })
-    ASSERT.equal(hex(signature), expectedSignature)
-    ASSERT.equal(verified, true)
+    expect(hex(signature)).toBe(expectedSignature)
+    expect(verified).toBe(true)
   })
 
   it('should pass test vector 3', () => {
-    let privateKey = hexToBytes(
-      'c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7',
-    )
-    const publicKey = hexToBytes(
-      'fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025',
-    )
+    let privateKey = hexToBytes('c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7')
+    const publicKey = hexToBytes('fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025')
     privateKey += publicKey
     const expectedSignature
       = '6291d657deec24024827e69c3abe01a3'
@@ -348,8 +327,8 @@ describe('ed25519', () => {
       signature,
       publicKey,
     })
-    ASSERT.equal(hex(signature), expectedSignature)
-    ASSERT.equal(verified, true)
+    expect(hex(signature)).toBe(expectedSignature)
+    expect(verified).toBe(true)
   })
 })
 
