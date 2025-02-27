@@ -58,7 +58,7 @@ interface Ed25519Options {
   encoding?: 'binary' | 'utf8'
 }
 
-interface Ed25519 {
+export interface Ed25519 {
   constants: Ed25519Constants
   generateKeyPair: (options?: Ed25519Options) => Ed25519KeyPair
   privateKeyFromAsn1: (obj: any) => { privateKeyBytes: BufferSource }
@@ -72,17 +72,15 @@ interface ExtendedError extends Error {
   errors?: any[]
 }
 
-const ed25519 = {} as Ed25519
-
-ed25519.constants = {
+const constants: Ed25519Constants = {
   PUBLIC_KEY_BYTE_LENGTH: 32,
   PRIVATE_KEY_BYTE_LENGTH: 64,
   SEED_BYTE_LENGTH: 32,
   SIGN_BYTE_LENGTH: 64,
   HASH_BYTE_LENGTH: 64,
-}
+} as const
 
-ed25519.generateKeyPair = function (options) {
+export function generateKeyPair(options: Ed25519Options) {
   options = options || {}
   let seed = options.seed
   if (seed === undefined) {
@@ -122,7 +120,7 @@ ed25519.generateKeyPair = function (options) {
  * @returns {object} keyInfo - The key information.
  * @returns {Buffer|Uint8Array} keyInfo.privateKeyBytes - 32 private key bytes.
  */
-ed25519.privateKeyFromAsn1 = function (obj: any) {
+export function privateKeyFromAsn1(obj: any) {
   const capture = {} as { privateKeyOid?: string, privateKey?: ByteStringBuffer }
   const errors: any[] = []
   const valid = asn1.validate(obj, privateKeyValidator, capture, errors)
@@ -152,7 +150,7 @@ ed25519.privateKeyFromAsn1 = function (obj: any) {
  *
  * @return {Buffer|Uint8Array} - 32 public key bytes.
  */
-ed25519.publicKeyFromAsn1 = function (obj: any): Buffer | Uint8Array {
+export function publicKeyFromAsn1(obj: any): Buffer | Uint8Array {
   const capture = {} as { publicKeyOid?: string, ed25519PublicKey?: Uint8Array }
   const errors: any[] = []
   const valid = asn1.validate(obj, publicKeyValidator, capture, errors)
@@ -177,7 +175,7 @@ ed25519.publicKeyFromAsn1 = function (obj: any): Buffer | Uint8Array {
   })
 }
 
-ed25519.publicKeyFromPrivateKey = function (options) {
+export function publicKeyFromPrivateKey(options: Ed25519Options): Buffer | Uint8Array {
   options = options || {}
   const privateKey = messageToNativeBuffer({
     message: options.privateKey,
@@ -197,7 +195,7 @@ ed25519.publicKeyFromPrivateKey = function (options) {
   return pk
 }
 
-ed25519.sign = function (options) {
+export function sign(options: Ed25519Options): Buffer | Uint8Array {
   options = options || {}
   const msg = messageToNativeBuffer(options)
   let privateKey = messageToNativeBuffer({
@@ -233,12 +231,8 @@ export function verify(options: Ed25519Options): boolean {
 
   const msg = messageToNativeBuffer(options)
 
-  if (options.signature === undefined) {
-    throw new TypeError(
-      '"options.signature" must be a node.js Buffer, a Uint8Array, a forge '
-      + 'ByteBuffer, or a binary string.',
-    )
-  }
+  if (options.signature === undefined)
+    throw new TypeError('"options.signature" must be a Node.js/Bun Buffer, a Uint8Array, a ByteBuffer, or a binary string.',)
 
   const sig = messageToNativeBuffer({
     message: options.signature,
@@ -1345,7 +1339,7 @@ function scalarbase(p: GFArray, s: number[]): void {
 
 // Add type conversion helpers
 function arrayToBuffer(arr: number[]): Buffer | Uint8Array {
-  return new NativeBuffer(arr)
+  return typeof Buffer !== 'undefined' ? Buffer.from(arr) : Uint8Array.from(arr)
 }
 
 function bufferToGF(buffer: BufferSource): GF {
@@ -1359,3 +1353,15 @@ function gfToBuffer(g: GF): Buffer | Uint8Array {
 
   return arrayToBuffer(arr)
 }
+
+export const ed25519: Ed25519 = {
+  constants,
+  generateKeyPair,
+  privateKeyFromAsn1,
+  publicKeyFromAsn1,
+  publicKeyFromPrivateKey,
+  sign,
+  verify,
+}
+
+export default ed25519

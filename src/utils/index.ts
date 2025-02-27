@@ -14,7 +14,7 @@ export class ByteStringBuffer {
   public read: number
   private _constructedStringLength: number
 
-  constructor(b?: string | ArrayBuffer | ArrayBufferView) {
+  constructor(b?: string | ArrayBuffer | ArrayBufferView, encoding?: 'utf8' | 'binary') {
     // Initialize properties
     this.data = ''
     this.read = 0
@@ -22,24 +22,17 @@ export class ByteStringBuffer {
 
     if (b !== undefined) {
       if (typeof b === 'string') {
-        this.data = b
+        if (encoding === 'utf8') {
+          const encoder = new TextEncoder()
+          const uint8Array = encoder.encode(b)
+          this.data = String.fromCharCode(...uint8Array)
+        } else if (encoding === 'binary') {
+          this.data = b
+        }
       }
       else if (isArrayBuffer(b) || isArrayBufferView(b)) {
-        if (typeof Buffer !== 'undefined' && b instanceof Buffer) {
-          this.data = b.toString('binary')
-        }
-        else {
-          // convert native buffer to forge buffer
-          const arr = new Uint8Array(b as ArrayBuffer)
-          try {
-            this.data = String.fromCharCode(...Array.from(arr))
-          }
-          catch (e) {
-            for (let i = 0; i < arr.length; ++i) {
-              this.putByte(arr[i])
-            }
-          }
-        }
+        const view = new Uint8Array(b instanceof ArrayBuffer ? b : b.buffer)
+        this.data = String.fromCharCode(...view)
       }
       else if (b instanceof ByteStringBuffer) {
         // copy existing buffer
@@ -54,6 +47,7 @@ export class ByteStringBuffer {
         this.read = b.read
       }
     }
+    this._constructedStringLength = this.data.length
   }
 
   /**
