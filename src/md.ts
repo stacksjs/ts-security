@@ -1,7 +1,8 @@
 import { md5 } from './algorithms/hash/md5'
 import { sha1 } from './algorithms/hash/sha1'
 import { sha256 } from './algorithms/hash/sha256'
-import { sha384, sha512 } from './algorithms/hash/sha512'
+import { sha384 } from './algorithms/hash/sha384'
+import { sha512 } from './algorithms/hash/sha512'
 
 export interface MessageDigest {
   sha1: typeof sha1

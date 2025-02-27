@@ -545,25 +545,26 @@ export class ByteStringBuffer {
   }
 }
 
+// Create an alias for ByteStringBuffer for backward compatibility
 export const ByteBuffer: typeof ByteStringBuffer = ByteStringBuffer
 
-// Utility functions
-
 /**
- * Creates a buffer that stores bytes.
+ * Creates a new byte buffer.
  *
- * @param [input] a string with encoded bytes to store in the buffer.
- * @param [encoding] (default: 'raw', other: 'utf8').
+ * @param [input] the input to create the byte buffer from.
+ * @param [encoding] optional encoding ('utf8' or 'binary').
+ *
+ * @return the byte buffer.
  */
 export function createBuffer(input?: string, encoding?: string): ByteStringBuffer {
-  encoding = encoding || 'raw'
-
   if (input !== undefined && encoding === 'utf8') {
     input = encodeUtf8(input)
   }
 
   return new ByteStringBuffer(input)
 }
+
+// Utility functions
 
 /**
  * Checks if the given object is an ArrayBuffer.
