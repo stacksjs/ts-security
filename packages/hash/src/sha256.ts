@@ -3,7 +3,7 @@
  *
  * This implementation follows FIPS 180-2 specification for SHA-256.
  * It provides a secure hash function that produces a 256-bit (32-byte) hash value
- * for any given input data.
+ * for any given input data. Similar to the node-forge implementation.
  *
  * Key features:
  * 1. Implements the standard SHA-256 algorithm as specified in FIPS 180-2

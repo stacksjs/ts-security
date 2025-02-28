@@ -1,5 +1,5 @@
 import { it, describe } from 'bun:test'
-import { sha512 as SHA512, sha384 as SHA384, sha512_256 as SHA256, sha512_224 as SHA224 } from 'ts-sha'
+import { sha512 as SHA512, sha384 as SHA384, sha512_256 as SHA256, sha512_224 as SHA224 } from '../../packages/hash/src'
 
 const ASSERT = require('node:assert')
 

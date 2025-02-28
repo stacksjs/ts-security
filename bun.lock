@@ -21,7 +21,7 @@
       },
     },
     "packages/sha": {
-      "name": "ts-sha",
+      "name": "ts-hash",
       "version": "0.0.0",
       "devDependencies": {
         "@stacksjs/docs": "^0.69.3",
@@ -1587,7 +1587,7 @@
 
     "ts-security-utils": ["ts-security-utils@workspace:packages/utils"],
 
-    "ts-sha": ["ts-sha@workspace:packages/sha"],
+    "ts-hash": ["ts-hash@workspace:packages/sha"],
 
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
