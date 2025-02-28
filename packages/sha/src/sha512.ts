@@ -1,15 +1,15 @@
 /**
  * Secure Hash Algorithm with a 1024-bit block size implementation.
  *
- * This includes: SHA-512, SHA-384, SHA-512/224, and SHA-512/256. For
- * SHA-256 (block size 512 bits), see sha256.ts.
+ * This includes: SHA-512, SHA-384, SHA-512/224, and SHA-512/256.
+ * For SHA-256 (block size 512 bits), see sha256.ts.
  *
- * See FIPS 180-4 for details.
+ * See FIPS 180-4 for more details.
  *
  * @author Chris Breuer
  */
-import type { ByteStringBuffer } from 'ts-security-utils'
-import { createBuffer, fillString } from 'ts-security-utils'
+import { ByteStringBuffer, createBuffer, fillString } from 'ts-security-utils'
+import type { MessageDigest, SHA512Algorithm, SHA512 } from './types'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
 export interface SHA512State {
@@ -23,23 +23,6 @@ export interface SHA512State {
   h7: [number, number]
 }
 
-// Message digest interface
-interface MessageDigest {
-  algorithm: string
-  blockLength: number
-  digestLength: number
-  messageLength: number
-  fullMessageLength: number[]
-  messageLength128?: number[]
-  messageLengthSize: number
-  start: () => MessageDigest
-  update: (msg: string, encoding?: string) => MessageDigest
-  digest: () => ByteStringBuffer
-}
-
-// SHA-512 algorithm type
-export type SHA512Algorithm = 'SHA-512' | 'SHA-384' | 'SHA-512/256' | 'SHA-512/224'
-
 // Internal state
 let _initialized = false
 let _padding: string | null = null
@@ -52,7 +35,7 @@ let _states: Record<SHA512Algorithm, [number, number][]> | null = null
  * @param algorithm - The algorithm to use (SHA-512, SHA-384, SHA-512/224, SHA-512/256)
  * @returns A message digest object
  */
-export function create(algorithm: SHA512Algorithm = 'SHA-512'): MessageDigest {
+export function create(algorithm: SHA512Algorithm = 'sha512'): MessageDigest {
   // Initialize constants if necessary
   if (!_initialized) {
     _init()
@@ -75,13 +58,13 @@ export function create(algorithm: SHA512Algorithm = 'SHA-512'): MessageDigest {
   // Determine digest length by algorithm name (default)
   let digestLength = 64
   switch (algorithm) {
-    case 'SHA-384':
+    case 'sha384':
       digestLength = 48
       break
-    case 'SHA-512/256':
+    case 'sha512/256':
       digestLength = 32
       break
-    case 'SHA-512/224':
+    case 'sha512/224':
       digestLength = 28
       break
   }
@@ -125,17 +108,21 @@ export function create(algorithm: SHA512Algorithm = 'SHA-512'): MessageDigest {
      * @param encoding - The encoding to use (default: 'raw', other: 'utf8').
      * @returns This digest object.
      */
-    update(msg: string, encoding?: string) {
+    update(msg: string | ByteStringBuffer, encoding?: string) {
       if (!msg) {
         return md
       }
 
       // Handle UTF-8 encoding
-      if (encoding === 'utf8')
-        msg = encodeURIComponent(msg)
+      let bytes: string
+      if (msg instanceof ByteStringBuffer) {
+        bytes = msg.bytes()
+      } else {
+        bytes = encoding === 'utf8' ? encodeURIComponent(msg) : msg
+      }
 
       // Update message length
-      const len = msg.length
+      const len = bytes.length
       md.messageLength += len
       const lenArr = [(len / 0x100000000) >>> 0, len >>> 0]
 
@@ -147,7 +134,7 @@ export function create(algorithm: SHA512Algorithm = 'SHA-512'): MessageDigest {
       }
 
       // Add bytes to input buffer
-      _input.putBytes(msg)
+      _input.putBytes(bytes)
 
       // Process bytes
       _update(_h!, _w, _input)
@@ -197,15 +184,15 @@ export function create(algorithm: SHA512Algorithm = 'SHA-512'): MessageDigest {
 
       // Build final hash value
       const rval = createBuffer()
-      const hlen = algorithm === 'SHA-512'
+      const hlen = algorithm === 'sha512'
         ? finalState.length
-        : algorithm === 'SHA-384'
+        : algorithm === 'sha384'
           ? finalState.length - 2
           : finalState.length - 4
 
       for (let i = 0; i < hlen; ++i) {
         rval.putInt32(finalState[i][0])
-        if (i !== hlen - 1 || algorithm !== 'SHA-512/224') {
+        if (i !== hlen - 1 || algorithm !== 'sha512/224') {
           rval.putInt32(finalState[i][1])
         }
       }
@@ -312,7 +299,7 @@ function _init(): void {
 
   // Initial hash states
   _states = {
-    'SHA-512': [
+    'sha512': [
       [0x6A09E667, 0xF3BCC908],
       [0xBB67AE85, 0x84CAA73B],
       [0x3C6EF372, 0xFE94F82B],
@@ -322,7 +309,7 @@ function _init(): void {
       [0x1F83D9AB, 0xFB41BD6B],
       [0x5BE0CD19, 0x137E2179],
     ].map(pair => [pair[0], pair[1]] as [number, number]),
-    'SHA-384': [
+    'sha384': [
       [0xCBBB9D5D, 0xC1059ED8],
       [0x629A292A, 0x367CD507],
       [0x9159015A, 0x3070DD17],
@@ -332,7 +319,7 @@ function _init(): void {
       [0xDB0C2E0D, 0x64F98FA7],
       [0x47B5481D, 0xBEFA4FA4],
     ].map(pair => [pair[0], pair[1]] as [number, number]),
-    'SHA-512/256': [
+    'sha512/256': [
       [0x22312194, 0xFC2BF72C],
       [0x9F555FA3, 0xC84C64C2],
       [0x2393B86B, 0x6F53B151],
@@ -342,7 +329,7 @@ function _init(): void {
       [0x2B0199FC, 0x2C85B8AA],
       [0x0EB72DDC, 0x81C52CA2],
     ].map(pair => [pair[0], pair[1]] as [number, number]),
-    'SHA-512/224': [
+    'sha512/224': [
       [0x8C3D37C8, 0x19544DA2],
       [0x73E19966, 0x89DCD4D6],
       [0x1DFAB7AE, 0x32FF9C82],
@@ -552,29 +539,21 @@ function _update(s: [number, number][], w: [number, number][], bytes: ByteString
   }
 }
 
-// Export the SHA-512 implementation
-interface SHA512API {
-  create: (algorithm?: SHA512Algorithm) => MessageDigest
-  sha384: { create: () => MessageDigest }
-  sha256: { create: () => MessageDigest }
-  sha224: { create: () => MessageDigest }
-}
-
 // Create SHA-384 implementation
-const createSHA384: () => MessageDigest = () => create('SHA-384')
+export const createSHA384: () => MessageDigest = () => create('sha384')
 
 // Create SHA-512/256 implementation
-const createSHA512_256: () => MessageDigest = () => create('SHA-512/256')
+export const createSHA512_256: () => MessageDigest = () => create('sha512/256')
 
 // Create SHA-512/224 implementation
-const createSHA512_224: () => MessageDigest = () => create('SHA-512/224')
+export const createSHA512_224: () => MessageDigest = () => create('sha512/224')
 
 export const sha384: MessageDigest = createSHA384()
 export const sha512_256: MessageDigest = createSHA512_256()
 export const sha512_224: MessageDigest = createSHA512_224()
 
 // Export all implementations
-export const sha512: SHA512API = {
+export const sha512: SHA512 = {
   create,
   sha384: { create: createSHA384 },
   sha256: { create: createSHA512_256 },
@@ -582,7 +561,7 @@ export const sha512: SHA512API = {
 }
 
 // Export for compatibility with forge namespace
-export const algorithms: Record<string, { create: () => MessageDigest }> = {
+export const algorithms: Record<SHA512Algorithm, { create: () => MessageDigest }> = {
   'sha512': { create },
   'sha384': { create: createSHA384 },
   'sha512/256': { create: createSHA512_256 },
