@@ -1,5 +1,6 @@
 {
   "name": "ts-security",
+  "private": true,
   "type": "module",
   "workspaces": [
     "packages/*"

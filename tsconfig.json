@@ -7,6 +7,12 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
+    "paths": {
+      "ts-security": ["./packages/ts-security/src"],
+      "ts-security-utils": ["./packages/utils/src"],
+      "ts-base-x": ["./packages/base-x/src"],
+      "ts-sha": ["./packages/sha/src"]
+    },
     "strict": true,
     "strictNullChecks": true,
     "noFallthroughCasesInSwitch": true,
