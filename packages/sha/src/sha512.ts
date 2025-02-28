@@ -6,11 +6,10 @@
  *
  * See FIPS 180-4 for details.
  *
- * @author Dave Longley
  * @author Chris Breuer
  */
-import type { ByteStringBuffer } from '../../utils'
-import { createBuffer, fillString } from '../../utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer, fillString } from 'ts-security-utils'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
 export interface SHA512State {

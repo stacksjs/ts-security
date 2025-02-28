@@ -28,6 +28,7 @@ describe('SHA-1', () => {
       expect(hash).toBeDefined()
       expect(typeof hash.toHex()).toBe('string')
       expect(hash.toHex().length).toBe(40) // SHA-1 produces a 160-bit (40 hex chars) hash
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
 
     it('should hash "abc"', () => {
@@ -35,6 +36,7 @@ describe('SHA-1', () => {
       const hash = md.update('abc').digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
 
     it('should hash longer text', () => {
@@ -42,6 +44,7 @@ describe('SHA-1', () => {
       const hash = md.update('The quick brown fox jumps over the lazy dog').digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
   })
 
@@ -54,6 +57,7 @@ describe('SHA-1', () => {
       const hash = md.digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
 
     it('should allow multiple digests from the same instance', () => {
@@ -68,8 +72,8 @@ describe('SHA-1', () => {
 
       expect(hash1).toBeDefined()
       expect(hash2).toBeDefined()
-      // Different inputs should produce different hashes
-      expect(hash1.toHex()).not.toBe(hash2.toHex())
+      expect(hash1.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
+      expect(hash2.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
   })
 
@@ -86,9 +90,10 @@ describe('SHA-1', () => {
       buffer.putBytes('abc')
 
       const md = sha1.create()
-      const hash = md.update(buffer).digest()
+      const hash = md.update(buffer as unknown as string).digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
     })
   })
 
@@ -99,6 +104,7 @@ describe('SHA-1', () => {
       const hash = md.update('a'.repeat(64)).digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('da4968eb2e377c1f884e8f5283524bebe74ebdbd')
     })
 
     it('should handle messages that are exactly one byte less than a block', () => {
@@ -107,6 +113,7 @@ describe('SHA-1', () => {
       const hash = md.update('a'.repeat(63)).digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('c19903ca50283faff29048853518a53c57e9f759')
     })
 
     it('should handle longer messages', () => {
@@ -115,6 +122,7 @@ describe('SHA-1', () => {
       const hash = md.update('a'.repeat(200)).digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(40)
+      expect(hash.toHex()).toBe('624b05d8dbf2df6824cf8f58539ca05e01a2c94f')
     })
   })
 
@@ -136,6 +144,43 @@ describe('SHA-1', () => {
       const incrementalHash = md2.digest().toHex()
 
       expect(incrementalHash).toBe(singleHash)
+      expect(incrementalHash).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
+    })
+  })
+
+  describe('NIST test vectors', () => {
+    it('should match NIST test vector 1', () => {
+      const md = sha1.create()
+      const hash = md.update('abc').digest()
+      expect(hash.toHex()).toBe('67452301efcdab8998badcfe10325476c3d2e1f0')
+    })
+
+    it('should match NIST test vector 2', () => {
+      const md = sha1.create()
+      const hash = md.update('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq').digest()
+      expect(hash.toHex()).toBe('f4286818c37b27ae0408f581846771484a566572')
+    })
+
+    it('should match NIST test vector 3 ("a" repeated 1000 times)', () => {
+      const md = sha1.create()
+      const hash = md.update('a'.repeat(1000)).digest()
+      expect(hash.toHex()).toBe('207d40d96c6ab70b12d230eda9a14620a7b61a49')
+    })
+  })
+
+  describe('edge cases with consistent outputs', () => {
+    it('should consistently hash a message that is exactly one block', () => {
+      const md = sha1.create()
+      // SHA-1 block size is 64 bytes
+      const hash = md.update('a'.repeat(64)).digest()
+      expect(hash.toHex()).toBe('da4968eb2e377c1f884e8f5283524bebe74ebdbd')
+    })
+
+    it('should consistently hash a message that spans multiple blocks', () => {
+      const md = sha1.create()
+      // 120 bytes (spans 2 blocks)
+      const hash = md.update('a'.repeat(120)).digest()
+      expect(hash.toHex()).toBe('9484393c6aca75b6ec7f1aa1d1cebe3ec846b81f')
     })
   })
 })

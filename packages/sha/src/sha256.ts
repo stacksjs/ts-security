@@ -15,8 +15,7 @@
  * @author Chris Breuer
  */
 
-import type { ByteStringBuffer } from 'ts-security-utils'
-import { createBuffer, fillString } from 'ts-security-utils'
+import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
 
 // SHA-256 state interface
 interface SHA256State {
@@ -40,7 +39,7 @@ interface MessageDigest {
   messageLength64?: number[]
   messageLengthSize: number
   start: () => MessageDigest
-  update: (msg: string, encoding?: string) => MessageDigest
+  update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
   digest: () => ByteStringBuffer
 }
 
@@ -54,7 +53,7 @@ let _k: number[] | null = null
  *
  * @returns a message digest object.
  */
-export function create(): MessageDigest {
+export function createSHA256(): MessageDigest {
   // Initialize constants if necessary
   if (!_initialized) {
     _init()
@@ -67,7 +66,7 @@ export function create(): MessageDigest {
   let _input = createBuffer()
 
   // Used for word storage
-  const _w = Array.from({ length: 64 }) as number[]
+  const _w = new Array(64).fill(0)
 
   // Message digest object
   const md: MessageDigest = {
@@ -117,20 +116,20 @@ export function create(): MessageDigest {
      * @param encoding - The encoding to use (default: 'raw', other: 'utf8').
      * @returns this digest object.
      */
-    update(msg: string, encoding?: string) {
+    update(msg: string | ByteStringBuffer, encoding?: string) {
       if (!msg) {
         return md
       }
 
       // Handle UTF-8 encoding
       if (encoding === 'utf8') {
-        msg = encodeURIComponent(msg)
+        msg = encodeUtf8(msg as string)
       }
 
       // Update message length
-      const len = msg.length
+      const len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
       md.messageLength += len
-      const lenArr = [(len / 0x100000000) >>> 0, len >>> 0]
+      const lenArr = [Math.floor(len / 0x100000000), len >>> 0]
 
       for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
         md.fullMessageLength[i] += lenArr[1]
@@ -140,7 +139,7 @@ export function create(): MessageDigest {
       }
 
       // Add bytes to input buffer
-      _input.putBytes(msg)
+      _input.putBytes(msg instanceof ByteStringBuffer ? msg.bytes() : msg)
 
       // Process bytes
       _update(_state!, _w, _input)
@@ -226,70 +225,22 @@ function _init(): void {
 
   // Create K table for SHA-256
   _k = [
-    0x428A2F98,
-    0x71374491,
-    0xB5C0FBCF,
-    0xE9B5DBA5,
-    0x3956C25B,
-    0x59F111F1,
-    0x923F82A4,
-    0xAB1C5ED5,
-    0xD807AA98,
-    0x12835B01,
-    0x243185BE,
-    0x550C7DC3,
-    0x72BE5D74,
-    0x80DEB1FE,
-    0x9BDC06A7,
-    0xC19BF174,
-    0xE49B69C1,
-    0xEFBE4786,
-    0x0FC19DC6,
-    0x240CA1CC,
-    0x2DE92C6F,
-    0x4A7484AA,
-    0x5CB0A9DC,
-    0x76F988DA,
-    0x983E5152,
-    0xA831C66D,
-    0xB00327C8,
-    0xBF597FC7,
-    0xC6E00BF3,
-    0xD5A79147,
-    0x06CA6351,
-    0x14292967,
-    0x27B70A85,
-    0x2E1B2138,
-    0x4D2C6DFC,
-    0x53380D13,
-    0x650A7354,
-    0x766A0ABB,
-    0x81C2C92E,
-    0x92722C85,
-    0xA2BFE8A1,
-    0xA81A664B,
-    0xC24B8B70,
-    0xC76C51A3,
-    0xD192E819,
-    0xD6990624,
-    0xF40E3585,
-    0x106AA070,
-    0x19A4C116,
-    0x1E376C08,
-    0x2748774C,
-    0x34B0BCB5,
-    0x391C0CB3,
-    0x4ED8AA4A,
-    0x5B9CCA4F,
-    0x682E6FF3,
-    0x748F82EE,
-    0x78A5636F,
-    0x84C87814,
-    0x8CC70208,
-    0x90BEFFFA,
-    0xA4506CEB,
-    0xBEF9A3F7,
-    0xC67178F2,
+    0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5,
+    0x3956C25B, 0x59F111F1, 0x923F82A4, 0xAB1C5ED5,
+    0xD807AA98, 0x12835B01, 0x243185BE, 0x550C7DC3,
+    0x72BE5D74, 0x80DEB1FE, 0x9BDC06A7, 0xC19BF174,
+    0xE49B69C1, 0xEFBE4786, 0x0FC19DC6, 0x240CA1CC,
+    0x2DE92C6F, 0x4A7484AA, 0x5CB0A9DC, 0x76F988DA,
+    0x983E5152, 0xA831C66D, 0xB00327C8, 0xBF597FC7,
+    0xC6E00BF3, 0xD5A79147, 0x06CA6351, 0x14292967,
+    0x27B70A85, 0x2E1B2138, 0x4D2C6DFC, 0x53380D13,
+    0x650A7354, 0x766A0ABB, 0x81C2C92E, 0x92722C85,
+    0xA2BFE8A1, 0xA81A664B, 0xC24B8B70, 0xC76C51A3,
+    0xD192E819, 0xD6990624, 0xF40E3585, 0x106AA070,
+    0x19A4C116, 0x1E376C08, 0x2748774C, 0x34B0BCB5,
+    0x391C0CB3, 0x4ED8AA4A, 0x5B9CCA4F, 0x682E6FF3,
+    0x748F82EE, 0x78A5636F, 0x84C87814, 0x8CC70208,
+    0x90BEFFFA, 0xA4506CEB, 0xBEF9A3F7, 0xC67178F2,
   ]
 
   _initialized = true
@@ -302,12 +253,24 @@ function _init(): void {
  * @param w - The array to use to store words.
  * @param bytes - The byte buffer to update with.
  */
-export function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
+function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
   // Consume 512 bit (64 byte) chunks
+  let t1: number, t2: number, s0: number, s1: number, ch: number, maj: number
+  let a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number
   let len = bytes.length()
 
   while (len >= 64) {
-    // Populate sixteen 32-bit big-endian words
+    // Initialize hash value for this chunk
+    a = s.h0
+    b = s.h1
+    c = s.h2
+    d = s.h3
+    e = s.h4
+    f = s.h5
+    g = s.h6
+    h = s.h7
+
+    // The w array will be populated with sixteen 32-bit big-endian words
     for (let i = 0; i < 16; ++i) {
       w[i] = bytes.getInt32()
     }
@@ -315,52 +278,42 @@ export function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): v
     // Extend into 64 32-bit words
     for (let i = 16; i < 64; ++i) {
       // XOR word 2 words ago rot right 17, rot right 19, shft right 10
-      const t1 = w[i - 2]
-      const s1 = ((t1 >>> 17) | (t1 << 15))
-        ^ ((t1 >>> 19) | (t1 << 13))
-        ^ (t1 >>> 10)
+      t1 = w[i - 2]
+      s1 = ((t1 >>> 17) | (t1 << 15)) ^
+           ((t1 >>> 19) | (t1 << 13)) ^
+           (t1 >>> 10)
 
-      // XOR word 15 words ago rot right 7, rot right 18, shift right 3
-      const t2 = w[i - 15]
-      const s0 = ((t2 >>> 7) | (t2 << 25))
-        ^ ((t2 >>> 18) | (t2 << 14))
-        ^ (t2 >>> 3)
+      // XOR word 15 words ago rot right 7, rot right 18, shft right 3
+      t2 = w[i - 15]
+      s0 = ((t2 >>> 7) | (t2 << 25)) ^
+           ((t2 >>> 18) | (t2 << 14)) ^
+           (t2 >>> 3)
 
       // Sum(t1, word 7 ago, t2, word 16 ago) modulo 2^32
       w[i] = (s1 + w[i - 7] + s0 + w[i - 16]) | 0
     }
 
-    // Initialize working variables
-    let a = s.h0
-    let b = s.h1
-    let c = s.h2
-    let d = s.h3
-    let e = s.h4
-    let f = s.h5
-    let g = s.h6
-    let h = s.h7
-
-    // Compression function main loop
+    // Round function
     for (let i = 0; i < 64; ++i) {
       // Sum1(e)
-      const s1 = ((e >>> 6) | (e << 26))
-        ^ ((e >>> 11) | (e << 21))
-        ^ ((e >>> 25) | (e << 7))
+      s1 = ((e >>> 6) | (e << 26)) ^
+           ((e >>> 11) | (e << 21)) ^
+           ((e >>> 25) | (e << 7))
 
-      // Ch(e, f, g)
-      const ch = g ^ (e & (f ^ g))
+      // Ch(e, f, g) (optimized)
+      ch = g ^ (e & (f ^ g))
 
       // Sum0(a)
-      const s0 = ((a >>> 2) | (a << 30))
-        ^ ((a >>> 13) | (a << 19))
-        ^ ((a >>> 22) | (a << 10))
+      s0 = ((a >>> 2) | (a << 30)) ^
+           ((a >>> 13) | (a << 19)) ^
+           ((a >>> 22) | (a << 10))
 
-      // Maj(a, b, c)
-      const maj = (a & b) | (c & (a ^ b))
+      // Maj(a, b, c) (optimized)
+      maj = (a & b) | (c & (a ^ b))
 
       // Main algorithm
-      const t1 = h + s1 + ch + _k![i] + w[i]
-      const t2 = s0 + maj
+      t1 = h + s1 + ch + _k![i] + w[i]
+      t2 = s0 + maj
 
       h = g
       g = f
@@ -386,9 +339,18 @@ export function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): v
   }
 }
 
-// Export the SHA-256 implementation
-interface SHA256API {
+/**
+ * SHA-256 module interface.
+ */
+interface SHA256Module {
   create: () => MessageDigest
 }
 
-export const sha256: SHA256API = { create }
+/**
+ * SHA-256 module object.
+ */
+export const sha256: SHA256Module = {
+  create: createSHA256,
+}
+
+export default sha256

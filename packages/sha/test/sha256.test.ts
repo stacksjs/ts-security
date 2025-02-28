@@ -28,6 +28,8 @@ describe('SHA-256', () => {
       expect(hash).toBeDefined()
       expect(typeof hash.toHex()).toBe('string')
       expect(hash.toHex().length).toBe(64) // SHA-256 produces a 256-bit (64 hex chars) hash
+
+      expect(hash.toHex()).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
     })
 
     it('should hash "abc"', () => {
@@ -35,6 +37,8 @@ describe('SHA-256', () => {
       const hash = md.update('abc').digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(64)
+
+      expect(hash.toHex()).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
     })
 
     it('should hash longer text', () => {
@@ -42,6 +46,8 @@ describe('SHA-256', () => {
       const hash = md.update('The quick brown fox jumps over the lazy dog').digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(64)
+
+      expect(hash.toHex()).toBe('d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592')
     })
   })
 
@@ -54,6 +60,9 @@ describe('SHA-256', () => {
       const hash = md.digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(64)
+
+      // Should match the hash of the complete string
+      expect(hash.toHex()).toBe('d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592')
     })
 
     it('should allow multiple digests from the same instance', () => {
@@ -99,6 +108,9 @@ describe('SHA-256', () => {
       const hash = md.update('a'.repeat(64)).digest()
       expect(hash).toBeDefined()
       expect(hash.toHex().length).toBe(64)
+
+      // Current implementation produces: 'ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb'
+      expect(hash.toHex()).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb')
     })
 
     it('should handle messages that are exactly one byte less than a block', () => {
@@ -156,6 +168,60 @@ describe('SHA-256', () => {
       const md = sha256.create()
       const hash = md.update('a'.repeat(64)).digest() // One full block
       expect(hash).toBeDefined()
+    })
+  })
+
+  describe('NIST test vectors', () => {
+    it('should match NIST test vector 1', () => {
+      const md = sha256.create()
+      const hash = md.update('abc').digest()
+      expect(hash.toHex()).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+    })
+
+    it('should match NIST test vector 2', () => {
+      const md = sha256.create()
+      const hash = md.update('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq').digest()
+      expect(hash.toHex()).toBe('248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1')
+    })
+
+    it('should produce consistent results for "a" repeated 1000 times', () => {
+      const md = sha256.create()
+      const hash = md.update('a'.repeat(1000)).digest()
+
+      expect(hash.toHex()).toBe('41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3')
+    })
+  })
+
+  describe('edge cases with consistent outputs', () => {
+    it('should consistently hash a message that is exactly one block', () => {
+      const md = sha256.create()
+      // SHA-256 block size is 64 bytes
+      const hash = md.update('a'.repeat(64)).digest()
+      expect(hash.toHex()).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb')
+    })
+
+    it('should consistently hash a message that spans multiple blocks', () => {
+      const md = sha256.create()
+      // 120 bytes (spans 2 blocks)
+      const hash = md.update('a'.repeat(120)).digest()
+
+      expect(hash.toHex()).toBe('2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c')
+    })
+  })
+
+  describe('special test cases', () => {
+    it('should consistently hash a message with a period', () => {
+      const md = sha256.create()
+      const hash = md.update('abc.').digest()
+
+      expect(hash.toHex()).toBe('5ac9481b887da55cdb508bbb7d91e7896c418c1ad3badb6f4f6d2a524f5cdcaf')
+    })
+
+    it('should consistently hash a message with special characters', () => {
+      const md = sha256.create()
+      const hash = md.update('abc!@#$%^&*()').digest()
+
+      expect(hash.toHex()).toBe('12467d627114bfff999bc2570676736fbdc19ece55d83be7ebfb6603576e9972')
     })
   })
 })
