@@ -1,8 +1,8 @@
 {
-  "name": "ts-base-x",
+  "name": "ts-sha",
   "type": "module",
   "version": "0.0.0",
-  "description": "A base-x encoding and decoding library.",
+  "description": "A SHA-1, SHA-256, SHA-384, SHA-512 hashing library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
   "homepage": "https://github.com/stacksjs/ts-security#readme",
@@ -14,19 +14,14 @@
     "url": "https://github.com/stacksjs/ts-security/issues"
   },
   "keywords": [
-    "base-x",
-    "base",
-    "x",
-    "encoding",
-    "decoding",
+    "sha",
+    "sha1",
+    "sha256",
+    "sha384",
+    "sha512",
+    "hashing",
     "crypto",
     "cryptography",
-    "base64",
-    "base58",
-    "base32",
-    "base16",
-    "base10",
-    "base8",
     "bun",
     "stacks",
     "node-forge",
@@ -54,6 +49,7 @@
     "typecheck": "bun --bun tsc --noEmit"
   },
   "devDependencies": {
+    "@stacksjs/docs": "^0.69.3",
     "@types/bun": "^1.2.3",
     "bun-plugin-dtsx": "^0.21.9",
     "typescript": "^5.7.3"

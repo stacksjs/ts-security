@@ -2,7 +2,7 @@
 // Copyright (c) 2018 base-x contributors
 // Copyright (c) 2014-2018 The Bitcoin Core developers (base58.cpp)
 // Distributed under the MIT software license, see the accompanying
-// file LICENSE or http://www.opensource.org/licenses/mit-license.php.
+// @see http://www.opensource.org/licenses/mit-license.php
 
 // Common alphabets and their bases
 export const ALPHABETS = {
@@ -86,6 +86,12 @@ export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
   const FACTOR = Math.log(BASE) / Math.log(256) // log(BASE) / log(256), rounded up
   const iFACTOR = Math.log(256) / Math.log(BASE) // log(256) / log(BASE), rounded up
 
+  /**
+   * Encodes a Uint8Array or string into a base-x encoded string.
+   *
+   * @param source - The input to encode.
+   * @returns The base-x encoded string.
+   */
   function encode(source: Uint8Array | string): string {
     // eslint-disable-next-line no-empty
     if (source instanceof Uint8Array) { }
@@ -146,6 +152,12 @@ export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
     return str
   }
 
+  /**
+   * Decodes a base-x encoded string into a Uint8Array.
+   *
+   * @param source - The base-x encoded string to decode.
+   * @returns The decoded Uint8Array.
+   */
   function decode(source: string): Uint8Array {
     if (typeof source !== 'string')
       throw new TypeError('Expected String')
