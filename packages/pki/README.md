@@ -6,168 +6,106 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-pki
+# ts-pem
 
-> A TypeScript implementation of the SHA family of cryptographic hash functions with a focus on type safety, security, and performance.
+> A TypeScript implementation of PEM (Privacy Enhanced Mail) encoding and decoding with a focus on type safety and standards compliance.
 
 ## Features
 
-- 🔒 **Comprehensive SHA Implementation**
-  - SHA-1 _(legacy, not recommended for security-critical applications)_
-  - SHA-256 _(part of the SHA-2 family)_
-  - SHA-512 with variants _(SHA-384, SHA-512/256, SHA-512/224)_
-
-- 🛡️ **Secure Implementation**
-  - Follows NIST standards and specifications
-  - Passes standard test vectors
-  - Handles edge cases properly
-
-- 🎯 **Type Safety**
-  - Full TypeScript support
-  - Comprehensive type definitions
-  - Strict type checking
-
-- 🧰 **Flexible API**
-  - Incremental hashing support
-  - Multiple digest formats
-  - UTF-8 encoding support
-  - ByteStringBuffer input support
+- 🔒 **RFC 1421 Compliant** _Implements PEM encoding & decoding according to standard_
+- 📦 **Versatile Handling** _Support for multiple PEM messages in a single string_
+- 🔄 **Header Processing** _Proper handling of PEM headers including Proc-Type, Content-Domain, and DEK-Info_
+- 🧩 **CSR Support** _Special handling for Certificate Signing Requests with NEW prefix_
+- 🔧 **Customizable Output** _Control over line length in encoded PEM output_
+- 🛡️ **Type Safety** _Full TypeScript support with comprehensive type definitions_
+- 🪶 **Lightweight** _No dependencies other than_
 
 ## Install
 
 ```bash
 # bun
-bun install ts-pki
+bun install ts-pem
 
 # npm
-npm install ts-pki
+npm install ts-pem
 
 # pnpm
-pnpm install ts-pki
+pnpm install ts-pem
 ```
 
 ## Get Started
 
-After installing the package, you can import and use the various hash functions:
+After installing the package, you can import and use the PEM encoding and decoding functions:
 
 ```ts
-import { sha1, sha256, sha512, sha384, sha512_256, sha512_224 } from 'ts-pki'
+import { encode, decode } from 'ts-pem'
 
-// SHA-1 Hashing (legacy, not recommended for security-critical applications)
-const md1 = sha1.create()
-md1.update('Hello, World!')
-const hash1 = md1.digest().toHex()
+// Decode a PEM-formatted string
+const pemString = `-----BEGIN CERTIFICATE-----
+MIIBPAIBAAJBALjXU+IdHkSkdBscgXf+EBoa55ruAIsU50uDFjFBkp+rWFt5AOGF
+9xL1/HNIby5M64BCw021nJTZKEOmXKdmzYsCAwEAAQ==
+-----END CERTIFICATE-----`
 
-// SHA-256 Hashing
-const md2 = sha256.create()
-md2.update('Hello, World!')
-const hash2 = md2.digest().toHex()
+const messages = decode(pemString)
+console.log(messages[0].type) // 'CERTIFICATE'
 
-// SHA-512 Hashing
-const md3 = sha512.create()
-md3.update('Hello, World!')
-const hash3 = md3.digest().toHex()
+// Create and encode a PEM message
+const newMessage = {
+  type: 'RSA PRIVATE KEY',
+  procType: null,
+  contentDomain: null,
+  dekInfo: null,
+  headers: [],
+  body: new TextEncoder().encode('your-binary-data-here')
+}
 
-// SHA-384 Hashing
-const md4 = sha384
-md4.update('Hello, World!')
-const hash4 = md4.digest().toHex()
-
-// SHA-512/256 Hashing
-const md5 = sha512_256
-md5.update('Hello, World!')
-const hash5 = md5.digest().toHex()
-
-// SHA-512/224 Hashing
-const md6 = sha512_224
-md6.update('Hello, World!')
-const hash6 = md6.digest().toHex()
-
-// Incremental hashing
-const md = sha256.create()
-md.update('Part 1 of the message')
-md.update('Part 2 of the message')
-md.update('Part 3 of the message')
-const hash = md.digest().toHex()
+const encodedPem = encode(newMessage)
+console.log(encodedPem)
+// -----BEGIN RSA PRIVATE KEY-----
+// eW91ci1iaW5hcnktZGF0YS1oZXJl
+// -----END RSA PRIVATE KEY-----
 ```
 
 ## API Reference
 
-### Common Interface
-
-All hash functions implement the `MessageDigest` interface:
+### Decode
 
 ```ts
-interface MessageDigest {
-  algorithm: string;        // The name of the algorithm (e.g., 'sha256')
-  blockLength: number;      // The block size in bytes
-  digestLength: number;     // The digest size in bytes
-  messageLength: number;    // The current message length
+function decode(str: string): PEMMessage[]
+```
 
-  // Resets the hash state
-  start(): MessageDigest;
+Decodes a PEM-formatted string into an array of PEM message objects.
 
-  // Updates the hash with new data
-  update(msg: string | ByteStringBuffer, encoding?: string): MessageDigest;
+- **Parameters**:
+  - `str`: The PEM-formatted string to decode
+- **Returns**: An array of `PEMMessage` objects
 
-  // Finalizes the hash computation and returns the digest
-  digest(): ByteStringBuffer;
+### Encode
+
+```ts
+function encode(msg: PEMMessage, options?: PEMEncodeOptions): string
+```
+
+Encodes a PEM message object into a PEM-formatted string.
+
+- **Parameters**:
+  - `msg`: The PEM message object to encode
+  - `options`: Optional encoding options
+    - `maxline`: Maximum characters per line for the body (default: 64)
+- **Returns**: A PEM-formatted string
+
+### PEMMessage Interface
+
+```ts
+interface PEMMessage {
+  type: string;              // The type of message (e.g., "RSA PRIVATE KEY")
+  procType: ProcType | null; // Processing type information
+  contentDomain: string | null; // Content domain (typically "RFC822")
+  dekInfo: DEKInfo | null;   // Data Encryption Key information
+  headers: PEMHeader[];      // Additional headers
+  body: Uint8Array;          // The binary-encoded body
 }
 ```
-
-### SHA-1
-
-```ts
-const md = sha1.create();
-```
-
-- Block size: 64 bytes
-- Digest size: 20 bytes (160 bits)
-
-### SHA-256
-
-```ts
-const md = sha256.create();
-```
-
-- Block size: 64 bytes
-- Digest size: 32 bytes (256 bits)
-
-### SHA-512
-
-```ts
-const md = sha512.create();
-```
-
-- Block size: 128 bytes
-- Digest size: 64 bytes (512 bits)
-
-### SHA-384
-
-```ts
-const md = sha384;
-```
-
-- Block size: 128 bytes
-- Digest size: 48 bytes (384 bits)
-
-### SHA-512/256
-
-```ts
-const md = sha512_256;
-```
-
-- Block size: 128 bytes
-- Digest size: 32 bytes (256 bits)
-
-### SHA-512/224
-
-```ts
-const md = sha512_224;
-```
-
-- Block size: 128 bytes
-- Digest size: 28 bytes (224 bits)
 
 ## Testing
 
@@ -177,7 +115,7 @@ bun test
 
 ## Changelog
 
-Please see our [releases](https://github.com/stacksjs/ts-pki/releases) page for more information on what has changed recently.
+Please see our [releases](https://github.com/stacksjs/ts-pem/releases) page for more information on what has changed recently.
 
 ## Contributing
 
@@ -195,7 +133,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-pki` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-pem` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -220,10 +158,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-pki?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-pki
-[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-pki/ci.yml?style=flat-square&branch=main
-[github-actions-href]: https://github.com/stacksjs/ts-pki/actions?query=workflow%3Aci
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-pem?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-pem
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-pem/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/ts-pem/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-pki/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-pki -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-pem/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-pem -->

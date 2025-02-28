@@ -1,5 +1,5 @@
 import { decode64, encode64 } from 'ts-security-utils'
-import type { PEMMessage, PEMHeader, ProcType, DEKInfo, PEMEncodeOptions } from './types'
+import type { PEMMessage, PEMHeader, PEMEncodeOptions } from './types'
 
 /**
  * TypeScript implementation of basic PEM (Privacy Enhanced Mail) algorithms.

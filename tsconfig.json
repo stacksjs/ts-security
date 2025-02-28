@@ -11,7 +11,9 @@
       "ts-security": ["./packages/ts-security/src"],
       "ts-security-utils": ["./packages/utils/src"],
       "ts-base-x": ["./packages/base-x/src"],
-      "ts-hash": ["packages/hash/src"]
+      "ts-hash": ["./packages/hash/src"],
+      "ts-pem": ["./packages/pem/src"],
+      "ts-pki": ["./packages/pki/src"]
     },
     "strict": true,
     "strictNullChecks": true,
