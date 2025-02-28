@@ -16,32 +16,7 @@
  */
 
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
-
-// SHA-256 state interface
-interface SHA256State {
-  h0: number
-  h1: number
-  h2: number
-  h3: number
-  h4: number
-  h5: number
-  h6: number
-  h7: number
-}
-
-// Message digest interface
-interface MessageDigest {
-  algorithm: string
-  blockLength: number
-  digestLength: number
-  messageLength: number
-  fullMessageLength: number[]
-  messageLength64?: number[]
-  messageLengthSize: number
-  start: () => MessageDigest
-  update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
-  digest: () => ByteStringBuffer
-}
+import type { MessageDigest, SHA256, SHA256State } from './types'
 
 // Internal state
 let _initialized = false
@@ -340,16 +315,9 @@ function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
 }
 
 /**
- * SHA-256 module interface.
- */
-interface SHA256Module {
-  create: () => MessageDigest
-}
-
-/**
  * SHA-256 module object.
  */
-export const sha256: SHA256Module = {
+export const sha256: SHA256 = {
   create: createSHA256,
 }
 

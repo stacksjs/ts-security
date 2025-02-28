@@ -6,26 +6,13 @@
  * @author Chris Breuer
  */
 import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
-
-export interface MessageDigest {
-  algorithm: string
-  blockLength: number
-  digestLength: number
-  messageLength: number
-  fullMessageLength: number[]
-  messageLengthSize: number
-  messageLength64?: number[]
-  start: () => MessageDigest
-  update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
-  digest: () => ByteStringBuffer
-}
-
+import type { MessageDigest } from './types'
 /**
  * Creates a SHA-1 message digest object.
  *
  * @return a message digest object.
  */
-export function create(): MessageDigest {
+export function createSHA1(): MessageDigest {
   // do initialization as necessary
   if (!_initialized) {
     _init()
@@ -153,34 +140,20 @@ export function create(): MessageDigest {
       finalBlock.putBytes(_padding.substr(0, padLength))
 
       // serialize message length in bits in big-endian order
-      let bits = md.fullMessageLength[0] * 8
-      const finalState = {
-        h0: _state!.h0,
-        h1: _state!.h1,
-        h2: _state!.h2,
-        h3: _state!.h3,
-        h4: _state!.h4,
-      }
-
-      for (let i = 0; i < md.fullMessageLength.length - 1; ++i) {
-        const next = md.fullMessageLength[i + 1] * 8
-        const carry = (next / 0x100000000) >>> 0
-        bits += carry
-        finalBlock.putInt32(bits >>> 0)
-        bits = next >>> 0
-      }
-      finalBlock.putInt32(bits)
+      const messageLengthBits = md.messageLength * 8
+      finalBlock.putInt32((messageLengthBits / 0x100000000) >>> 0)
+      finalBlock.putInt32(messageLengthBits >>> 0)
 
       // update state one last time
-      _update(finalState, _w, finalBlock)
+      _update(_state!, _w, finalBlock)
 
       // build final hash value
       const rval = createBuffer()
-      rval.putInt32(finalState.h0)
-      rval.putInt32(finalState.h1)
-      rval.putInt32(finalState.h2)
-      rval.putInt32(finalState.h3)
-      rval.putInt32(finalState.h4)
+      rval.putInt32(_state!.h0)
+      rval.putInt32(_state!.h1)
+      rval.putInt32(_state!.h2)
+      rval.putInt32(_state!.h3)
+      rval.putInt32(_state!.h4)
 
       // reset state for next use
       _input = createBuffer()
@@ -270,6 +243,7 @@ function _update(s: {
         t = 0xCA62C1D6
       }
 
+      // Update working variables
       t = (((a << 5) | (a >>> 27)) + f + e + t + w[i]) >>> 0
       e = d
       d = c
@@ -278,7 +252,7 @@ function _update(s: {
       a = t
     }
 
-    // update state
+    // Update state
     s.h0 = (s.h0 + a) >>> 0
     s.h1 = (s.h1 + b) >>> 0
     s.h2 = (s.h2 + c) >>> 0
@@ -289,8 +263,8 @@ function _update(s: {
   }
 }
 
-export const sha1: { create: typeof create } = {
-  create,
+export const sha1: { create: typeof createSHA1 } = {
+  create: createSHA1,
 }
 
 export default sha1
