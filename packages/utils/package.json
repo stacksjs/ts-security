@@ -1,8 +1,8 @@
 {
-  "name": "ts-base-x",
+  "name": "ts-security-utils",
   "type": "module",
   "version": "0.0.0",
-  "description": "A base-x encoding and decoding library.",
+  "description": "A collection of utility functions for the ts-security package.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
   "homepage": "https://github.com/stacksjs/ts-security#readme",
@@ -14,22 +14,15 @@
     "url": "https://github.com/stacksjs/ts-security/issues"
   },
   "keywords": [
-    "base-x",
-    "base",
-    "x",
-    "encoding",
-    "decoding",
+    "utils",
+    "utility",
+    "functions",
+    "helpers",
+    "security",
     "crypto",
     "cryptography",
-    "base64",
-    "base58",
-    "base32",
-    "base16",
-    "base10",
-    "base8",
     "bun",
     "stacks",
-    "node-forge",
     "typescript",
     "javascript"
   ],
@@ -52,6 +45,11 @@
     "release": "bun run changelog && bunx bumpp package.json --all",
     "test": "bun test",
     "typecheck": "bun --bun tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.3",
+    "bun-plugin-dtsx": "^0.21.9",
+    "typescript": "^5.7.3"
   },
   "overrides": {
     "unconfig": "0.3.10"

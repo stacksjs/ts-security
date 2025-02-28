@@ -1,8 +1,8 @@
 // base-x encoding / decoding
 // Copyright (c) 2018 base-x contributors
 // Copyright (c) 2014-2018 The Bitcoin Core developers (base58.cpp)
-// Distributed under the MIT software license, see the accompanying
-// @see http://www.opensource.org/licenses/mit-license.php
+// Distributed under the MIT software license, see the accompanying:
+// http://www.opensource.org/licenses/mit-license.php
 
 // Common alphabets and their bases
 export const ALPHABETS = {

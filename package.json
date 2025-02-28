@@ -1,6 +1,9 @@
 {
   "name": "ts-security",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "version": "0.0.0",
   "description": "A TLS/HTTPS library with automation.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

@@ -48,11 +48,8 @@
     "test": "bun test",
     "typecheck": "bun --bun tsc --noEmit"
   },
-  "devDependencies": {
-    "@stacksjs/docs": "^0.69.3",
-    "@types/bun": "^1.2.3",
-    "bun-plugin-dtsx": "^0.21.9",
-    "typescript": "^5.7.3"
+  "dependencies": {
+    "ts-security-utils": "workspace:*"
   },
   "overrides": {
     "unconfig": "0.3.10"
