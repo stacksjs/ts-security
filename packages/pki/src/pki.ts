@@ -1,3 +1,5 @@
+import { decode, encode } from 'ts-pem'
+
 /**
  * Converts an RSA private key from PEM format.
  *
@@ -6,7 +8,7 @@
  * @return the private key.
  */
 export function privateKeyFromPem(pem: string) {
-  var msg = forge.pem.decode(pem)[0];
+  var msg = decode(pem)[0];
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
     var error = new Error('Could not convert private key from PEM; PEM ' +
@@ -38,7 +40,7 @@ export function privateKeyToPem(key: any, maxline: number) {
     type: 'RSA PRIVATE KEY',
     body: asn1.toDer(pki.privateKeyToAsn1(key)).getBytes()
   };
-  return forge.pem.encode(msg, { maxline: maxline });
+  return pem.encode(msg, { maxline: maxline });
 };
 
 /**
@@ -55,5 +57,6 @@ export function privateKeyInfoToPem(pki: any, maxline: number) {
     type: 'PRIVATE KEY',
     body: asn1.toDer(pki).getBytes()
   };
-  return forge.pem.encode(msg, { maxline: maxline });
+
+  return encode(msg, { maxline: maxline });
 };

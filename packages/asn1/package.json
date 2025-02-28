@@ -1,0 +1,55 @@
+{
+  "name": "ts-pki",
+  "type": "module",
+  "version": "0.0.0",
+  "description": "A PKI library.",
+  "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
+  "license": "MIT",
+  "homepage": "https://github.com/stacksjs/ts-security#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacksjs/ts-security.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stacksjs/ts-security/issues"
+  },
+  "keywords": [
+    "pki",
+    "crypto",
+    "cryptography",
+    "bun",
+    "stacks",
+    "node-forge",
+    "typescript",
+    "javascript"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["README.md", "dist"],
+  "scripts": {
+    "build": "bun build.ts",
+    "lint": "bunx --bun eslint .",
+    "lint:fix": "bunx --bun eslint . --fix",
+    "fresh": "bunx rimraf node_modules/ bun.lock && bun i",
+    "changelog": "bunx changelogen --output CHANGELOG.md",
+    "prepublishOnly": "bun --bun run build",
+    "release": "bun run changelog && bunx bumpp package.json --all",
+    "test": "bun test",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "ts-security-utils": "workspace:*"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bun lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,ts}": "bunx eslint . --fix"
+  }
+}
