@@ -53,9 +53,6 @@
     "test": "bun test",
     "typecheck": "bun --bun tsc --noEmit"
   },
-  "overrides": {
-    "unconfig": "0.3.10"
-  },
   "simple-git-hooks": {
     "pre-commit": "bun lint-staged"
   },

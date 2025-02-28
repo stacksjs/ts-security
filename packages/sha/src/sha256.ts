@@ -12,12 +12,11 @@
  * 4. Supports both synchronous and streaming operations
  * 5. Handles UTF-8 encoded input
  *
- * @author Dave Longley
  * @author Chris Breuer
  */
 
-import type { ByteStringBuffer } from '../../utils'
-import { createBuffer, fillString } from '../../utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer, fillString } from 'ts-security-utils'
 
 // SHA-256 state interface
 interface SHA256State {

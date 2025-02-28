@@ -51,9 +51,6 @@
   "dependencies": {
     "ts-security-utils": "workspace:*"
   },
-  "overrides": {
-    "unconfig": "0.3.10"
-  },
   "simple-git-hooks": {
     "pre-commit": "bun lint-staged"
   },
