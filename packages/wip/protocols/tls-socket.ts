@@ -29,7 +29,7 @@
  *
  * @return the TLS-wrapped socket.
  */
-import { createConnection } from '../protocols/tls'
+import { createConnection } from './tls'
 
 export function wrapSocket(options: SocketOptions): Socket {
   // get raw socket

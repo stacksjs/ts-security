@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { fillString } from '../../src/utils'
+import { fillString } from '../../packages/wip/utils'
 import { sha1 } from '../../src/algorithms/hash/sha1'
 
 describe('sha1', () => {

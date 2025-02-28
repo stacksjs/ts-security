@@ -9,8 +9,8 @@
 
 import type { MessageDigest } from '../algorithms/hash/sha1'
 import { sha1 } from '../algorithms/hash/sha1'
-import { int32ToBytes, isServer, xorBytes } from '../utils'
-import { hmac } from '../utils/hmac'
+import { int32ToBytes, isServer, xorBytes } from '.'
+import { hmac } from './hmac'
 
 let crypto: typeof import('node:crypto') | undefined
 if (isServer) {

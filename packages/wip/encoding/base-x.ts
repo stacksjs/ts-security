@@ -23,11 +23,45 @@ export const ALPHABETS = {
 export type KnownAlphabet = typeof ALPHABETS[keyof typeof ALPHABETS]
 export type Alphabet = KnownAlphabet | string
 
+/**
+ * Interface for base-x encoding and decoding.
+ *
+ * @example
+ * ```ts
+ * import { base64, base } from 'ts-security'
+ *
+ * // const base64 = base(ALPHABETS.BASE64)
+ * const encoded = base64.encode(new Uint8Array([1, 2, 3]))
+ * const decoded = base64.decode(encoded)
+ * ```
+ *
+ * @example
+ */
 export interface BaseConverter {
+  /**
+   * Encodes a Uint8Array or string into a base-x encoded string.
+   *
+   * @param input - The input to encode.
+   * @param maxline - The maximum line length for multi-line encoding.
+   * @returns The base-x encoded string.
+   */
   encode: (input: Uint8Array | string, maxline?: number) => string
+  /**
+   * Decodes a base-x encoded string into a Uint8Array.
+   *
+   * @param input - The base-x encoded string to decode.
+   * @param maxline - The maximum line length for multi-line decoding.
+   * @returns The decoded Uint8Array.
+   */
   decode: (input: string, maxline?: number) => Uint8Array
 }
 
+/**
+ * Creates a base converter for a given alphabet.
+ *
+ * @param ALPHABET - The alphabet to use for encoding and decoding.
+ * @returns A BaseConverter object with encode and decode methods.
+ */
 export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
   if (ALPHABET.length >= 255)
     throw new TypeError('Alphabet too long')
@@ -55,14 +89,14 @@ export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
   function encode(source: Uint8Array | string): string {
     // eslint-disable-next-line no-empty
     if (source instanceof Uint8Array) { }
-    else if (ArrayBuffer.isView(source)) {
+    else if (ArrayBuffer.isView(source))
       source = new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
-    }
-    else if (Array.isArray(source)) {
+    else if (Array.isArray(source))
       source = Uint8Array.from(source)
-    }
+
     if (!(source instanceof Uint8Array))
       throw new TypeError('Expected Uint8Array')
+
     if (source.length === 0)
       return ''
 
@@ -102,9 +136,8 @@ export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
 
     // Skip leading zeroes in base58 result.
     let it2 = size - length
-    while (it2 !== size && b58[it2] === 0) {
+    while (it2 !== size && b58[it2] === 0)
       it2++
-    }
 
     // Translate the result into a string.
     let str = LEADER.repeat(zeroes)

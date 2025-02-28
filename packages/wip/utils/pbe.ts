@@ -33,8 +33,8 @@ import { rc2 } from '../algorithms/symmetric/rc2'
 import { asn1 } from '../encoding/asn1'
 import { pem } from '../encoding/pem'
 import { oids } from '../oids'
-import { pbkdf2 } from '../utils/pbkdf2'
-import { getBytesSync } from '../utils/random'
+import { pbkdf2 } from './pbkdf2'
+import { getBytesSync } from './random'
 
 // Error codes enum
 export const PBEErrorCode = {
