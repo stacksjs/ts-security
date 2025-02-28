@@ -17,6 +17,7 @@ codecov
 commitlint
 commitlintrc
 composables
+csrs
 davidanson
 dbaeumer
 degit

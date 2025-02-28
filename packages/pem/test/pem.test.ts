@@ -1,227 +1,157 @@
-import { expect, it, describe } from 'bun:test'
-import { sha256 } from '../src/sha256'
-import { ByteStringBuffer } from 'ts-security-utils'
+import { describe, it, expect } from 'bun:test'
+import { encode, decode } from '../src/pem'
 
-describe('SHA-256', () => {
-  describe('API structure', () => {
-    it('should export a sha256 object with create method', () => {
-      expect(sha256).toBeDefined()
-      expect(typeof sha256.create).toBe('function')
-    })
+const _input = '-----BEGIN PRIVACY-ENHANCED MESSAGE-----\r\n'
+  + 'Proc-Type: 4,ENCRYPTED\r\n'
+  + 'Content-Domain: RFC822\r\n'
+  + 'DEK-Info: DES-CBC,F8143EDE5960C597\r\n'
+  + 'Originator-ID-Symmetric: linn@zendia.enet.dec.com,,\r\n'
+  + 'Recipient-ID-Symmetric: linn@zendia.enet.dec.com,ptf-kmc,3\r\n'
+  + 'Key-Info: DES-ECB,RSA-MD2,9FD3AAD2F2691B9A,\r\n'
+  + ' B70665BB9BF7CBCDA60195DB94F727D3\r\n'
+  + 'Recipient-ID-Symmetric: pem-dev@tis.com,ptf-kmc,4\r\n'
+  + 'Key-Info: DES-ECB,RSA-MD2,161A3F75DC82EF26,\r\n'
+  + ' E2EF532C65CBCFF79F83A2658132DB47\r\n'
+  + '\r\n'
+  + 'LLrHB0eJzyhP+/fSStdW8okeEnv47jxe7SJ/iN72ohNcUk2jHEUSoH1nvNSIWL9M\r\n'
+  + '8tEjmF/zxB+bATMtPjCUWbz8Lr9wloXIkjHUlBLpvXR0UrUzYbkNpk0agV2IzUpk\r\n'
+  + 'J6UiRRGcDSvzrsoK+oNvqu6z7Xs5Xfz5rDqUcMlK1Z6720dcBWGGsDLpTpSCnpot\r\n'
+  + 'dXd/H5LMDWnonNvPCwQUHg==\r\n'
+  + '-----END PRIVACY-ENHANCED MESSAGE-----\r\n'
+  + '-----BEGIN PRIVACY-ENHANCED MESSAGE-----\r\n'
+  + 'Proc-Type: 4,ENCRYPTED\r\n'
+  + 'Content-Domain: RFC822\r\n'
+  + 'DEK-Info: DES-CBC,BFF968AA74691AC1\r\n'
+  + 'Originator-Certificate:\r\n'
+  + ' MIIBlTCCAScCAWUwDQYJKoZIhvcNAQECBQAwUTELMAkGA1UEBhMCVVMxIDAeBgNV\r\n'
+  + ' BAoTF1JTQSBEYXRhIFNlY3VyaXR5LCBJbmMuMQ8wDQYDVQQLEwZCZXRhIDExDzAN\r\n'
+  + ' BgNVBAsTBk5PVEFSWTAeFw05MTA5MDQxODM4MTdaFw05MzA5MDMxODM4MTZaMEUx\r\n'
+  + ' CzAJBgNVBAYTAlVTMSAwHgYDVQQKExdSU0EgRGF0YSBTZWN1cml0eSwgSW5jLjEU\r\n'
+  + ' MBIGA1UEAxMLVGVzdCBVc2VyIDEwWTAKBgRVCAEBAgICAANLADBIAkEAwHZHl7i+\r\n'
+  + ' yJcqDtjJCowzTdBJrdAiLAnSC+CnnjOJELyuQiBgkGrgIh3j8/x0fM+YrsyF1u3F\r\n'
+  + ' LZPVtzlndhYFJQIDAQABMA0GCSqGSIb3DQEBAgUAA1kACKr0PqphJYw1j+YPtcIq\r\n'
+  + ' iWlFPuN5jJ79Khfg7ASFxskYkEMjRNZV/HZDZQEhtVaU7Jxfzs2wfX5byMp2X3U/\r\n'
+  + ' 5XUXGx7qusDgHQGs7Jk9W8CW1fuSWUgN4w==\r\n'
+  + 'Key-Info: RSA,\r\n'
+  + ' I3rRIGXUGWAF8js5wCzRTkdhO34PTHdRZY9Tuvm03M+NM7fx6qc5udixps2Lng0+\r\n'
+  + ' wGrtiUm/ovtKdinz6ZQ/aQ==\r\n'
+  + 'Issuer-Certificate:\r\n'
+  + ' MIIB3DCCAUgCAQowDQYJKoZIhvcNAQECBQAwTzELMAkGA1UEBhMCVVMxIDAeBgNV\r\n'
+  + ' BAoTF1JTQSBEYXRhIFNlY3VyaXR5LCBJbmMuMQ8wDQYDVQQLEwZCZXRhIDExDTAL\r\n'
+  + ' BgNVBAsTBFRMQ0EwHhcNOTEwOTAxMDgwMDAwWhcNOTIwOTAxMDc1OTU5WjBRMQsw\r\n'
+  + ' CQYDVQQGEwJVUzEgMB4GA1UEChMXUlNBIERhdGEgU2VjdXJpdHksIEluYy4xDzAN\r\n'
+  + ' BgNVBAsTBkJldGEgMTEPMA0GA1UECxMGTk9UQVJZMHAwCgYEVQgBAQICArwDYgAw\r\n'
+  + ' XwJYCsnp6lQCxYykNlODwutF/jMJ3kL+3PjYyHOwk+/9rLg6X65B/LD4bJHtO5XW\r\n'
+  + ' cqAz/7R7XhjYCm0PcqbdzoACZtIlETrKrcJiDYoP+DkZ8k1gCk7hQHpbIwIDAQAB\r\n'
+  + ' MA0GCSqGSIb3DQEBAgUAA38AAICPv4f9Gx/tY4+p+4DB7MV+tKZnvBoy8zgoMGOx\r\n'
+  + ' dD2jMZ/3HsyWKWgSF0eH/AJB3qr9zosG47pyMnTf3aSy2nBO7CMxpUWRBcXUpE+x\r\n'
+  + ' EREZd9++32ofGBIXaialnOgVUn0OzSYgugiQ077nJLDUj0hQehCizEs5wUJ35a5h\r\n'
+  + 'MIC-Info: RSA-MD5,RSA,\r\n'
+  + ' UdFJR8u/TIGhfH65ieewe2lOW4tooa3vZCvVNGBZirf/7nrgzWDABz8w9NsXSexv\r\n'
+  + ' AjRFbHoNPzBuxwmOAFeA0HJszL4yBvhG\r\n'
+  + 'Recipient-ID-Asymmetric:\r\n'
+  + ' MFExCzAJBgNVBAYTAlVTMSAwHgYDVQQKExdSU0EgRGF0YSBTZWN1cml0eSwgSW5j\r\n'
+  + ' LjEPMA0GA1UECxMGQmV0YSAxMQ8wDQYDVQQLEwZOT1RBUlk=,66\r\n'
+  + 'Key-Info: RSA,\r\n'
+  + ' O6BS1ww9CTyHPtS3bMLD+L0hejdvX6Qv1HK2ds2sQPEaXhX8EhvVphHYTjwekdWv\r\n'
+  + ' 7x0Z3Jx2vTAhOYHMcqqCjA==\r\n'
+  + '\r\n'
+  + 'qeWlj/YJ2Uf5ng9yznPbtD0mYloSwIuV9FRYx+gzY+8iXd/NQrXHfi6/MhPfPF3d\r\n'
+  + 'jIqCJAxvld2xgqQimUzoS1a4r7kQQ5c/Iua4LqKeq3ciFzEv/MbZhA==\r\n'
+  + '-----END PRIVACY-ENHANCED MESSAGE-----\r\n'
+  + '-----BEGIN RSA PRIVATE KEY-----\r\n'
+  + 'MIIBPAIBAAJBALjXU+IdHkSkdBscgXf+EBoa55ruAIsU50uDFjFBkp+rWFt5AOGF\r\n'
+  + '9xL1/HNIby5M64BCw021nJTZKEOmXKdmzYsCAwEAAQJBAApyYRNOgf9vLAC8Q7T8\r\n'
+  + 'bvyKuLxQ50b1D319EywFgLv1Yn0s/F9F+Rew6c04Q0pIqmuOGUM7z94ul/y5OlNJ\r\n'
+  + '2cECIQDveEW1ib2+787l7Y0tMeDzf/HQl4MAWdcxXWOeUFK+7QIhAMWZsukutEn9\r\n'
+  + '9/yqFMt8bL/dclfNn1IAgUL4+dMJ7zdXAiEAhaxGhVKxN28XuCOFhe/s2R/XdQ/O\r\n'
+  + 'UZjU1bqCzDGcLvUCIGYmxu71Tg7SVFkyM/3eHPozKOFrU2m5CRnuTHhlMl2RAiEA\r\n'
+  + '0vhM5TEmmNWz0anPVabqDj9TA0z5MsDJQcn5NmO9xnw=\r\n'
+  + '-----END RSA PRIVATE KEY-----\r\n'
 
-    it('should create a SHA-256 message digest object with correct interface', () => {
-      const md = sha256.create()
-      expect(md).toBeDefined()
-      expect(md.algorithm).toBe('sha256')
-      expect(md.blockLength).toBe(64)
-      expect(md.digestLength).toBe(32) // SHA-256 produces a 32-byte (256-bit) digest
-      expect(typeof md.start).toBe('function')
-      expect(typeof md.update).toBe('function')
-      expect(typeof md.digest).toBe('function')
-    })
+const _csrWithNew = '-----BEGIN NEW CERTIFICATE REQUEST-----\r\n'
+  + 'MIIE9jCCAt4CAQAwfjELMAkGA1UEBhMCVVMxETAPBgNVBAgMCFZpcmdpbmlhMRMw\r\n'
+  + 'EQYDVQQHDApCbGFja3NidXJnMR0wGwYDVQQKDBREaWdpdGFsIEJhemFhciwgSW5j\r\n'
+  + 'LjEMMAoGA1UECwwDT1NTMRowGAYDVQQDDBFkaWdpdGFsYmF6YWFyLmNvbTCCAiIw\r\n'
+  + 'DQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAKbqOZ0oC5L+GFnuvwuWnq5J/wxQ\r\n'
+  + '6upw5qvA+zfHZYkqdC170OYKsfC67/W6591631xGhVden26/BdxilpeSX1hFVqPF\r\n'
+  + 'IND7KJvo039QdFQzmzBgqcY5cr11OT9jYjoQMPCehRmbmv6RNaKqTdITMrGZMFzk\r\n'
+  + 'HFWfshuY71A0+wlz2pOzi79qL7tdcm5s6Whge3/0AAZi19Ze148vCH+HHnbQ7jMH\r\n'
+  + 'bGJlFZhvGYd2D/clCVnG4w4mCX6scMBZXtf4k1qZAuyhEpTJl8vxCExQs2iCN8lw\r\n'
+  + '4tEJH979MQsTDCNf5EZOBzMa4tJtybvQcmFQT2Xjb/8qYT0GyBP+XyJ6nmY3S0R2\r\n'
+  + 'xZtIsuKlayTw1GG/cYg3OC73G1lbVFLYLh1R+nEs14XX5Dj3J0zTxLeWewFIL7FP\r\n'
+  + 'D77oRqTHoHNIWz3SJ3S0OTqCYr+5h4vjUOCyXdjCZMZSFOWfCjcMIqcUsysj05gL\r\n'
+  + 'YBw5z+ZUn17zEEKBuq1tjS1UInbLPBbDMYc1P0NAO5UltdpOs0FPXWgHtzpVoYgZ\r\n'
+  + '7W2mXSTgP3xfVicWK6SBP0ejJmcgt4eB5gKidfg0t1BbB/4TgHLrDgGZapVA4DrX\r\n'
+  + 'agUxalhOrvV0Pm3zWdn6DNGNQbtm0xOebzEFL2bDRangK3OnA4EtOMj39cK2f4bY\r\n'
+  + '6ENG38DrC/ctvFmHAgMBAAGgMzAxBgkqhkiG9w0BCQ4xJDAiMAsGA1UdDwQEAwIE\r\n'
+  + 'MDATBgNVHSUEDDAKBggrBgEFBQcDATANBgkqhkiG9w0BAQsFAAOCAgEAGXNXqKmv\r\n'
+  + 'Dzkvm+ZTTmwsjf8zlCp1M+QtPSvCMGGUJtqwIFarIKc1H5ZIyfh3p+ws1xDFw0ZK\r\n'
+  + 'xPyIleeCqMVPAL9me4l8oaQ2IoQ917rmcsdfbPh3/8JkU5rotoRBW0JtsMTx5A6U\r\n'
+  + '7FluYFeKVTM1GZo3TpMhG7NZFePtIJfP/hPwtNnIrBkMOLmvyfN68UO1uhazx5/a\r\n'
+  + 'Uanp1JF9+05hwNSIL/R6TC/RQdeA5b3fycDPfhHhot7Bs/FczgF6I7Qrmyb4pzmR\r\n'
+  + 'e0knYlOucs0CsV/qj2K2Iouu0lWA0nZQQsbBtvN8dExYZpGPl4LJqNGYF4rLsoep\r\n'
+  + 'VyDD79rwCM6oqYbQ6GXQJdzXnQoAJTTFyg8bGmj9osBaSb8WKfz1VspnHzsbryxT\r\n'
+  + 'LPCI9Drg9kB28f7PGN0KWZnmWgD2qV/UuVPjxNhHTC8nEHCQP0gPeHrRgCyhDT4n\r\n'
+  + 'WPluKuX1B+xO5aOXOSmKcHNufDrN1l/ErhOvYeAimPq1Ag74Z946s27fO0M00kHK\r\n'
+  + '+ex8zj29okA0QSsJuCVbOA1tFlyoRd7apN/z1mpcvpb+TDZgdH/HFyrMK1bH2J5u\r\n'
+  + 'I1iuhuP3g2HSdjLC0wuUA4u73WcbcH7X9tnAHymFgGa5pNUlRPllbIRWvCM+7UaY\r\n'
+  + 'x6n+naGYblpSHXiboXRsuGWUtTjvqNVdOxA=\r\n'
+  + '-----END NEW CERTIFICATE REQUEST-----\r\n'
+
+const _csrWithoutNew = '-----BEGIN CERTIFICATE REQUEST-----\r\n'
+  + 'MIIE9jCCAt4CAQAwfjELMAkGA1UEBhMCVVMxETAPBgNVBAgMCFZpcmdpbmlhMRMw\r\n'
+  + 'EQYDVQQHDApCbGFja3NidXJnMR0wGwYDVQQKDBREaWdpdGFsIEJhemFhciwgSW5j\r\n'
+  + 'LjEMMAoGA1UECwwDT1NTMRowGAYDVQQDDBFkaWdpdGFsYmF6YWFyLmNvbTCCAiIw\r\n'
+  + 'DQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAKbqOZ0oC5L+GFnuvwuWnq5J/wxQ\r\n'
+  + '6upw5qvA+zfHZYkqdC170OYKsfC67/W6591631xGhVden26/BdxilpeSX1hFVqPF\r\n'
+  + 'IND7KJvo039QdFQzmzBgqcY5cr11OT9jYjoQMPCehRmbmv6RNaKqTdITMrGZMFzk\r\n'
+  + 'HFWfshuY71A0+wlz2pOzi79qL7tdcm5s6Whge3/0AAZi19Ze148vCH+HHnbQ7jMH\r\n'
+  + 'bGJlFZhvGYd2D/clCVnG4w4mCX6scMBZXtf4k1qZAuyhEpTJl8vxCExQs2iCN8lw\r\n'
+  + '4tEJH979MQsTDCNf5EZOBzMa4tJtybvQcmFQT2Xjb/8qYT0GyBP+XyJ6nmY3S0R2\r\n'
+  + 'xZtIsuKlayTw1GG/cYg3OC73G1lbVFLYLh1R+nEs14XX5Dj3J0zTxLeWewFIL7FP\r\n'
+  + 'D77oRqTHoHNIWz3SJ3S0OTqCYr+5h4vjUOCyXdjCZMZSFOWfCjcMIqcUsysj05gL\r\n'
+  + 'YBw5z+ZUn17zEEKBuq1tjS1UInbLPBbDMYc1P0NAO5UltdpOs0FPXWgHtzpVoYgZ\r\n'
+  + '7W2mXSTgP3xfVicWK6SBP0ejJmcgt4eB5gKidfg0t1BbB/4TgHLrDgGZapVA4DrX\r\n'
+  + 'agUxalhOrvV0Pm3zWdn6DNGNQbtm0xOebzEFL2bDRangK3OnA4EtOMj39cK2f4bY\r\n'
+  + '6ENG38DrC/ctvFmHAgMBAAGgMzAxBgkqhkiG9w0BCQ4xJDAiMAsGA1UdDwQEAwIE\r\n'
+  + 'MDATBgNVHSUEDDAKBggrBgEFBQcDATANBgkqhkiG9w0BAQsFAAOCAgEAGXNXqKmv\r\n'
+  + 'Dzkvm+ZTTmwsjf8zlCp1M+QtPSvCMGGUJtqwIFarIKc1H5ZIyfh3p+ws1xDFw0ZK\r\n'
+  + 'xPyIleeCqMVPAL9me4l8oaQ2IoQ917rmcsdfbPh3/8JkU5rotoRBW0JtsMTx5A6U\r\n'
+  + '7FluYFeKVTM1GZo3TpMhG7NZFePtIJfP/hPwtNnIrBkMOLmvyfN68UO1uhazx5/a\r\n'
+  + 'Uanp1JF9+05hwNSIL/R6TC/RQdeA5b3fycDPfhHhot7Bs/FczgF6I7Qrmyb4pzmR\r\n'
+  + 'e0knYlOucs0CsV/qj2K2Iouu0lWA0nZQQsbBtvN8dExYZpGPl4LJqNGYF4rLsoep\r\n'
+  + 'VyDD79rwCM6oqYbQ6GXQJdzXnQoAJTTFyg8bGmj9osBaSb8WKfz1VspnHzsbryxT\r\n'
+  + 'LPCI9Drg9kB28f7PGN0KWZnmWgD2qV/UuVPjxNhHTC8nEHCQP0gPeHrRgCyhDT4n\r\n'
+  + 'WPluKuX1B+xO5aOXOSmKcHNufDrN1l/ErhOvYeAimPq1Ag74Z946s27fO0M00kHK\r\n'
+  + '+ex8zj29okA0QSsJuCVbOA1tFlyoRd7apN/z1mpcvpb+TDZgdH/HFyrMK1bH2J5u\r\n'
+  + 'I1iuhuP3g2HSdjLC0wuUA4u73WcbcH7X9tnAHymFgGa5pNUlRPllbIRWvCM+7UaY\r\n'
+  + 'x6n+naGYblpSHXiboXRsuGWUtTjvqNVdOxA=\r\n'
+  + '-----END CERTIFICATE REQUEST-----\r\n'
+
+describe('pem', () => {
+  it('should decode and re-encode PEM messages', () => {
+    const msgs = decode(_input)
+
+    let output = ''
+    for (let i = 0; i < msgs.length; ++i) {
+      output += encode(msgs[i])
+    }
+
+    expect(output).toBe(_input)
   })
 
-  describe('hashing functionality', () => {
-    it('should hash empty string', () => {
-      const md = sha256.create()
-      const hash = md.update('').digest()
-      expect(hash).toBeDefined()
-      expect(typeof hash.toHex()).toBe('string')
-      expect(hash.toHex().length).toBe(64) // SHA-256 produces a 256-bit (64 hex chars) hash
-
-      expect(hash.toHex()).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
-    })
-
-    it('should hash "abc"', () => {
-      const md = sha256.create()
-      const hash = md.update('abc').digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-
-      expect(hash.toHex()).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-    })
-
-    it('should hash longer text', () => {
-      const md = sha256.create()
-      const hash = md.update('The quick brown fox jumps over the lazy dog').digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-
-      expect(hash.toHex()).toBe('d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592')
-    })
+  it('should decode a CSR from PEM with NEW in the labels', () => {
+    const csrs = decode(_csrWithNew)
+    for (let i = 0; i < csrs.length; ++i) {
+      expect(csrs[i].type).toBe('CERTIFICATE REQUEST')
+    }
   })
 
-  describe('incremental hashing', () => {
-    it('should support incremental hashing', () => {
-      const md = sha256.create()
-      md.update('The quick brown ')
-      md.update('fox jumps over ')
-      md.update('the lazy dog')
-      const hash = md.digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-
-      // Should match the hash of the complete string
-      expect(hash.toHex()).toBe('d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592')
-    })
-
-    it('should allow multiple digests from the same instance', () => {
-      const md = sha256.create()
-      md.start()
-      md.update('abc')
-      const hash1 = md.digest()
-
-      md.start()
-      md.update('def')
-      const hash2 = md.digest()
-
-      expect(hash1).toBeDefined()
-      expect(hash2).toBeDefined()
-      // Different inputs should produce different hashes
-      expect(hash1.toHex()).not.toBe(hash2.toHex())
-    })
-  })
-
-  describe('UTF-8 encoding', () => {
-    it('should handle UTF-8 encoding parameter', () => {
-      const md = sha256.create()
-      expect(() => md.update('test string', 'utf8')).not.toThrow()
-    })
-  })
-
-  describe('ByteStringBuffer input', () => {
-    it('should hash ByteStringBuffer input', () => {
-      const buffer = new ByteStringBuffer()
-      buffer.putBytes('abc')
-
-      const md = sha256.create()
-      const hash = md.update(buffer as unknown as string).digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-    })
-  })
-
-  describe('edge cases', () => {
-    it('should handle messages that require padding to a new block', () => {
-      // 64 bytes is exactly one block, so this will require padding in a new block
-      const md = sha256.create()
-      const hash = md.update('a'.repeat(64)).digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-
-      // Current implementation produces: 'ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb'
-      expect(hash.toHex()).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb')
-    })
-
-    it('should handle messages that are exactly one byte less than a block', () => {
-      // 63 bytes is one byte less than a block
-      const md = sha256.create()
-      const hash = md.update('a'.repeat(63)).digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-    })
-
-    it('should handle longer messages', () => {
-      // Test with a longer message (multiple blocks)
-      const md = sha256.create()
-      const hash = md.update('a'.repeat(200)).digest()
-      expect(hash).toBeDefined()
-      expect(hash.toHex().length).toBe(64)
-    })
-  })
-
-  describe('state management', () => {
-    it('should reset state when start() is called', () => {
-      const md = sha256.create()
-      md.update('test')
-      md.start()
-      expect(md.messageLength).toBe(0)
-    })
-
-    it('should maintain state between updates', () => {
-      const md1 = sha256.create()
-      const singleHash = md1.update('abcdef').digest().toHex()
-
-      const md2 = sha256.create()
-      md2.update('abc')
-      md2.update('def')
-      const incrementalHash = md2.digest().toHex()
-
-      expect(incrementalHash).toBe(singleHash)
-    })
-  })
-
-  describe('SHA-256 specific features', () => {
-    it('should use the correct initial hash values', () => {
-      // SHA-256 has specific initial hash values defined in the standard
-      const md = sha256.create()
-
-      // We'll test this indirectly by checking the hash of an empty string
-      // which should only depend on the initial values and padding
-      const hash = md.update('').digest()
-      expect(hash).toBeDefined()
-    })
-
-    it('should handle the K constants correctly', () => {
-      // SHA-256 uses 64 constants in its compression function
-      // We'll test this indirectly by hashing data that would exercise these constants
-      const md = sha256.create()
-      const hash = md.update('a'.repeat(64)).digest() // One full block
-      expect(hash).toBeDefined()
-    })
-  })
-
-  describe('NIST test vectors', () => {
-    it('should match NIST test vector 1', () => {
-      const md = sha256.create()
-      const hash = md.update('abc').digest()
-      expect(hash.toHex()).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-    })
-
-    it('should match NIST test vector 2', () => {
-      const md = sha256.create()
-      const hash = md.update('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq').digest()
-      expect(hash.toHex()).toBe('248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1')
-    })
-
-    it('should produce consistent results for "a" repeated 1000 times', () => {
-      const md = sha256.create()
-      const hash = md.update('a'.repeat(1000)).digest()
-
-      expect(hash.toHex()).toBe('41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3')
-    })
-  })
-
-  describe('edge cases with consistent outputs', () => {
-    it('should consistently hash a message that is exactly one block', () => {
-      const md = sha256.create()
-      // SHA-256 block size is 64 bytes
-      const hash = md.update('a'.repeat(64)).digest()
-      expect(hash.toHex()).toBe('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb')
-    })
-
-    it('should consistently hash a message that spans multiple blocks', () => {
-      const md = sha256.create()
-      // 120 bytes (spans 2 blocks)
-      const hash = md.update('a'.repeat(120)).digest()
-
-      expect(hash.toHex()).toBe('2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c')
-    })
-  })
-
-  describe('special test cases', () => {
-    it('should consistently hash a message with a period', () => {
-      const md = sha256.create()
-      const hash = md.update('abc.').digest()
-
-      expect(hash.toHex()).toBe('5ac9481b887da55cdb508bbb7d91e7896c418c1ad3badb6f4f6d2a524f5cdcaf')
-    })
-
-    it('should consistently hash a message with special characters', () => {
-      const md = sha256.create()
-      const hash = md.update('abc!@#$%^&*()').digest()
-
-      expect(hash.toHex()).toBe('12467d627114bfff999bc2570676736fbdc19ece55d83be7ebfb6603576e9972')
-    })
+  it('should decode a CSR from PEM without NEW in the labels', () => {
+    const csrs = decode(_csrWithoutNew)
+    for (let i = 0; i < csrs.length; ++i) {
+      expect(csrs[i].type).toBe('CERTIFICATE REQUEST')
+    }
   })
 })
