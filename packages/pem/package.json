@@ -1,5 +1,5 @@
 {
-  "name": "ts-pki",
+  "name": "ts-pem",
   "type": "module",
   "version": "0.0.0",
   "description": "A PKI library.",

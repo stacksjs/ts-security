@@ -1,8 +1,8 @@
 {
-  "name": "ts-pki",
+  "name": "ts-pkcs",
   "type": "module",
   "version": "0.0.0",
-  "description": "A PKI library.",
+  "description": "A PKCS library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
   "homepage": "https://github.com/stacksjs/ts-security#readme",
