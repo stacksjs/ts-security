@@ -6,105 +6,154 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-pem
+# ts-asn1
 
-> A TypeScript implementation of PEM (Privacy Enhanced Mail) encoding and decoding with a focus on type safety and standards compliance.
+> A TypeScript implementation of ASN.1 encoding and decoding with a focus on type safety and standards compliance.
 
 ## Features
 
-- 🔒 **RFC 1421 Compliant** _Implements PEM encoding & decoding according to standard_
-- 📦 **Versatile Handling** _Support for multiple PEM messages in a single string_
-- 🔄 **Header Processing** _Proper handling of PEM headers including Proc-Type, Content-Domain, and DEK-Info_
-- 🧩 **CSR Support** _Special handling for Certificate Signing Requests with NEW prefix_
-- 🔧 **Customizable Output** _Control over line length in encoded PEM output_
+- 🔒 **DER Compliant** _Implements ASN.1 encoding & decoding according to standard_
+- 🔄 **Comprehensive Type Support** _Support for INTEGER, BIT STRING, OCTET STRING, NULL, OBJECT IDENTIFIER, SEQUENCE, SET, and more_
+- 🧩 **Validation** _Validate ASN.1 structures against expected schemas_
+- 🔧 **Flexible Parsing** _Support for both strict DER and more lenient BER parsing_
 - 🛡️ **Type Safety** _Full TypeScript support with comprehensive type definitions_
-- 🪶 **Lightweight** _No dependencies other than_
+- 🪶 **Lightweight** _No dependencies_
+- 🔍 **Debugging** _Pretty printing of ASN.1 structures for easier debugging_
 
 ## Install
 
 ```bash
 # bun
-bun install ts-pem
+bun install ts-asn1
 
 # npm
-npm install ts-pem
+npm install ts-asn1
 
 # pnpm
-pnpm install ts-pem
+pnpm install ts-asn1
 ```
 
 ## Get Started
 
-After installing the package, you can import and use the PEM encoding and decoding functions:
+After installing the package, you can import and use the ASN.1 encoding and decoding functions:
 
 ```ts
-import { decode, encode } from 'ts-pem'
+import { asn1 } from 'ts-asn1'
+import { utils } from 'ts-security-utils'
 
-// Decode a PEM-formatted string
-const pemString = `-----BEGIN CERTIFICATE-----
-MIIBPAIBAAJBALjXU+IdHkSkdBscgXf+EBoa55ruAIsU50uDFjFBkp+rWFt5AOGF
-9xL1/HNIby5M64BCw021nJTZKEOmXKdmzYsCAwEAAQ==
------END CERTIFICATE-----`
+// Create an ASN.1 INTEGER
+const intValue = asn1.integerToDer(123)
+console.log(utils.bytesToHex(intValue)) // "7b"
 
-const messages = decode(pemString)
-console.log(messages[0].type) // 'CERTIFICATE'
+// Parse ASN.1 DER encoded data
+const derData = utils.hexToBytes('300a02010102010202010304010a')
+const asn1Object = asn1.fromDer(derData)
+console.log(asn1.prettyPrint(asn1Object))
+// SEQUENCE {
+//   INTEGER 1
+//   INTEGER 2
+//   INTEGER 3
+//   OCTET STRING 0a
+// }
 
-// Create and encode a PEM message
-const newMessage = {
-  type: 'RSA PRIVATE KEY',
-  procType: null,
-  contentDomain: null,
-  dekInfo: null,
-  headers: [],
-  body: new TextEncoder().encode('your-binary-data-here')
-}
+// Convert dates to/from ASN.1 generalized time
+const date = new Date('2025-03-01T12:00:00Z')
+const genTime = asn1.dateToGeneralizedTime(date)
+console.log(genTime) // "20250301120000Z"
 
-const encodedPem = encode(newMessage)
-console.log(encodedPem)
-// -----BEGIN RSA PRIVATE KEY-----
-// eW91ci1iaW5hcnktZGF0YS1oZXJl
-// -----END RSA PRIVATE KEY-----
+// Convert back to a date
+const parsedDate = asn1.generalizedTimeToDate(genTime)
+console.log(parsedDate.toISOString()) // "2025-03-01T12:00:00.000Z"
 ```
 
 ## API Reference
 
-### Decode
+### ASN.1 Types
+
+The library supports all standard ASN.1 types:
 
 ```ts
-function decode(str: string): PEMMessage[]
+const Type = {
+  BOOLEAN: 1,
+  INTEGER: 2,
+  BITSTRING: 3,
+  OCTETSTRING: 4,
+  NULL: 5,
+  OID: 6,
+  OBJECT_DESCRIPTOR: 7,
+  EXTERNAL: 8,
+  REAL: 9,
+  ENUMERATED: 10,
+  EMBEDDED_PDV: 11,
+  UTF8: 12,
+  RELATIVE_OID: 13,
+  SEQUENCE: 16,
+  SET: 17,
+  NUMERIC_STRING: 18,
+  PRINTABLE_STRING: 19,
+  T61_STRING: 20,
+  VIDEOTEX_STRING: 21,
+  IA5_STRING: 22,
+  UTC_TIME: 23,
+  GENERALIZED_TIME: 24,
+  GRAPHIC_STRING: 25,
+  VISIBLE_STRING: 26,
+  GENERAL_STRING: 27,
+  UNIVERSAL_STRING: 28,
+  CHARACTER_STRING: 29,
+  BMP_STRING: 30
+} as const
 ```
 
-Decodes a PEM-formatted string into an array of PEM message objects.
-
-- **Parameters**:
-  - `str`: The PEM-formatted string to decode
-- **Returns**: An array of `PEMMessage` objects
-
-### Encode
+### ASN.1 Tag Classes
 
 ```ts
-function encode(msg: PEMMessage, options?: PEMEncodeOptions): string
+const Class = {
+  UNIVERSAL: 0,
+  APPLICATION: 1,
+  CONTEXT_SPECIFIC: 2,
+  PRIVATE: 3
+} as const
 ```
 
-Encodes a PEM message object into a PEM-formatted string.
+### Key Functions
 
-- **Parameters**:
-  - `msg`: The PEM message object to encode
-  - `options`: Optional encoding options
-    - `maxline`: Maximum characters per line for the body (default: 64)
-- **Returns**: A PEM-formatted string
-
-### PEMMessage Interface
+#### Encoding/Decoding
 
 ```ts
-interface PEMMessage {
-  type: string // The type of message (e.g., "RSA PRIVATE KEY")
-  procType: ProcType | null // Processing type information
-  contentDomain: string | null // Content domain (typically "RFC822")
-  dekInfo: DEKInfo | null // Data Encryption Key information
-  headers: PEMHeader[] // Additional headers
-  body: Uint8Array // The binary-encoded body
-}
+// Convert to/from DER encoding
+function fromDer(bytes: Uint8Array, options?: FromDerOptions): Asn1Object
+function toDer(obj: Asn1Object): Buffer
+
+// Convert integers to/from DER
+function integerToDer(n: number): Buffer
+function derToInteger(bytes: Uint8Array): number
+
+// Convert OIDs to/from DER
+function oidToDer(oid: string): Buffer
+function derToOid(bytes: Uint8Array): string
+
+// Date conversions
+function dateToGeneralizedTime(date: Date): string
+function generalizedTimeToDate(genTime: string): Date
+function dateToUtcTime(date: Date): string
+function utcTimeToDate(utcTime: string): Date
+```
+
+#### Utility Functions
+
+```ts
+// Create a copy of an ASN.1 object
+function copy(obj: Asn1Object): Asn1Object
+
+// Compare two ASN.1 objects for equality
+function equals(obj1: any, obj2: any): boolean
+
+// Validate an ASN.1 object against a schema
+function validate(obj: Asn1Object, validator: Validator, capture?: Record<string, any>, errors?: string[]): boolean
+
+// Pretty print an ASN.1 object for debugging
+function prettyPrint(obj: Asn1Object, indent?: string): string
 ```
 
 ## Testing
@@ -115,7 +164,7 @@ bun test
 
 ## Changelog
 
-Please see our [releases](https://github.com/stacksjs/ts-pem/releases) page for more information on what has changed recently.
+Please see our [releases](https://github.com/stacksjs/ts-security/releases) page for more information on what has changed recently.
 
 ## Contributing
 
@@ -133,7 +182,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-pem` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-asn1` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -158,10 +207,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-pem?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-pem
-[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-pem/ci.yml?style=flat-square&branch=main
-[github-actions-href]: https://github.com/stacksjs/ts-pem/actions?query=workflow%3Aci
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-asn1?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-asn1
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-security/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/ts-security/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-pem/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-pem -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-asn1/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-asn1 -->
