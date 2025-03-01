@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { utils as UTIL } from 'ts-security-utils'
-import { asn1 as ASN1 } from '../src/aes'
+import { asn1 as ASN1 } from 'ts-asn1'
 
 describe('asn1', () => {
   // Define types at the top
