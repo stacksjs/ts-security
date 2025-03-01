@@ -1,4 +1,9 @@
-import { decode, encode } from 'ts-pem'
+import { decode, encode, pem } from 'ts-pem'
+import { asn1 } from 'ts-asn1'
+
+interface CustomError extends Error {
+  headerType?: string
+}
 
 /**
  * Converts an RSA private key from PEM format.
@@ -11,11 +16,11 @@ export function privateKeyFromPem(pem: string) {
   const msg = decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
-    const error = new Error('Could not convert private key from PEM; PEM '
-      + 'header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
+    const error: CustomError = new Error('Could not convert private key from PEM; PEM header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
     error.headerType = msg.type
     throw error
   }
+
   if (msg.procType && msg.procType.type === 'ENCRYPTED') {
     throw new Error('Could not convert private key from PEM; PEM is encrypted.')
   }
@@ -23,7 +28,7 @@ export function privateKeyFromPem(pem: string) {
   // convert DER to ASN.1 object
   const obj = asn1.fromDer(msg.body)
 
-  return pki.privateKeyFromAsn1(obj)
+  return privateKeyFromAsn1(obj)
 };
 
 /**
@@ -34,12 +39,13 @@ export function privateKeyFromPem(pem: string) {
  *
  * @return the PEM-formatted private key.
  */
-export function privateKeyToPem(key: any, maxline: number) {
+export function privateKeyToPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PRIVATE KEY',
-    body: asn1.toDer(pki.privateKeyToAsn1(key)).getBytes(),
+    body: asn1.toDer(privateKeyToAsn1(key)).getBytes(),
   }
+
   return pem.encode(msg, { maxline })
 };
 
@@ -60,3 +66,17 @@ export function privateKeyInfoToPem(pki: any, maxline: number) {
 
   return encode(msg, { maxline })
 };
+
+export interface PKI {
+  privateKeyFromPem: typeof privateKeyFromPem
+  privateKeyToPem: typeof privateKeyToPem
+  privateKeyInfoToPem: typeof privateKeyInfoToPem
+}
+
+export const pki: PKI = {
+  privateKeyFromPem,
+  privateKeyToPem,
+  privateKeyInfoToPem,
+}
+
+export default pki

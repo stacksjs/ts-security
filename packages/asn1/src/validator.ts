@@ -1,4 +1,4 @@
-import { Class, Type } from '../encoding/asn1'
+import { Class, Type } from './asn1'
 
 export interface Asn1Validator {
   name: string

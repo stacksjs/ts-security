@@ -1,5 +1,9 @@
 import type { RSA } from './algorithms/asymmetric/rsa'
 import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetric/rsa'
+import { asn1 } from './encoding/asn1'
+import { pem } from './encoding/pem'
+import { certificateExtensionsToAsn1, certificateFromPem, certificateToAsn1, CRIAttributesAsArray, getCertificationRequestInfo } from './x509'
+
 /**
  * TypeScript implementation of a basic Public Key Infrastructure, including
  * support for RSA public and private keys.
@@ -7,9 +11,6 @@ import { privateKeyFromAsn1, privateKeyToAsn1, rsa } from './algorithms/asymmetr
  * @author Dave Longley
  * @author Chris Breuer
  */
-import { asn1 } from './encoding/asn1'
-import { pem } from './encoding/pem'
-import { certificateExtensionsToAsn1, certificateFromPem, certificateToAsn1, CRIAttributesAsArray, getCertificationRequestInfo } from './x509'
 
 interface CustomError extends Error {
   headerType?: string

@@ -504,3 +504,25 @@ export function decode64(input: string): string {
 
   return output
 }
+
+/**
+ * Converts a string of bytes to a hexadecimal string.
+ *
+ * @param bytes the string of bytes to convert.
+ *
+ * @return the hexadecimal string.
+ */
+export function bytesToHex(bytes: string): string {
+  return createBuffer(bytes).toHex()
+}
+
+/**
+ * Decodes UTF-8 bytes into a string of characters.
+ *
+ * @param bytes the UTF-8 bytes to decode.
+ *
+ * @return the string of characters.
+ */
+export function decodeUtf8(bytes: string): string {
+  return decodeURIComponent(escape(bytes))
+}

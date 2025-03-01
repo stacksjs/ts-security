@@ -12,7 +12,8 @@
       "ts-hash": ["./packages/hash/src"],
       "ts-pem": ["./packages/pem/src"],
       "ts-pki": ["./packages/pki/src"],
-      "ts-asn1": ["./packages/asn1/src"]
+      "ts-asn1": ["./packages/asn1/src"],
+      "ts-rsa": ["./packages/rsa/src"]
     },
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
