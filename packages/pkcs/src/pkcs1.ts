@@ -337,3 +337,5 @@ export const pkcs1: PKCS1 = {
   decode_rsa_oaep,
   rsa_mgf1,
 }
+
+export default pkcs1

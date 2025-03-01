@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'bun:test'
 import { createBuffer, decode64, encode64, fillString } from 'ts-security-utils'
 import { sha1, sha256 } from 'ts-hash'
+import { BigInteger } from 'ts-jsbn'
 
 const ASSERT = require('node:assert')
-
-const BigInteger = JSBN.BigInteger
 
 // RSA's test vectors for Forge's RSA-OAEP implementation:
 // http://www.rsa.com/rsalabs/node.asp?id=2125
