@@ -1,5 +1,7 @@
+import { rsa } from 'ts-rsa'
 import { asn1 } from 'ts-asn1'
 import { decode, encode, pem } from 'ts-pem'
+import { createBuffer } from 'ts-security-utils'
 
 interface CustomError extends Error {
   headerType?: string
@@ -12,7 +14,7 @@ interface CustomError extends Error {
  *
  * @return the private key.
  */
-export function privateKeyFromPem(pem: string) {
+export function privateKeyFromPem(pem: string): any {
   const msg = decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
@@ -26,9 +28,9 @@ export function privateKeyFromPem(pem: string) {
   }
 
   // convert DER to ASN.1 object
-  const obj = asn1.fromDer(msg.body)
+  const obj = asn1.fromDer(createBuffer(msg.body))
 
-  return privateKeyFromAsn1(obj)
+  return rsa.privateKeyFromAsn1(obj)
 };
 
 /**
@@ -43,7 +45,11 @@ export function privateKeyToPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PRIVATE KEY',
-    body: asn1.toDer(privateKeyToAsn1(key)).getBytes(),
+    body: new TextEncoder().encode(asn1.toDer(rsa.privateKeyToAsn1(key)).getBytes()),
+    procType: null,
+    contentDomain: null,
+    dekInfo: null,
+    headers: []
   }
 
   return pem.encode(msg, { maxline })
@@ -57,11 +63,15 @@ export function privateKeyToPem(key: any, maxline: number): string {
  *
  * @return the PEM-formatted private key.
  */
-export function privateKeyInfoToPem(pki: any, maxline: number) {
+export function privateKeyInfoToPem(pki: any, maxline: number): string {
   // convert to DER, then PEM-encode
   const msg = {
     type: 'PRIVATE KEY',
-    body: asn1.toDer(pki).getBytes(),
+    body: new TextEncoder().encode(asn1.toDer(pki).getBytes()),
+    procType: null,
+    contentDomain: null,
+    dekInfo: null,
+    headers: []
   }
 
   return encode(msg, { maxline })

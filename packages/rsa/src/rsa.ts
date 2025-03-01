@@ -1,3 +1,12 @@
+import type { Asn1Object, Asn1Validator } from '../../asn1/src'
+import { asn1 } from '../../asn1/src'
+import { oids } from '../../oids'
+import { encode_rsa_oaep, pkcs1 } from '../../pkcs1/src'
+import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki/src'
+import { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
+import { BigInteger } from './jsbn'
+import { prime } from './prime'
+
 /**
  * Javascript implementation of basic RSA algorithms.
  *
@@ -60,15 +69,6 @@
  *
  * The OID for the RSA key algorithm is: 1.2.840.113549.1.1.1
  */
-
-import type { Asn1Object, Asn1Validator } from '../../asn1/src'
-import { asn1 } from '../../asn1/src'
-import { oids } from '../../oids'
-import { encode_rsa_oaep, pkcs1 } from '../../pkcs1/src'
-import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki/src'
-import util, { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
-import { BigInteger } from './jsbn'
-import { prime } from './prime'
 
 type CustomError = Error & {
   algorithm?: string
@@ -1116,7 +1116,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
             }
             // check hash algorithm identifier
             // see PKCS1-v1-5DigestAlgorithms in RFC 8017
-            // FIXME: add support to vaidator for strict value choices
+            // FIXME: add support to validator for strict value choices
             const oid = asn1.derToOid(capture.algorithmIdentifier)
             if (!(oid === oids.md2
               || oid === oids.md5
@@ -2230,6 +2230,10 @@ export interface RSA {
   privateKeyToPem: typeof privateKeyToPem
   privateKeyInfoToPem: typeof privateKeyInfoToPem
   publicKeyValidator: typeof publicKeyValidator
+  privateKeyFromAsn1: typeof privateKeyFromAsn1
+  privateKeyToAsn1: typeof privateKeyToAsn1
+  publicKeyFromAsn1: typeof publicKeyFromAsn1
+  publicKeyToAsn1: typeof publicKeyToAsn1
   encrypt: typeof encrypt
   decrypt: typeof decrypt
 }
@@ -2240,6 +2244,10 @@ export const rsa: RSA = {
   privateKeyToPem,
   privateKeyInfoToPem,
   publicKeyValidator,
+  privateKeyFromAsn1,
+  privateKeyToAsn1,
+  publicKeyFromAsn1,
+  publicKeyToAsn1,
   encrypt,
   decrypt,
 }
