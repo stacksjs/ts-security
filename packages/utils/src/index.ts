@@ -526,3 +526,161 @@ export function bytesToHex(bytes: string): string {
 export function decodeUtf8(bytes: string): string {
   return decodeURIComponent(escape(bytes))
 }
+
+/**
+ * Converts a hex string into a 'binary' encoded string of bytes.
+ *
+ * @param hex the hexadecimal string to convert.
+ *
+ * @return the binary-encoded string of bytes.
+ */
+export function hexToBytes(hex: string): string {
+  // TODO: deprecate: "Deprecated. Use util.binary.hex.decode instead."
+  let rval = ''
+  let i = 0
+  if ((hex.length & 1) === 1) {
+    // odd number of characters, convert first character alone
+    i = 1
+    rval += String.fromCharCode(Number.parseInt(hex[0], 16))
+  }
+
+  // convert 2 characters (1 byte) at a time
+  for (; i < hex.length; i += 2) {
+    rval += String.fromCharCode(Number.parseInt(hex.substr(i, 2), 16))
+  }
+
+  return rval
+}
+
+/**
+ * Estimates the number of processes that can be run concurrently. If
+ * creating Web Workers, keep in mind that the main JavaScript process needs
+ * its own core.
+ *
+ * @param options the options to use: update true to force an update (not use the cached value).
+ * @param callback(err, max) called once the operation completes.
+ */
+export function estimateCores(options: any, callback: any): void {
+  if (typeof options === 'function') {
+    callback = options
+    options = {}
+  }
+
+  options = options || {}
+
+  if ('cores' in util && options?.update !== true)
+    return callback(null, util.cores)
+
+  if (typeof navigator !== 'undefined'
+    && 'hardwareConcurrency' in navigator
+    && navigator.hardwareConcurrency > 0) {
+    util.cores = navigator.hardwareConcurrency
+    return callback(null, util.cores)
+  }
+
+  if (typeof Worker === 'undefined') {
+    // workers not available
+    util.cores = 1
+    return callback(null, util.cores)
+  }
+
+  if (typeof Blob === 'undefined') {
+    // can't estimate, default to 2
+    util.cores = 2
+    return callback(null, util.cores)
+  }
+
+  // create worker concurrency estimation code as blob
+  const blobUrl = URL.createObjectURL(new Blob(['(', function () {
+    self.addEventListener('message', (e) => {
+      // run worker for 4 ms
+      const st = Date.now()
+      const et = st + 4
+      while (Date.now() < et);
+      self.postMessage({ st, et })
+    })
+  }.toString(), ')()'], { type: 'application/javascript' }))
+
+  // take 5 samples using 16 workers
+  sample([], 5, 16)
+
+  function sample(max: number[], samples: number, numWorkers: number) {
+    if (samples === 0) {
+      // get overlap average
+      const avg = Math.floor(max.reduce((acc: number, x: number) => acc + x, 0) / max.length)
+      util.cores = Math.max(1, avg)
+      URL.revokeObjectURL(blobUrl)
+      return callback(null, util.cores)
+    }
+
+    map(numWorkers, (err: Error | null, results: any[]) => {
+      max.push(reduce(numWorkers, results))
+      sample(max, samples - 1, numWorkers)
+    })
+  }
+
+  function map(numWorkers: number, callback: (err: Error | null, results: any[]) => void) {
+    const workers: Worker[] = []
+    const results: any[] = []
+
+    for (let i = 0; i < numWorkers; ++i) {
+      const worker = new Worker(blobUrl)
+      workers.push(worker)
+      worker.addEventListener('message', (e: MessageEvent<any>) => {
+        results.push(e.data)
+        if (results.length === numWorkers) {
+          for (let i = 0; i < numWorkers; ++i) {
+            workers[i].terminate()
+          }
+          callback(null, results)
+        }
+      })
+      worker.postMessage(i)
+    }
+  }
+
+  function reduce(numWorkers: number, results: any[]) {
+    // find overlapping time windows
+    const overlaps: number[] = []
+    for (let n = 0; n < numWorkers; ++n) {
+      const r1 = results[n]
+      for (let i = 0; i < numWorkers; ++i) {
+        if (n === i) {
+          continue
+        }
+        const r2 = results[i]
+        if ((r1.st > r2.st && r1.st < r2.et)
+          || (r2.st > r1.st && r2.st < r1.et)) {
+          overlaps.push(i)
+        }
+      }
+    }
+    return overlaps.length
+  }
+}
+
+export interface Utils {
+  encodeUtf8: (bytes: string) => string
+  decodeUtf8: (bytes: string) => string
+  encode64: (input: string, maxline?: number) => string
+  decode64: (input: string) => string
+  bytesToHex: (bytes: string) => string
+  createBuffer: (b?: string | ArrayBuffer | Uint8Array) => ByteStringBuffer
+  fillString: (char: string, count: number) => string
+  ByteStringBuffer: typeof ByteStringBuffer
+  hexToBytes: (hex: string) => string
+  estimateCores: (options: any, callback: any) => void
+}
+
+export const utils: Utils = {
+  encodeUtf8,
+  decodeUtf8,
+  encode64,
+  decode64,
+  bytesToHex,
+  createBuffer,
+  fillString,
+  ByteStringBuffer,
+  hexToBytes,
+  estimateCores,
+}

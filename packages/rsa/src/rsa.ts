@@ -61,12 +61,11 @@
  * The OID for the RSA key algorithm is: 1.2.840.113549.1.1.1
  */
 
-import type { Asn1Object } from '../../encoding/asn1'
-import type { Asn1Validator } from '../../validators/asn1-validator'
-import { asn1 } from '../../encoding/asn1'
+import type { Asn1Object, Asn1Validator } from '../../asn1/src'
+import { asn1 } from '../../asn1/src'
 import { oids } from '../../oids'
-import { encode_rsa_oaep, pkcs1 } from '../../pkcs1'
-import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki'
+import { encode_rsa_oaep, pkcs1 } from '../../pkcs1/src'
+import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki/src'
 import util, { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
 import { BigInteger } from './jsbn'
 import { prime } from './prime'
