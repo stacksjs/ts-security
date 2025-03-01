@@ -1,3 +1,5 @@
+export * from './random'
+
 // base64 characters, reverse mapping
 const _base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
 const _base64Idx = [

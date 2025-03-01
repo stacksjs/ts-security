@@ -14,7 +14,10 @@
       "ts-pki": ["./packages/pki/src"],
       "ts-asn1": ["./packages/asn1/src"],
       "ts-rsa": ["./packages/rsa/src"],
-      "ts-jsbn": ["./packages/jsbn/src"]
+      "ts-jsbn": ["./packages/jsbn/src"],
+      "ts-pkcs": ["./packages/pkcs/src"],
+      "ts-oids": ["./packages/oids.ts"],
+      "ts-aes": ["./packages/aes/src"]
     },
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,

@@ -17,7 +17,7 @@
 
 import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode } from './cipher-modes'
-import { ByteStringBuffer, createBuffer } from '../../utils'
+import { ByteStringBuffer, createBuffer } from 'ts-security-utils'
 import { createCipher, registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
 
@@ -489,18 +489,18 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
       // temp = SubWord(RotWord(temp)) ^ Rcon[i / Nk]
       temp
         = sbox[temp >>> 16 & 255] << 24
-          ^ sbox[temp >>> 8 & 255] << 16
-          ^ sbox[temp & 255] << 8
-          ^ sbox[temp >>> 24] ^ (rcon[iNk] << 24)
+        ^ sbox[temp >>> 8 & 255] << 16
+        ^ sbox[temp & 255] << 8
+        ^ sbox[temp >>> 24] ^ (rcon[iNk] << 24)
       iNk++
     }
     else if (Nk > 6 && (i % Nk === 4)) {
       // temp = SubWord(temp)
       temp
         = sbox[temp >>> 24] << 24
-          ^ sbox[temp >>> 16 & 255] << 16
-          ^ sbox[temp >>> 8 & 255] << 8
-          ^ sbox[temp & 255]
+        ^ sbox[temp >>> 16 & 255] << 16
+        ^ sbox[temp >>> 8 & 255] << 8
+        ^ sbox[temp & 255]
     }
     w[i] = w[i - Nk] ^ temp
   }
@@ -820,24 +820,24 @@ export function _updateBlock(w: number[], input: number[], output: number[], dec
   // Note: rows are shifted inline
   output[0]
     = (sub[a >>> 24] << 24)
-      ^ (sub[b >>> 16 & 255] << 16)
-      ^ (sub[c >>> 8 & 255] << 8)
-      ^ (sub[d & 255]) ^ w[++i]
+    ^ (sub[b >>> 16 & 255] << 16)
+    ^ (sub[c >>> 8 & 255] << 8)
+    ^ (sub[d & 255]) ^ w[++i]
   output[decrypt ? 3 : 1]
     = (sub[b >>> 24] << 24)
-      ^ (sub[c >>> 16 & 255] << 16)
-      ^ (sub[d >>> 8 & 255] << 8)
-      ^ (sub[a & 255]) ^ w[++i]
+    ^ (sub[c >>> 16 & 255] << 16)
+    ^ (sub[d >>> 8 & 255] << 8)
+    ^ (sub[a & 255]) ^ w[++i]
   output[2]
     = (sub[c >>> 24] << 24)
-      ^ (sub[d >>> 16 & 255] << 16)
-      ^ (sub[a >>> 8 & 255] << 8)
-      ^ (sub[b & 255]) ^ w[++i]
+    ^ (sub[d >>> 16 & 255] << 16)
+    ^ (sub[a >>> 8 & 255] << 8)
+    ^ (sub[b & 255]) ^ w[++i]
   output[decrypt ? 1 : 3]
     = (sub[d >>> 24] << 24)
-      ^ (sub[a >>> 16 & 255] << 16)
-      ^ (sub[b >>> 8 & 255] << 8)
-      ^ (sub[c & 255]) ^ w[++i]
+    ^ (sub[a >>> 16 & 255] << 16)
+    ^ (sub[b >>> 8 & 255] << 8)
+    ^ (sub[c & 255]) ^ w[++i]
 }
 
 function createEncryptionCipher(key: string, bits: string | Buffer): BlockCipher {

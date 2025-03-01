@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { sha1, sha256 } from 'ts-hash'
 import { BigInteger } from 'ts-jsbn'
-
+import { rsa } from 'ts-rsa'
 import { createBuffer, decode64, encode64, fillString } from 'ts-security-utils'
+import { decode_rsa_oaep, encode_rsa_oaep } from '../src/pkcs1'
 const ASSERT = require('node:assert')
 
 // RSA's test vectors for Forge's RSA-OAEP implementation:
@@ -17,7 +18,7 @@ describe('pkcs1', () => {
     // test decrypting corrupted data: flip every bit (skip first byte to
     // avoid triggering other invalid encryption error) in the message this
     // tests the padding error handling
-    const encoded = PKCS1.encode_rsa_oaep(
+    const encoded = encode_rsa_oaep(
       keys.publicKey,
       'datadatadatadata',
       { seed },
@@ -38,7 +39,7 @@ describe('pkcs1', () => {
 
       try {
         const decrypted = keys.privateKey.decrypt(out, null)
-        PKCS1.decode_rsa_oaep(keys.privateKey, decrypted)
+        decode_rsa_oaep(keys.privateKey, decrypted)
         throw {
           message: 'Expected an exception.',
         }
@@ -52,10 +53,10 @@ describe('pkcs1', () => {
   it('should detect leading zero bytes', () => {
     const keys = makeKey()
     const message = fillString('\x00', 80)
-    const encoded = PKCS1.encode_rsa_oaep(keys.publicKey, message)
+    const encoded = encode_rsa_oaep(keys.publicKey, message)
     const ciphertext = keys.publicKey.encrypt(encoded, null)
     const decrypted = keys.privateKey.decrypt(ciphertext, null)
-    const decoded = PKCS1.decode_rsa_oaep(keys.privateKey, decrypted)
+    const decoded = decode_rsa_oaep(keys.privateKey, decrypted)
     ASSERT.equal(message, decoded)
   })
 
@@ -1000,12 +1001,12 @@ describe('pkcs1', () => {
     return new BigInteger(hex, 16)
   }
 
-  function _base64ToBn(s) {
+  function _base64ToBn(s: string) {
     const decoded = decode64(s)
     return _bytesToBigInteger(decoded)
   }
 
-  function checkOAEPEncryptExamples(publicKey, privateKey, md, examples) {
+  function checkOAEPEncryptExamples(publicKey: any, privateKey: any, md: any, examples: any) {
     if (md === 'sha1') {
       md = sha1.create()
     }
@@ -1028,16 +1029,16 @@ describe('pkcs1', () => {
   }
 
   function checkOAEPEncrypt(
-    publicKey,
-    privateKey,
-    md,
-    message,
-    seed,
-    expected,
+    publicKey: any,
+    privateKey: any,
+    md: any,
+    message: any,
+    seed: any,
+    expected: any,
   ) {
     message = decode64(message)
     seed = decode64(seed)
-    const encoded = PKCS1.encode_rsa_oaep(
+    const encoded = encode_rsa_oaep(
       publicKey,
       message,
       { seed, md },
@@ -1046,7 +1047,7 @@ describe('pkcs1', () => {
     ASSERT.equal(expected, encode64(ciphertext))
 
     const decrypted = privateKey.decrypt(ciphertext, null)
-    let decoded = PKCS1.decode_rsa_oaep(privateKey, decrypted, { md })
+    let decoded = decode_rsa_oaep(privateKey, decrypted, { md })
     ASSERT.equal(message, decoded)
 
     // test with higher-level API, default label, and generating a seed
@@ -1055,10 +1056,11 @@ describe('pkcs1', () => {
     ASSERT.equal(message, decoded)
   }
 
-  function decodeBase64PublicKey(modulus, exponent) {
+  function decodeBase64PublicKey(modulus: any, exponent: any) {
     modulus = _base64ToBn(modulus)
     exponent = _base64ToBn(exponent)
-    return PKI.setRsaPublicKey(modulus, exponent)
+
+    return rsa.setRsaPublicKey(modulus, exponent)
   }
 
   function decodeBase64PrivateKey(modulus, exponent, d, p, q, dP, dQ, qInv) {

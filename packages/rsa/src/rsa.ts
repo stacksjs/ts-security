@@ -1,11 +1,11 @@
-import type { Asn1Object, Asn1Validator } from '../../asn1/src'
-import { asn1 } from '../../asn1/src'
-import { oids } from '../../oids'
-import { encode_rsa_oaep, pkcs1 } from '../../pkcs1/src'
-import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from '../../pki/src'
-import { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from '../../utils'
-import { BigInteger } from './jsbn'
-import { prime } from './prime'
+import type { Asn1Object, Asn1Validator } from 'ts-asn1'
+import { asn1 } from 'ts-asn1'
+import { oids } from 'ts-oids'
+import { encode_rsa_oaep, pkcs1 } from 'ts-pkcs'
+import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from 'ts-pki'
+import { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from 'ts-security-utils'
+import { BigInteger } from 'ts-jsbn'
+import { prime } from 'ts-prime'
 
 /**
  * Javascript implementation of basic RSA algorithms.
@@ -2234,6 +2234,7 @@ export interface RSA {
   privateKeyToAsn1: typeof privateKeyToAsn1
   publicKeyFromAsn1: typeof publicKeyFromAsn1
   publicKeyToAsn1: typeof publicKeyToAsn1
+  setRsaPublicKey: typeof setRsaPublicKey
   encrypt: typeof encrypt
   decrypt: typeof decrypt
 }
@@ -2248,6 +2249,7 @@ export const rsa: RSA = {
   privateKeyToAsn1,
   publicKeyFromAsn1,
   publicKeyToAsn1,
+  setRsaPublicKey,
   encrypt,
   decrypt,
 }
