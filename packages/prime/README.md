@@ -6,155 +6,152 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-asn1
+# ts-prime
 
-> A TypeScript implementation of ASN.1 encoding and decoding with a focus on type safety and standards compliance.
+> A TypeScript implementation of probabilistic prime number generation with a focus on performance and security.
 
 ## Features
 
-- 🔒 **DER Compliant** _Implements ASN.1 encoding & decoding according to standard_
-- 🔄 **Comprehensive Type Support** _Support for INTEGER, BIT STRING, OCTET STRING, NULL, OBJECT IDENTIFIER, SEQUENCE, SET, and more_
-- 🧩 **Validation** _Validate ASN.1 structures against expected schemas_
-- 🔧 **Flexible Parsing** _Support for both strict DER and more lenient BER parsing_
+- 🔢 **Probabilistic Prime Generation** _Generate probable prime numbers of any bit length_
+- 🧮 **Miller-Rabin Testing** _Uses the Miller-Rabin primality test for efficient prime verification_
+- 🧵 **Web Worker Support** _Optional multi-threaded prime generation for improved performance_
+- ⏱️ **Non-Blocking Operation** _Configurable time slicing to prevent UI blocking_
+- 🔄 **Customizable PRNG** _Support for custom cryptographically secure random number generators_
 - 🛡️ **Type Safety** _Full TypeScript support with comprehensive type definitions_
-- 🪶 **Lightweight** _No dependencies_
-- 🔍 **Debugging** _Pretty printing of ASN.1 structures for easier debugging_
+- 🔍 **Configurable Testing** _Adjustable number of primality tests based on security requirements_
+- 🚀 **Performance Optimized** _Efficient algorithms for generating large prime numbers_
 
 ## Install
 
 ```bash
 # bun
-bun install ts-asn1
+bun install ts-prime
 
 # npm
-npm install ts-asn1
+npm install ts-prime
 
 # pnpm
-pnpm install ts-asn1
+pnpm install ts-prime
 ```
 
 ## Get Started
 
-After installing the package, you can import and use the ASN.1 encoding and decoding functions:
+After installing the package, you can import and use the prime number generation functions:
 
 ```ts
-import { asn1 } from 'ts-asn1'
-import { utils } from 'ts-security-utils'
+import { prime } from 'ts-prime'
 
-// Create an ASN.1 INTEGER
-const intValue = asn1.integerToDer(123)
-console.log(utils.bytesToHex(intValue)) // "7b"
+// Generate a 1024-bit probable prime
+prime.generateProbablePrime(1024, {}, (err, num) => {
+  if (err) {
+    console.error('Error generating prime:', err)
+    return
+  }
 
-// Parse ASN.1 DER encoded data
-const derData = utils.hexToBytes('300a02010102010202010304010a')
-const asn1Object = asn1.fromDer(derData)
-console.log(asn1.prettyPrint(asn1Object))
-// SEQUENCE {
-//   INTEGER 1
-//   INTEGER 2
-//   INTEGER 3
-//   OCTET STRING 0a
-// }
+  console.log('Generated prime:', num.toString())
+  console.log('Bit length:', num.bitLength())
+  console.log('Is probably prime:', num.isProbablePrime(10))
+})
 
-// Convert dates to/from ASN.1 generalized time
-const date = new Date('2025-03-01T12:00:00Z')
-const genTime = asn1.dateToGeneralizedTime(date)
-console.log(genTime) // "20250301120000Z"
+// With custom options
+const options = {
+  algorithm: 'PRIMEINC',
+  maxBlockTime: 10, // ms to allow blocking before yielding
+  millerRabinTests: 15, // number of primality tests
+  workers: 2, // number of web workers to use (if supported)
+  workLoad: 100 // work units per worker
+}
 
-// Convert back to a date
-const parsedDate = asn1.generalizedTimeToDate(genTime)
-console.log(parsedDate.toISOString()) // "2025-03-01T12:00:00.000Z"
+prime.generateProbablePrime(2048, options, (err, num) => {
+  if (err) {
+    console.error('Error generating prime:', err)
+    return
+  }
+
+  console.log('Generated 2048-bit prime:', num.toString())
+})
+
+// With custom PRNG
+const customPRNG = {
+  getBytesSync: (length) => {
+    // Your secure random byte generation logic here
+    // Must return a string of length 'length'
+    return secureRandomString(length)
+  }
+}
+
+prime.generateProbablePrime(512, { prng: customPRNG }, (err, num) => {
+  if (err) {
+    console.error('Error generating prime:', err)
+    return
+  }
+
+  console.log('Generated prime with custom PRNG:', num.toString())
+})
 ```
 
 ## API Reference
 
-### ASN.1 Types
-
-The library supports all standard ASN.1 types:
+### Prime Generation
 
 ```ts
-const Type = {
-  BOOLEAN: 1,
-  INTEGER: 2,
-  BITSTRING: 3,
-  OCTETSTRING: 4,
-  NULL: 5,
-  OID: 6,
-  OBJECT_DESCRIPTOR: 7,
-  EXTERNAL: 8,
-  REAL: 9,
-  ENUMERATED: 10,
-  EMBEDDED_PDV: 11,
-  UTF8: 12,
-  RELATIVE_OID: 13,
-  SEQUENCE: 16,
-  SET: 17,
-  NUMERIC_STRING: 18,
-  PRINTABLE_STRING: 19,
-  T61_STRING: 20,
-  VIDEOTEX_STRING: 21,
-  IA5_STRING: 22,
-  UTC_TIME: 23,
-  GENERALIZED_TIME: 24,
-  GRAPHIC_STRING: 25,
-  VISIBLE_STRING: 26,
-  GENERAL_STRING: 27,
-  UNIVERSAL_STRING: 28,
-  CHARACTER_STRING: 29,
-  BMP_STRING: 30
-} as const
+function generateProbablePrime(
+  bits: number,
+  options: PrimeOptions,
+  callback: (err: Error | null, num?: BigInteger) => void
+): void
 ```
 
-### ASN.1 Tag Classes
+Generates a random probable prime with the specified number of bits.
+
+#### Parameters
+
+- `bits`: The number of bits for the prime number.
+- `options`: Configuration options for prime generation.
+- `callback`: Function called with the generated prime or an error.
+
+#### PrimeOptions
 
 ```ts
-const Class = {
-  UNIVERSAL: 0,
-  APPLICATION: 1,
-  CONTEXT_SPECIFIC: 2,
-  PRIVATE: 3
-} as const
+interface PrimeOptions {
+  algorithm?: string | { name: string, options?: any }
+  prng?: {
+    getBytesSync: (length: number) => string
+  }
+  maxBlockTime?: number
+  millerRabinTests?: number
+  workers?: number
+  workLoad?: number
+  workerScript?: string
+}
 ```
 
-### Key Functions
+- `algorithm`: The algorithm to use (default: 'PRIMEINC').
+- `prng`: A custom crypto-secure pseudo-random number generator.
+- `maxBlockTime`: Maximum time (ms) to block the main thread (default: 10ms).
+- `millerRabinTests`: Number of Miller-Rabin tests to perform.
+- `workers`: Number of web workers to use (-1 for CPU cores - 1).
+- `workLoad`: Number of potential primes for each worker to check.
+- `workerScript`: Path to the worker script.
 
-#### Encoding/Decoding
+### Miller-Rabin Tests
 
-```ts
-// Convert to/from DER encoding
-function fromDer(bytes: Uint8Array, options?: FromDerOptions): Asn1Object
-function toDer(obj: Asn1Object): Buffer
+The number of Miller-Rabin tests is automatically determined based on the bit size to achieve an error probability of (1/2)^80:
 
-// Convert integers to/from DER
-function integerToDer(n: number): Buffer
-function derToInteger(bytes: Uint8Array): number
-
-// Convert OIDs to/from DER
-function oidToDer(oid: string): Buffer
-function derToOid(bytes: Uint8Array): string
-
-// Date conversions
-function dateToGeneralizedTime(date: Date): string
-function generalizedTimeToDate(genTime: string): Date
-function dateToUtcTime(date: Date): string
-function utcTimeToDate(utcTime: string): Date
-```
-
-#### Utility Functions
-
-```ts
-// Create a copy of an ASN.1 object
-function copy(obj: Asn1Object): Asn1Object
-
-// Compare two ASN.1 objects for equality
-function equals(obj1: any, obj2: any): boolean
-
-// Validate an ASN.1 object against a schema
-function validate(obj: Asn1Object, validator: Validator, capture?: Record<string, any>, errors?: string[]): boolean
-
-// Pretty print an ASN.1 object for debugging
-function prettyPrint(obj: Asn1Object, indent?: string): string
-```
+| Bit Size | Tests |
+|----------|-------|
+| ≤ 100    | 27    |
+| ≤ 150    | 18    |
+| ≤ 200    | 15    |
+| ≤ 250    | 12    |
+| ≤ 300    | 9     |
+| ≤ 350    | 8     |
+| ≤ 400    | 7     |
+| ≤ 500    | 6     |
+| ≤ 600    | 5     |
+| ≤ 800    | 4     |
+| ≤ 1250   | 3     |
+| > 1250   | 2     |
 
 ## Testing
 
@@ -182,7 +179,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-asn1` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-prime` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -207,10 +204,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-asn1?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-asn1
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-prime?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-prime
 [github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-security/ci.yml?style=flat-square&branch=main
 [github-actions-href]: https://github.com/stacksjs/ts-security/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-asn1/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-asn1 -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-prime/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-prime -->

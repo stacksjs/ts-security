@@ -195,18 +195,18 @@ function primeincFindPrimeWithWorkers(bits: number, rng: RNGInterface, options: 
 
     // listen for requests from workers and assign ranges to find prime
     for (let i = 0; i < numWorkers; ++i) {
-      workers[i].addEventListener('message', workerMessage)
+      workers[i].addEventListener('message', workerMessage as EventListener)
     }
 
     let found = false
-    function workerMessage(e: WorkerMessageEvent) {
+    function workerMessage(e: any) {
       // ignore message, prime already found
       if (found) {
         return
       }
 
       --running
-      const data = e.data
+      const data = e.data as WorkerMessageData
       if (data.found) {
         // terminate all workers
         for (let i = 0; i < workers.length; ++i) {
