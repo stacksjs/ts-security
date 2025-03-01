@@ -1,6 +1,6 @@
-import { rsa } from 'ts-rsa'
 import { asn1 } from 'ts-asn1'
 import { decode, encode, pem } from 'ts-pem'
+import { rsa } from 'ts-rsa'
 import { createBuffer } from 'ts-security-utils'
 
 interface CustomError extends Error {
@@ -49,7 +49,7 @@ export function privateKeyToPem(key: any, maxline: number): string {
     procType: null,
     contentDomain: null,
     dekInfo: null,
-    headers: []
+    headers: [],
   }
 
   return pem.encode(msg, { maxline })
@@ -71,7 +71,7 @@ export function privateKeyInfoToPem(pki: any, maxline: number): string {
     procType: null,
     contentDomain: null,
     dekInfo: null,
-    headers: []
+    headers: [],
   }
 
   return encode(msg, { maxline })

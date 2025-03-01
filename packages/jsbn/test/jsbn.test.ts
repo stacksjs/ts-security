@@ -51,7 +51,7 @@ describe('BigInteger', () => {
       console.log('BigInteger object:', {
         t: bi.t,
         s: bi.s,
-        data: bi.data.slice(0, bi.t)
+        data: bi.data.slice(0, bi.t),
       })
       console.log('toString result:', bi.toString())
       expect(bi.toString()).toBe('-789')
@@ -62,7 +62,7 @@ describe('BigInteger', () => {
       console.log('BigInteger from negative string:', {
         t: bi.t,
         s: bi.s,
-        data: bi.data.slice(0, bi.t)
+        data: bi.data.slice(0, bi.t),
       })
       console.log('toString result:', bi.toString())
       expect(bi.toString()).toBe('-101')
@@ -109,17 +109,17 @@ describe('BigInteger', () => {
       console.log('a + b:', {
         a: a.toString(),
         b: b.toString(),
-        result: a.add(b).toString()
+        result: a.add(b).toString(),
       })
       console.log('a - b:', {
         a: a.toString(),
         b: b.toString(),
-        result: a.subtract(b).toString()
+        result: a.subtract(b).toString(),
       })
       console.log('a * b:', {
         a: a.toString(),
         b: b.toString(),
-        result: a.multiply(b).toString()
+        result: a.multiply(b).toString(),
       })
       expect(a.add(b).toString()).toBe('80')
       expect(a.subtract(b).toString()).toBe('120')

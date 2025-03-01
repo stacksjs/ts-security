@@ -6,106 +6,130 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-pem
+# ts-jsbn
 
-> A TypeScript implementation of PEM (Privacy Enhanced Mail) encoding and decoding with a focus on type safety and standards compliance.
+> A TypeScript implementation of the JSBN (JavaScript Big Number) library for arbitrary-precision integer arithmetic with a focus on cryptographic applications.
 
 ## Features
 
-- 🔒 **RFC 1421 Compliant** _Implements PEM encoding & decoding according to standard_
-- 📦 **Versatile Handling** _Support for multiple PEM messages in a single string_
-- 🔄 **Header Processing** _Proper handling of PEM headers including Proc-Type, Content-Domain, and DEK-Info_
-- 🧩 **CSR Support** _Special handling for Certificate Signing Requests with NEW prefix_
-- 🔧 **Customizable Output** _Control over line length in encoded PEM output_
+- 🔢 **Arbitrary-Precision Arithmetic** _Handle integers of any size without precision loss_
+- 🔐 **Cryptographic Operations** _Support for modular arithmetic essential for RSA and other crypto algorithms_
+- 🧮 **Complete Math Library** _Addition, subtraction, multiplication, division, and more_
+- 🔄 **Modular Operations** _Modular exponentiation, inverse, and GCD calculations_
+- 🧪 **Primality Testing** _Miller-Rabin primality test implementation_
+- 🔍 **Bitwise Operations** _Bit shifting, testing, and manipulation_
 - 🛡️ **Type Safety** _Full TypeScript support with comprehensive type definitions_
-- 🪶 **Lightweight** _No dependencies other than_
+- 🪶 **Lightweight** _No dependencies other than core utilities_
 
 ## Install
 
 ```bash
 # bun
-bun install ts-pem
+bun install ts-jsbn
 
 # npm
-npm install ts-pem
+npm install ts-jsbn
 
 # pnpm
-pnpm install ts-pem
+pnpm install ts-jsbn
 ```
 
 ## Get Started
 
-After installing the package, you can import and use the PEM encoding and decoding functions:
+After installing the package, you can import and use the BigInteger class:
 
 ```ts
-import { decode, encode } from 'ts-pem'
+import { BigInteger } from 'ts-jsbn'
 
-// Decode a PEM-formatted string
-const pemString = `-----BEGIN CERTIFICATE-----
-MIIBPAIBAAJBALjXU+IdHkSkdBscgXf+EBoa55ruAIsU50uDFjFBkp+rWFt5AOGF
-9xL1/HNIby5M64BCw021nJTZKEOmXKdmzYsCAwEAAQ==
------END CERTIFICATE-----`
+// Create BigInteger instances
+const a = new BigInteger('123456789012345678901234567890')
+const b = new BigInteger('98765432109876543210')
 
-const messages = decode(pemString)
-console.log(messages[0].type) // 'CERTIFICATE'
+// Basic arithmetic
+const sum = a.add(b)
+const difference = a.subtract(b)
+const product = a.multiply(b)
+const quotient = a.divide(b)
 
-// Create and encode a PEM message
-const newMessage = {
-  type: 'RSA PRIVATE KEY',
-  procType: null,
-  contentDomain: null,
-  dekInfo: null,
-  headers: [],
-  body: new TextEncoder().encode('your-binary-data-here')
-}
+console.log('Sum:', sum.toString())
+console.log('Difference:', difference.toString())
+console.log('Product:', product.toString())
+console.log('Quotient:', quotient.toString())
 
-const encodedPem = encode(newMessage)
-console.log(encodedPem)
-// -----BEGIN RSA PRIVATE KEY-----
-// eW91ci1iaW5hcnktZGF0YS1oZXJl
-// -----END RSA PRIVATE KEY-----
+// Modular arithmetic (useful for cryptography)
+const modulus = new BigInteger('65537')
+const exponent = new BigInteger('3')
+const base = new BigInteger('42')
+
+// Calculate (base^exponent) mod modulus
+const modPowResult = base.modPow(exponent, modulus)
+console.log('Modular exponentiation:', modPowResult.toString())
+
+// Calculate modular inverse
+const inverse = base.modInverse(modulus)
+console.log('Modular inverse:', inverse.toString())
+
+// Primality testing
+const prime = new BigInteger('997')
+console.log('Is prime:', prime.isProbablePrime(10) ? 'Yes' : 'No')
 ```
 
 ## API Reference
 
-### Decode
+### Constructor
 
 ```ts
-function decode(str: string): PEMMessage[]
+new BigInteger(value?: number | string | null, radix?: number, length?: number)
 ```
 
-Decodes a PEM-formatted string into an array of PEM message objects.
+Creates a new BigInteger instance.
 
 - **Parameters**:
-  - `str`: The PEM-formatted string to decode
-- **Returns**: An array of `PEMMessage` objects
+  - `value`: A number, string, or null to initialize the BigInteger
+  - `radix`: The base of the number representation (default: 10)
+  - `length`: Used for specific initialization scenarios
 
-### Encode
+### Basic Arithmetic
 
-```ts
-function encode(msg: PEMMessage, options?: PEMEncodeOptions): string
-```
+- `add(a: BigInteger): BigInteger` - Adds two BigIntegers
+- `subtract(a: BigInteger): BigInteger` - Subtracts one BigInteger from another
+- `multiply(a: BigInteger): BigInteger` - Multiplies two BigIntegers
+- `divide(a: BigInteger): BigInteger` - Divides one BigInteger by another
 
-Encodes a PEM message object into a PEM-formatted string.
+### Modular Arithmetic
 
-- **Parameters**:
-  - `msg`: The PEM message object to encode
-  - `options`: Optional encoding options
-    - `maxline`: Maximum characters per line for the body (default: 64)
-- **Returns**: A PEM-formatted string
+- `mod(m: BigInteger): BigInteger` - Returns this BigInteger modulo m
+- `modPow(e: BigInteger, m: BigInteger): BigInteger` - Calculates (this^e) mod m
+- `modInverse(m: BigInteger): BigInteger` - Calculates the modular multiplicative inverse
 
-### PEMMessage Interface
+### Comparison
 
-```ts
-interface PEMMessage {
-  type: string // The type of message (e.g., "RSA PRIVATE KEY")
-  procType: ProcType | null // Processing type information
-  contentDomain: string | null // Content domain (typically "RFC822")
-  dekInfo: DEKInfo | null // Data Encryption Key information
-  headers: PEMHeader[] // Additional headers
-  body: Uint8Array // The binary-encoded body
-}
-```
+- `compareTo(a: BigInteger): number` - Compares two BigIntegers
+- `equals(a: BigInteger): boolean` - Checks if two BigIntegers are equal
+
+### Bitwise Operations
+
+- `shiftLeft(n: number): BigInteger` - Shifts bits left by n positions
+- `shiftRight(n: number): BigInteger` - Shifts bits right by n positions
+- `testBit(n: number): boolean` - Tests if the nth bit is set
+
+### Number Theory
+
+- `gcd(a: BigInteger): BigInteger` - Calculates the greatest common divisor
+- `isProbablePrime(t: number): boolean` - Tests if this BigInteger is probably prime
+
+### Conversion
+
+- `toString(radix?: number): string` - Converts to string in the specified radix
+- `intValue(): number` - Converts to a JavaScript number
+
+## Limitations
+
+Please note the following limitations of the current implementation:
+
+1. Negative numbers are not fully supported in all operations
+2. Some operations with negative numbers may not work as expected
+3. For full support of negative numbers, additional work is needed in various methods
 
 ## Testing
 
@@ -115,7 +139,7 @@ bun test
 
 ## Changelog
 
-Please see our [releases](https://github.com/stacksjs/ts-pem/releases) page for more information on what has changed recently.
+Please see our [releases](https://github.com/stacksjs/ts-jsbn/releases) page for more information on what has changed recently.
 
 ## Contributing
 
@@ -133,7 +157,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-pem` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-jsbn` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -146,8 +170,7 @@ We would like to extend our thanks to the following sponsors for funding Stacks 
 
 ## Credits
 
-- [Dave Longley](https://github.com/dlongley)
-- [node-forge](https://github.com/digitalbazaar/forge)
+- [Tom Wu](https://github.com/wwwtyro/jsbn) - Original JSBN implementation
 - [Chris Breuer](https://github.com/chrisbbreuer)
 - [All Contributors](../../contributors)
 
@@ -158,10 +181,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-pem?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-pem
-[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-pem/ci.yml?style=flat-square&branch=main
-[github-actions-href]: https://github.com/stacksjs/ts-pem/actions?query=workflow%3Aci
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-jsbn?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-jsbn
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-jsbn/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/ts-jsbn/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-pem/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-pem -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-jsbn/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-jsbn -->

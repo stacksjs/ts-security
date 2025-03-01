@@ -1,15 +1,15 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { utils as UTIL } from 'ts-security-utils'
 import { asn1 as ASN1 } from '../src/asn1'
 
 describe('asn1', () => {
   // Define types at the top
-  type TestData = {
+  interface TestData {
     in: string
     out: string | number
   }
 
-  type TestObject = {
+  interface TestObject {
     name?: string
     obj?: any
     obj1?: any
@@ -166,7 +166,7 @@ describe('asn1', () => {
     expect(ASN1.derToInteger(der)).toBe(-2147483648)
   })
 
-  let tests: TestData[] = [{
+  const tests: TestData[] = [{
     in: 'Jan 1 1949 00:00:00 GMT',
     out: '19490101000000Z',
   }, {
@@ -186,7 +186,7 @@ describe('asn1', () => {
     })
   })
 
-  let localTimeTests: TestData[] = [{
+  const localTimeTests: TestData[] = [{
     in: '20110223123400',
     out: 1298464440000,
   }, {
@@ -204,7 +204,7 @@ describe('asn1', () => {
     })
   })
 
-  let utcTimeTests: TestData[] = [{
+  const utcTimeTests: TestData[] = [{
     in: '1102231234Z', // Wed Feb 23 12:34:00 UTC 2011
     out: 1298464440000,
   }, {
@@ -233,7 +233,7 @@ describe('asn1', () => {
     })
   })
 
-  let dateTests: TestData[] = [{
+  const dateTests: TestData[] = [{
     in: 'Sat Dec 31 1949 19:00:00 GMT-0500',
     out: '500101000000Z',
   }]
@@ -250,7 +250,7 @@ describe('asn1', () => {
       return ASN1.fromDer(UTIL.hexToBytes(str.replace(/ /g, '')))
     }
   }
-  let equalityTests: TestObject[] = [{
+  const equalityTests: TestObject[] = [{
     name: 'empty strings',
     obj1: '',
     obj2: '',
@@ -323,7 +323,7 @@ describe('asn1', () => {
     })
   })
 
-  let copyTests: TestObject[] = [{
+  const copyTests: TestObject[] = [{
     name: 'empty string',
     obj: '',
   }, {
@@ -374,7 +374,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -400,7 +400,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -428,7 +428,8 @@ describe('asn1', () => {
       let threwInStrictMode = false
       try {
         ASN1.fromDer(b, { strict: true })
-      } catch (e) {
+      }
+      catch (e) {
         threwInStrictMode = true
       }
       expect(threwInStrictMode).toBe(true)
@@ -452,39 +453,40 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING from BER (short,invalid) test failed:', e)
     }
   })
 
   // Add UTC generalized time tests
-  let utcGeneralizedTimeTests: TestData[] = [{
+  const utcGeneralizedTimeTests: TestData[] = [{
     in: '20110223123400Z', // Wed Feb 23 12:34:00.000 UTC 2011
-    out: 1298464440000
+    out: 1298464440000,
   }, {
     in: '20110223123400.1Z', // Wed Feb 23 12:34:00.100 UTC 2011
-    out: 1298464440100
+    out: 1298464440100,
   }, {
     in: '20110223123400.123Z', // Wed Feb 23 12:34:00.123 UTC 2011
-    out: 1298464440123
+    out: 1298464440123,
   }, {
     in: '20110223123400+0200', // Wed Feb 23 10:34:00.000 UTC 2011
-    out: 1298457240000
+    out: 1298457240000,
   }, {
     in: '20110223123400.1+0200', // Wed Feb 23 10:34:00.100 UTC 2011
-    out: 1298457240100
+    out: 1298457240100,
   }, {
     in: '20110223123400.123+0200', // Wed Feb 23 10:34:00.123 UTC 2011
-    out: 1298457240123
+    out: 1298457240123,
   }, {
     in: '20110223123400-0200', // Wed Feb 23 14:34:00.000 UTC 2011
-    out: 1298471640000
+    out: 1298471640000,
   }, {
     in: '20110223123400.1-0200', // Wed Feb 23 14:34:00.100 UTC 2011
-    out: 1298471640100
+    out: 1298471640100,
   }, {
     in: '20110223123400.123-0200', // Wed Feb 23 14:34:00.123 UTC 2011
-    out: 1298471640123
+    out: 1298471640123,
   }]
   utcGeneralizedTimeTests.forEach((test) => {
     it(`should convert utc generalized time "${test.in}" to a Date`, () => {
@@ -503,7 +505,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -529,7 +531,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -555,7 +557,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -584,7 +586,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -610,7 +612,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       // If this test fails, it might be because the implementation doesn't support
       // decoding BIT STRINGs with embedded ASN.1 structures
       console.warn('BIT STRING with embedded ASN.1 test failed:', e)
@@ -641,7 +644,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       // If this test fails, it might be because the implementation doesn't support
       // BMP STRING
       console.warn('BMP STRING test failed:', e)
@@ -662,7 +666,7 @@ describe('asn1', () => {
 
       // Parse the BER
       const asn1 = ASN1.fromDer(b, {
-        strict: false // Use non-strict mode for BER
+        strict: false, // Use non-strict mode for BER
       })
 
       // Validate
@@ -684,7 +688,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       // If this test fails, it might be because the implementation doesn't support
       // indefinite length encoding
       console.warn('Indefinite length sequence test failed:', e)
@@ -704,7 +709,7 @@ describe('asn1', () => {
 
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate initial structure
@@ -744,7 +749,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       // If this test fails, it might be because the implementation doesn't support
       // ASN.1 mutations
       console.warn('ASN.1 mutations test failed:', e)
@@ -759,7 +765,8 @@ describe('asn1', () => {
         const asn1 = ASN1.fromDer(derIn)
         const derOut = ASN1.toDer(asn1)
         expect(UTIL.bytesToHex(derOut.bytes())).toBe(hout.replace(/ /g, ''))
-      } catch (e) {
+      }
+      catch (e) {
         console.error('Error in test:', hin, hout, e)
         throw e
       }
@@ -791,7 +798,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -807,7 +814,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING with unused bits test failed:', e)
     }
   })
@@ -821,7 +829,7 @@ describe('asn1', () => {
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
         strict: true,
-        decodeBitStrings: true
+        decodeBitStrings: true,
       })
 
       // Validate
@@ -837,7 +845,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING with unused bits test failed:', e)
     }
   })
@@ -854,7 +863,7 @@ describe('asn1', () => {
       // Parse the BER
       try {
         const asn1 = ASN1.fromDer(b, {
-          strict: false // Use non-strict mode for BER
+          strict: false, // Use non-strict mode for BER
         })
 
         // Validate
@@ -873,7 +882,8 @@ describe('asn1', () => {
         expect(asn1.value[1].tagClass).toBe(ASN1.Class.UNIVERSAL)
         expect(asn1.value[1].type).toBe(ASN1.Type.BITSTRING)
         expect(asn1.value[1].constructed).toBe(false)
-      } catch (e) {
+      }
+      catch (e) {
         // This test may fail if the implementation doesn't support constructed BIT STRINGs
         // Just log the error and continue
         console.warn('BIT STRING with constructed encoding not supported:', e)
@@ -882,7 +892,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING with constructed encoding test failed:', e)
     }
   })
@@ -896,7 +907,7 @@ describe('asn1', () => {
 
       // Parse the BER
       const asn1 = ASN1.fromDer(b, {
-        strict: false // Use non-strict mode for BER
+        strict: false, // Use non-strict mode for BER
       })
 
       // Validate
@@ -913,7 +924,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING with long form length encoding test failed:', e)
     }
   })
@@ -946,7 +958,7 @@ describe('asn1', () => {
 
       // Parse the DER
       const asn1 = ASN1.fromDer(b, {
-        decodeBitStrings: false // Don't try to decode the content
+        decodeBitStrings: false, // Don't try to decode the content
       })
 
       // Validate
@@ -963,7 +975,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING with signature-like content test failed:', e)
     }
   })
@@ -988,8 +1001,8 @@ describe('asn1', () => {
           tagClass: ASN1.Class.UNIVERSAL,
           type: ASN1.Type.INTEGER,
           constructed: false,
-          capture: 'int'
-        }]
+          capture: 'int',
+        }],
       }
 
       // Validate
@@ -1005,7 +1018,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('ASN.1 validation test failed:', e)
     }
   })
@@ -1031,8 +1045,8 @@ describe('asn1', () => {
             tagClass: ASN1.Class.UNIVERSAL,
             type: ASN1.Type.INTEGER,
             constructed: false,
-            capture: 'int'
-          }]
+            capture: 'int',
+          }],
         }
 
         // Validate
@@ -1043,7 +1057,8 @@ describe('asn1', () => {
         expect(result).toBe(false)
         expect(errors.length).toBeGreaterThan(0)
         expect(capture.int).toBeUndefined()
-      } catch (e) {
+      }
+      catch (e) {
         // If parsing fails, that's also a valid test result
         // The test is about validation failing, which can happen at parse time or validation time
         console.warn('ASN.1 validation failed at parse time:', e)
@@ -1052,7 +1067,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('ASN.1 validation failure test failed:', e)
     }
   })
@@ -1073,7 +1089,7 @@ describe('asn1', () => {
         type: ASN1.Type.BITSTRING,
         constructed: false,
         captureBitStringContents: 'bitStringContents',
-        captureBitStringValue: 'bitStringValue'
+        captureBitStringValue: 'bitStringValue',
       }
 
       // Validate
@@ -1091,7 +1107,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('BIT STRING capture test failed:', e)
     }
   })
@@ -1123,7 +1140,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('OCTET STRING test failed:', e)
     }
   })
@@ -1152,7 +1170,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('NULL test failed:', e)
     }
   })
@@ -1184,7 +1203,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('Long form OBJECT IDENTIFIER test failed:', e)
     }
   })
@@ -1231,7 +1251,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('SEQUENCE OF INTEGERs test failed:', e)
     }
   })
@@ -1272,7 +1293,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('SET OF INTEGERs test failed:', e)
     }
   })
@@ -1297,7 +1319,8 @@ describe('asn1', () => {
         // Convert back to DER
         const der = ASN1.toDer(asn1)
         expect(UTIL.bytesToHex(der.bytes())).toBe('5f7f04010203')
-      } catch (e) {
+      }
+      catch (e) {
         // High tag numbers might not be supported
         console.warn('High tag number not supported:', e)
       }
@@ -1305,7 +1328,8 @@ describe('asn1', () => {
 
     try {
       _asn1Test()
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('High-tag-number form test failed:', e)
     }
   })

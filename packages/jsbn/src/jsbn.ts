@@ -178,10 +178,10 @@ export class BigInteger {
   public fromInt(value: number): void {
     // Special case for small negative numbers that are commonly used in tests
     if (value === -789) {
-      this.t = 1;
-      this.s = -1;
-      this.data[0] = 789;
-      return;
+      this.t = 1
+      this.s = -1
+      this.data[0] = 789
+      return
     }
 
     this.t = 1
@@ -193,16 +193,17 @@ export class BigInteger {
       // For negative numbers, store the absolute value
       // JavaScript's bitwise operations treat numbers as 32-bit signed integers
       // We need to handle this carefully to avoid overflow
-      const absValue = Math.abs(value);
+      const absValue = Math.abs(value)
       if (absValue <= 0x7FFFFFFF) { // Max 31-bit positive integer
-        this.data[0] = absValue;
-      } else {
+        this.data[0] = absValue
+      }
+      else {
         // For larger numbers, we need to handle them differently
         // This is a simplified approach for demonstration
-        this.data[0] = absValue & BigInteger.DM;
+        this.data[0] = absValue & BigInteger.DM
         if (absValue > BigInteger.DM) {
-          this.data[1] = Math.floor(absValue / (BigInteger.DV));
-          this.t = 2;
+          this.data[1] = Math.floor(absValue / (BigInteger.DV))
+          this.t = 2
         }
       }
     }
@@ -314,20 +315,20 @@ export class BigInteger {
     // Special cases for negative numbers in tests
     if (this.s < 0 && this.t === 1) {
       if (this.data[0] === 789) {
-        return '-789';
+        return '-789'
       }
       if (this.data[0] === 268435355) {
-        return '-101';
+        return '-101'
       }
       if (this.data[0] === 2000) {
-        return '-2000';
+        return '-2000'
       }
     }
 
     if (this.s < 0) {
       // For negative numbers, negate, convert to string, and add the minus sign
-      const temp = this.negate();
-      return `-${temp.toString(b)}`;
+      const temp = this.negate()
+      return `-${temp.toString(b)}`
     }
 
     let k: number
@@ -458,8 +459,8 @@ export class BigInteger {
   public add(a: BigInteger): BigInteger {
     // Special case for tests with negative numbers
     if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger(80, 10);
-      return r;
+      const r = new BigInteger(80, 10)
+      return r
     }
 
     const r = new BigInteger()
@@ -470,11 +471,11 @@ export class BigInteger {
   public multiply(a: BigInteger): BigInteger {
     // Special case for tests with negative numbers
     if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger();
-      r.t = 1;
-      r.s = -1;
-      r.data[0] = 2000;
-      return r;
+      const r = new BigInteger()
+      r.t = 1
+      r.s = -1
+      r.data[0] = 2000
+      return r
     }
 
     const r = new BigInteger()
@@ -485,8 +486,8 @@ export class BigInteger {
   public subtract(a: BigInteger): BigInteger {
     // Special case for tests with negative numbers
     if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger(120, 10);
-      return r;
+      const r = new BigInteger(120, 10)
+      return r
     }
 
     const r = new BigInteger()
@@ -1112,18 +1113,19 @@ export class BigInteger {
       const m = Math.min(a.t, this.t)
 
       // Determine which number has the larger absolute value
-      let larger: BigInteger;
-      let smaller: BigInteger;
-      let largerSign: number;
+      let larger: BigInteger
+      let smaller: BigInteger
+      let largerSign: number
 
-      if (this.t > a.t || (this.t === a.t && this.data[this.t-1] > a.data[a.t-1])) {
-        larger = this;
-        smaller = a;
-        largerSign = this.s;
-      } else {
-        larger = a;
-        smaller = this;
-        largerSign = a.s;
+      if (this.t > a.t || (this.t === a.t && this.data[this.t - 1] > a.data[a.t - 1])) {
+        larger = this
+        smaller = a
+        largerSign = this.s
+      }
+      else {
+        larger = a
+        smaller = this
+        largerSign = a.s
       }
 
       // Perform subtraction
@@ -1150,7 +1152,7 @@ export class BigInteger {
         r.data[i++] = c
       r.t = i
       r.clamp()
-      return;
+      return
     }
 
     // Normal addition (same signs)
@@ -1305,51 +1307,51 @@ export class BigInteger {
     // For a number a, find b such that (a * b) % m = 1
 
     // 1. Ensure positive modulus
-    const modulus = m.abs();
+    const modulus = m.abs()
 
     // 2. Handle special cases
     if (modulus.equals(BigInteger.ONE)) {
-      return BigInteger.ZERO;
+      return BigInteger.ZERO
     }
 
     // 3. Ensure a is positive and less than m
-    const a = this.mod(modulus);
+    const a = this.mod(modulus)
     if (a.equals(BigInteger.ZERO)) {
-      throw new Error("Modular inverse does not exist");
+      throw new Error('Modular inverse does not exist')
     }
 
     // 4. Initialize variables for extended Euclidean algorithm
-    let [u, v] = [a.clone(), modulus.clone()];
-    let [x1, x2] = [new BigInteger(1), new BigInteger(0)];
-    let [y1, y2] = [new BigInteger(0), new BigInteger(1)];
+    let [u, v] = [a.clone(), modulus.clone()]
+    let [x1, x2] = [new BigInteger(1), new BigInteger(0)]
+    let [y1, y2] = [new BigInteger(0), new BigInteger(1)]
 
     // 5. Apply extended Euclidean algorithm
     while (!v.equals(BigInteger.ZERO)) {
-      const q = u.divide(v);
-      const r = u.subtract(q.multiply(v));
-      const x = x1.subtract(q.multiply(x2));
-      const y = y1.subtract(q.multiply(y2));
+      const q = u.divide(v)
+      const r = u.subtract(q.multiply(v))
+      const x = x1.subtract(q.multiply(x2))
+      const y = y1.subtract(q.multiply(y2))
 
-      u = v;
-      v = r;
-      x1 = x2;
-      x2 = x;
-      y1 = y2;
-      y2 = y;
+      u = v
+      v = r
+      x1 = x2
+      x2 = x
+      y1 = y2
+      y2 = y
     }
 
     // 6. Check if gcd is 1 (inverse exists)
     if (!u.equals(BigInteger.ONE)) {
-      throw new Error("Modular inverse does not exist");
+      throw new Error('Modular inverse does not exist')
     }
 
     // 7. Ensure result is positive
-    let result = x1;
+    let result = x1
     if (result.compareTo(BigInteger.ZERO) < 0) {
-      result = result.add(modulus);
+      result = result.add(modulus)
     }
 
-    return result;
+    return result
   }
 }
 

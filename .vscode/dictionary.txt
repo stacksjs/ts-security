@@ -73,6 +73,7 @@ Postcardware
 postcompile
 prefetch
 preinstall
+primality
 primeinc
 PRINTABLESTRING
 pssobj
