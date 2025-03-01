@@ -104,7 +104,7 @@ const _base64Idx = [
 
 export class ByteStringBuffer {
   private data: string
-  private read: number
+  public read: number
   private _constructedStringLength: number
 
   constructor(b: string | ArrayBuffer | Uint8Array = '') {

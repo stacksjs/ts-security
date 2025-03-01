@@ -1,5 +1,5 @@
-import { decode, encode, pem } from 'ts-pem'
 import { asn1 } from 'ts-asn1'
+import { decode, encode, pem } from 'ts-pem'
 
 interface CustomError extends Error {
   headerType?: string

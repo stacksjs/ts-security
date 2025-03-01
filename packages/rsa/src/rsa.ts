@@ -1244,15 +1244,15 @@ export function setPrivateKey(
   dQ: BigInteger,
   qInv: BigInteger,
 ): {
-  n: BigInteger
-  e: BigInteger
-  d: BigInteger
-  p: BigInteger
-  q: BigInteger
-  dP: BigInteger
-  dQ: BigInteger
-  qInv: BigInteger
-} {
+    n: BigInteger
+    e: BigInteger
+    d: BigInteger
+    p: BigInteger
+    q: BigInteger
+    dP: BigInteger
+    dQ: BigInteger
+    qInv: BigInteger
+  } {
   const key = {
     n,
     e,
@@ -1911,9 +1911,9 @@ function _bnToBytes(b: BigInteger) {
     // leading 0x00 for positive integer
     && ((bytes.charCodeAt(0) === 0
       && (bytes.charCodeAt(1) & 0x80) === 0)
-      // leading 0xFF for negative integer
-      || (bytes.charCodeAt(0) === 0xFF
-        && (bytes.charCodeAt(1) & 0x80) === 0x80))) {
+    // leading 0xFF for negative integer
+    || (bytes.charCodeAt(0) === 0xFF
+      && (bytes.charCodeAt(1) & 0x80) === 0x80))) {
     return bytes.substr(1)
   }
 

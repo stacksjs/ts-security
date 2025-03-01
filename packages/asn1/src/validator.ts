@@ -1,5 +1,6 @@
-import { Class, Type } from './asn1'
 import type { Asn1Validator, ValidatorMap } from './types'
+import { Class, Type } from './asn1'
+
 export const ans1PrivateKeyValidator: Asn1Validator = {
   // PrivateKeyInfo
   name: 'PrivateKeyInfo',

@@ -1,6 +1,6 @@
-import type { ByteStringBuffer } from '../utils'
-import { oids } from '../oids'
+import type { ByteStringBuffer } from 'ts-security-utils'
 import { bytesToHex, createBuffer, decodeUtf8 } from 'ts-security-utils'
+import { oids } from '../../oids'
 
 /**
  * TypeScript implementation of Abstract Syntax Notation Number One.
@@ -723,9 +723,9 @@ export function toDer(obj: Asn1Object): ByteStringBuffer {
         // leading 0x00 for positive integer
         && ((obj.value.charCodeAt(0) === 0
           && (obj.value.charCodeAt(1) & 0x80) === 0)
-          // leading 0xFF for negative integer
-          || (obj.value.charCodeAt(0) === 0xFF
-            && (obj.value.charCodeAt(1) & 0x80) === 0x80))) {
+        // leading 0xFF for negative integer
+        || (obj.value.charCodeAt(0) === 0xFF
+          && (obj.value.charCodeAt(1) & 0x80) === 0x80))) {
         value.putBytes(obj.value.substr(1))
       }
       else {
@@ -1276,7 +1276,7 @@ const _nonLatinRegex = /[^u0-\\f]/
  *
  * @return the string.
  */
-export function prettyPrint(obj: any, level: number, indentation: number): string {
+export function prettyPrint(obj: any, level?: number, indentation?: number): string {
   let rval = ''
 
   // set default level and indentation
