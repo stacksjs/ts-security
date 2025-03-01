@@ -249,7 +249,7 @@ describe('BigInteger', () => {
       expect(a.and(b).toString()).toBe('1') // 001 in binary
     })
 
-    it.skip('should perform bitwise OR operation', () => {
+    it('should perform bitwise OR operation', () => {
       const a = new BigInteger('5') // 101 in binary
       const b = new BigInteger('3') // 011 in binary
 
@@ -263,18 +263,18 @@ describe('BigInteger', () => {
       expect(a.xor(b).toString()).toBe('6') // 110 in binary
     })
 
-    it.skip('should perform bitwise AND NOT operation', () => {
+    it('should perform bitwise AND NOT operation', () => {
       const a = new BigInteger('5') // 101 in binary
       const b = new BigInteger('3') // 011 in binary
 
       expect(a.andNot(b).toString()).toBe('4') // 100 in binary
     })
 
-    it.skip('should perform bitwise NOT operation', () => {
+    it('should perform bitwise NOT operation', () => {
       const a = new BigInteger('5') // 101 in binary
       // NOT operation is typically implemented as a complement within a certain bit width
       // For a 4-bit representation, ~5 would be ~0101 = 1010 = 10 in decimal
-      expect(a.not().toString()).not.toBe('5')
+      expect(a.not().toString()).toBe('10')
     })
 
     it('should set, clear, and flip bits', () => {

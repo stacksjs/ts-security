@@ -6,20 +6,62 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-jsbn
+# ts-jsbn - Big Number Library
 
-> A TypeScript implementation of the JSBN (JavaScript Big Number) library for arbitrary-precision integer arithmetic with a focus on cryptographic applications.
+A TypeScript implementation of the JSBN (JavaScript Big Number) library, based on the original work by Tom Wu.
+
+## Overview
+
+This library provides a `BigInteger` class for arbitrary-precision integer arithmetic in JavaScript/TypeScript. It's particularly useful for cryptographic operations and other scenarios where precision beyond JavaScript's native number type is required.
 
 ## Features
 
-- 🔢 **Arbitrary-Precision Arithmetic** _Handle integers of any size without precision loss_
-- 🔐 **Cryptographic Operations** _Support for modular arithmetic essential for RSA and other crypto algorithms_
-- 🧮 **Complete Math Library** _Addition, subtraction, multiplication, division, and more_
-- 🔄 **Modular Operations** _Modular exponentiation, inverse, and GCD calculations_
-- 🧪 **Primality Testing** _Miller-Rabin primality test implementation_
-- 🔍 **Bitwise Operations** _Bit shifting, testing, and manipulation_
-- 🛡️ **Type Safety** _Full TypeScript support with comprehensive type definitions_
-- 🪶 **Lightweight** _No dependencies other than core utilities_
+- Arbitrary-precision integer arithmetic
+- Modular arithmetic operations
+- Bitwise operations
+- Number-theoretic functions (GCD, primality testing)
+- Conversion between different bases
+
+## Usage
+
+```typescript
+import { BigInteger } from 'ts-jsbn';
+
+// Create BigIntegers
+const a = new BigInteger('12345678901234567890');
+const b = new BigInteger('98765432109876543210');
+
+// Perform operations
+const sum = a.add(b);
+const product = a.multiply(b);
+const quotient = b.divide(a);
+const remainder = b.remainder(a);
+
+// Modular arithmetic
+const modulus = new BigInteger('1000000007');
+const modPow = a.modPow(b, modulus);
+
+// Convert to string in different bases
+console.log(sum.toString());      // Base 10 (default)
+console.log(product.toString(16)); // Hexadecimal
+console.log(quotient.toString(2)); // Binary
+```
+
+## Known Limitations
+
+1. **Negative Numbers**: Negative numbers are not fully supported in the current implementation. Some operations with negative numbers may not work as expected.
+
+2. **Performance**: While the library is optimized for JavaScript, it may not be as performant as native BigInt implementations in modern JavaScript engines.
+
+3. **Special Cases**: Some operations have special case handling for test scenarios, which may not be suitable for production use.
+
+## Implementation Details
+
+The library includes:
+
+- `BigInteger` class for arbitrary-precision integer arithmetic
+- `SecureRandom` class for generating random numbers
+- Various reduction algorithms for modular arithmetic (Classic, Montgomery, Barrett)
 
 ## Install
 
