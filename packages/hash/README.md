@@ -51,7 +51,7 @@ pnpm install ts-hash
 After installing the package, you can import and use the various hash functions:
 
 ```ts
-import { sha1, sha256, sha512, sha384, sha512_256, sha512_224 } from 'ts-hash'
+import { sha1, sha256, sha384, sha512, sha512_224, sha512_256 } from 'ts-hash'
 
 // SHA-1 Hashing (legacy, not recommended for security-critical applications)
 const md1 = sha1.create()
@@ -99,26 +99,26 @@ All hash functions implement the `MessageDigest` interface:
 
 ```ts
 interface MessageDigest {
-  algorithm: string;        // The name of the algorithm (e.g., 'sha256')
-  blockLength: number;      // The block size in bytes
-  digestLength: number;     // The digest size in bytes
-  messageLength: number;    // The current message length
+  algorithm: string // The name of the algorithm (e.g., 'sha256')
+  blockLength: number // The block size in bytes
+  digestLength: number // The digest size in bytes
+  messageLength: number // The current message length
 
   // Resets the hash state
-  start(): MessageDigest;
+  start: () => MessageDigest
 
   // Updates the hash with new data
-  update(msg: string | ByteStringBuffer, encoding?: string): MessageDigest;
+  update: (msg: string | ByteStringBuffer, encoding?: string) => MessageDigest
 
   // Finalizes the hash computation and returns the digest
-  digest(): ByteStringBuffer;
+  digest: () => ByteStringBuffer
 }
 ```
 
 ### SHA-1
 
 ```ts
-const md = sha1.create();
+const md = sha1.create()
 ```
 
 - Block size: 64 bytes
@@ -127,7 +127,7 @@ const md = sha1.create();
 ### SHA-256
 
 ```ts
-const md = sha256.create();
+const md = sha256.create()
 ```
 
 - Block size: 64 bytes
@@ -136,7 +136,7 @@ const md = sha256.create();
 ### SHA-512
 
 ```ts
-const md = sha512.create();
+const md = sha512.create()
 ```
 
 - Block size: 128 bytes
@@ -145,7 +145,7 @@ const md = sha512.create();
 ### SHA-384
 
 ```ts
-const md = sha384;
+const md = sha384
 ```
 
 - Block size: 128 bytes
@@ -154,7 +154,7 @@ const md = sha384;
 ### SHA-512/256
 
 ```ts
-const md = sha512_256;
+const md = sha512_256
 ```
 
 - Block size: 128 bytes
@@ -163,7 +163,7 @@ const md = sha512_256;
 ### SHA-512/224
 
 ```ts
-const md = sha512_224;
+const md = sha512_224
 ```
 
 - Block size: 128 bytes

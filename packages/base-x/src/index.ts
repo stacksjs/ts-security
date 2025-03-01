@@ -95,10 +95,12 @@ export function base(ALPHABET: Alphabet = ALPHABETS.BASE58): BaseConverter {
   function encode(source: Uint8Array | string): string {
     // eslint-disable-next-line no-empty
     if (source instanceof Uint8Array) { }
-    else if (ArrayBuffer.isView(source))
+    else if (ArrayBuffer.isView(source)) {
       source = new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
-    else if (Array.isArray(source))
+    }
+    else if (Array.isArray(source)) {
       source = Uint8Array.from(source)
+    }
 
     if (!(source instanceof Uint8Array))
       throw new TypeError('Expected Uint8Array')

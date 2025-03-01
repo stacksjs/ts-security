@@ -1,3 +1,4 @@
+import type { MessageDigest, SHA512, SHA512Algorithm } from './types'
 /**
  * Secure Hash Algorithm with a 1024-bit block size implementation.
  *
@@ -9,7 +10,6 @@
  * @author Chris Breuer
  */
 import { ByteStringBuffer, createBuffer, fillString } from 'ts-security-utils'
-import type { MessageDigest, SHA512Algorithm, SHA512 } from './types'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
 export interface SHA512State {
@@ -117,7 +117,8 @@ export function create(algorithm: SHA512Algorithm = 'sha512'): MessageDigest {
       let bytes: string
       if (msg instanceof ByteStringBuffer) {
         bytes = msg.bytes()
-      } else {
+      }
+      else {
         bytes = encoding === 'utf8' ? encodeURIComponent(msg) : msg
       }
 

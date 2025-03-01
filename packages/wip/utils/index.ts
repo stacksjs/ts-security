@@ -26,7 +26,8 @@ export class ByteStringBuffer {
           const encoder = new TextEncoder()
           const uint8Array = encoder.encode(b)
           this.data = String.fromCharCode(...uint8Array)
-        } else if (encoding === 'binary') {
+        }
+        else if (encoding === 'binary') {
           this.data = b
         }
       }

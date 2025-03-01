@@ -1647,7 +1647,8 @@ function _encodePkcs1_v1_5(m: string, key: {
     while (padNum > 0) {
       let numZeros = 0
       const padBytes = random.getBytes(padNum)
-      if (!padBytes) continue
+      if (!padBytes)
+        continue
       for (let i = 0; i < padNum; ++i) {
         padByte = padBytes.charCodeAt(i)
         if (padByte === 0)

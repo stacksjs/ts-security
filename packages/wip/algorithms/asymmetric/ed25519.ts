@@ -232,7 +232,7 @@ export function verify(options: Ed25519Options): boolean {
   const msg = messageToNativeBuffer(options)
 
   if (options.signature === undefined)
-    throw new TypeError('"options.signature" must be a Node.js/Bun Buffer, a Uint8Array, a ByteBuffer, or a binary string.',)
+    throw new TypeError('"options.signature" must be a Node.js/Bun Buffer, a Uint8Array, a ByteBuffer, or a binary string.')
 
   const sig = messageToNativeBuffer({
     message: options.signature,

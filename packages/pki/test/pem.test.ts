@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'bun:test'
-import { encode, decode } from '../src/pem'
+import { describe, expect, it } from 'bun:test'
+import { decode, encode } from '../src/pem'
 
 const _input = '-----BEGIN PRIVACY-ENHANCED MESSAGE-----\r\n'
   + 'Proc-Type: 4,ENCRYPTED\r\n'

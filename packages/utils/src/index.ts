@@ -114,11 +114,13 @@ export class ByteStringBuffer {
 
     if (typeof b === 'string') {
       this.data = b
-    } else if (b instanceof ArrayBuffer || b instanceof Uint8Array) {
+    }
+    else if (b instanceof ArrayBuffer || b instanceof Uint8Array) {
       const arr = b instanceof ArrayBuffer ? new Uint8Array(b) : b
       try {
         this.data = String.fromCharCode.apply(null, Array.from(arr))
-      } catch (e) {
+      }
+      catch (e) {
         for (let i = 0; i < arr.length; ++i) {
           this.putByte(arr[i])
         }
@@ -167,44 +169,50 @@ export class ByteStringBuffer {
 
   putInt16(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF))
+      String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   putInt24(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF))
+      String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   putInt32(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i >> 24 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i & 0xFF))
+      String.fromCharCode(i >> 24 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i & 0xFF),
+    )
   }
 
   putInt16Le(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF))
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF),
+    )
   }
 
   putInt24Le(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF))
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF),
+    )
   }
 
   putInt32Le(i: number): ByteStringBuffer {
     return this.putBytes(
-      String.fromCharCode(i & 0xFF) +
-      String.fromCharCode(i >> 8 & 0xFF) +
-      String.fromCharCode(i >> 16 & 0xFF) +
-      String.fromCharCode(i >> 24 & 0xFF))
+      String.fromCharCode(i & 0xFF)
+      + String.fromCharCode(i >> 8 & 0xFF)
+      + String.fromCharCode(i >> 16 & 0xFF)
+      + String.fromCharCode(i >> 24 & 0xFF),
+    )
   }
 
   putInt(i: number, n: number): ByteStringBuffer {
@@ -234,54 +242,54 @@ export class ByteStringBuffer {
 
   getInt16(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 8 |
-      this.data.charCodeAt(this.read + 1))
+      this.data.charCodeAt(this.read) << 8
+      | this.data.charCodeAt(this.read + 1))
     this.read += 2
     return rval
   }
 
   getInt24(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 16 |
-      this.data.charCodeAt(this.read + 1) << 8 |
-      this.data.charCodeAt(this.read + 2))
+      this.data.charCodeAt(this.read) << 16
+      | this.data.charCodeAt(this.read + 1) << 8
+      | this.data.charCodeAt(this.read + 2))
     this.read += 3
     return rval
   }
 
   getInt32(): number {
     const rval = (
-      this.data.charCodeAt(this.read) << 24 |
-      this.data.charCodeAt(this.read + 1) << 16 |
-      this.data.charCodeAt(this.read + 2) << 8 |
-      this.data.charCodeAt(this.read + 3))
+      this.data.charCodeAt(this.read) << 24
+      | this.data.charCodeAt(this.read + 1) << 16
+      | this.data.charCodeAt(this.read + 2) << 8
+      | this.data.charCodeAt(this.read + 3))
     this.read += 4
     return rval
   }
 
   getInt16Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) |
-      this.data.charCodeAt(this.read + 1) << 8)
+      this.data.charCodeAt(this.read)
+      | this.data.charCodeAt(this.read + 1) << 8)
     this.read += 2
     return rval
   }
 
   getInt24Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) |
-      this.data.charCodeAt(this.read + 1) << 8 |
-      this.data.charCodeAt(this.read + 2) << 16)
+      this.data.charCodeAt(this.read)
+      | this.data.charCodeAt(this.read + 1) << 8
+      | this.data.charCodeAt(this.read + 2) << 16)
     this.read += 3
     return rval
   }
 
   getInt32Le(): number {
     const rval = (
-      this.data.charCodeAt(this.read) |
-      this.data.charCodeAt(this.read + 1) << 8 |
-      this.data.charCodeAt(this.read + 2) << 16 |
-      this.data.charCodeAt(this.read + 3) << 24)
+      this.data.charCodeAt(this.read)
+      | this.data.charCodeAt(this.read + 1) << 8
+      | this.data.charCodeAt(this.read + 2) << 16
+      | this.data.charCodeAt(this.read + 3) << 24)
     this.read += 4
     return rval
   }
@@ -311,9 +319,11 @@ export class ByteStringBuffer {
       count = Math.min(this.length(), count)
       rval = this.data.slice(this.read, this.read + count)
       this.read += count
-    } else if (count === 0) {
+    }
+    else if (count === 0) {
       rval = ''
-    } else {
+    }
+    else {
       rval = (this.read === 0) ? this.data : this.data.slice(this.read)
       this.clear()
     }
@@ -321,9 +331,9 @@ export class ByteStringBuffer {
   }
 
   bytes(count?: number): string {
-    return (typeof(count) === 'undefined' ?
-      this.data.slice(this.read) :
-      this.data.slice(this.read, this.read + count))
+    return (typeof (count) === 'undefined'
+      ? this.data.slice(this.read)
+      : this.data.slice(this.read, this.read + count))
   }
 
   at(i: number): number {
@@ -331,9 +341,9 @@ export class ByteStringBuffer {
   }
 
   setAt(i: number, b: number): ByteStringBuffer {
-    this.data = this.data.substr(0, this.read + i) +
-      String.fromCharCode(b) +
-      this.data.substr(this.read + i + 1)
+    this.data = this.data.substr(0, this.read + i)
+      + String.fromCharCode(b)
+      + this.data.substr(this.read + i + 1)
     return this
   }
 

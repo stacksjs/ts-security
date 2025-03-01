@@ -38,7 +38,7 @@ pnpm install ts-pem
 After installing the package, you can import and use the PEM encoding and decoding functions:
 
 ```ts
-import { encode, decode } from 'ts-pem'
+import { decode, encode } from 'ts-pem'
 
 // Decode a PEM-formatted string
 const pemString = `-----BEGIN CERTIFICATE-----
@@ -98,12 +98,12 @@ Encodes a PEM message object into a PEM-formatted string.
 
 ```ts
 interface PEMMessage {
-  type: string;              // The type of message (e.g., "RSA PRIVATE KEY")
-  procType: ProcType | null; // Processing type information
-  contentDomain: string | null; // Content domain (typically "RFC822")
-  dekInfo: DEKInfo | null;   // Data Encryption Key information
-  headers: PEMHeader[];      // Additional headers
-  body: Uint8Array;          // The binary-encoded body
+  type: string // The type of message (e.g., "RSA PRIVATE KEY")
+  procType: ProcType | null // Processing type information
+  contentDomain: string | null // Content domain (typically "RFC822")
+  dekInfo: DEKInfo | null // Data Encryption Key information
+  headers: PEMHeader[] // Additional headers
+  body: Uint8Array // The binary-encoded body
 }
 ```
 

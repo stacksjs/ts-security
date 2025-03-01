@@ -1,6 +1,6 @@
-import { expect, it, describe } from 'bun:test'
-import { sha1 } from '../src/sha1'
+import { describe, expect, it } from 'bun:test'
 import { ByteStringBuffer } from 'ts-security-utils'
+import { sha1 } from '../src/sha1'
 
 describe('SHA-1', () => {
   describe('API structure', () => {
@@ -77,7 +77,7 @@ describe('SHA-1', () => {
   describe('UTF-8 encoding', () => {
     it('should handle UTF-8 encoding parameter', () => {
       const md = sha1.create()
-      const hash = md.update('c\'\u00e8', 'utf8').digest()
+      const hash = md.update('c\'\u00E8', 'utf8').digest()
       expect(hash.toHex()).toBe('98c9a3f804daa73b68a5660d032499a447350c0d')
     })
   })
@@ -155,7 +155,7 @@ describe('SHA-1', () => {
 
     it('should hash 10000 repetitions of "abc"', () => {
       const md = sha1.create()
-      for(let i = 0; i < 10000; ++i) {
+      for (let i = 0; i < 10000; ++i) {
         md.update('abc')
       }
       expect(md.digest().toHex()).toBe('a838edb5dec47b84b4bfb0a528ea958a5d9d2350')

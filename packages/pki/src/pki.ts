@@ -8,22 +8,22 @@ import { decode, encode } from 'ts-pem'
  * @return the private key.
  */
 export function privateKeyFromPem(pem: string) {
-  var msg = decode(pem)[0];
+  const msg = decode(pem)[0]
 
   if (msg.type !== 'PRIVATE KEY' && msg.type !== 'RSA PRIVATE KEY') {
-    var error = new Error('Could not convert private key from PEM; PEM ' +
-      'header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".');
-    error.headerType = msg.type;
-    throw error;
+    const error = new Error('Could not convert private key from PEM; PEM '
+      + 'header type is not "PRIVATE KEY" or "RSA PRIVATE KEY".')
+    error.headerType = msg.type
+    throw error
   }
   if (msg.procType && msg.procType.type === 'ENCRYPTED') {
-    throw new Error('Could not convert private key from PEM; PEM is encrypted.');
+    throw new Error('Could not convert private key from PEM; PEM is encrypted.')
   }
 
   // convert DER to ASN.1 object
-  var obj = asn1.fromDer(msg.body);
+  const obj = asn1.fromDer(msg.body)
 
-  return pki.privateKeyFromAsn1(obj);
+  return pki.privateKeyFromAsn1(obj)
 };
 
 /**
@@ -36,11 +36,11 @@ export function privateKeyFromPem(pem: string) {
  */
 export function privateKeyToPem(key: any, maxline: number) {
   // convert to ASN.1, then DER, then PEM-encode
-  var msg = {
+  const msg = {
     type: 'RSA PRIVATE KEY',
-    body: asn1.toDer(pki.privateKeyToAsn1(key)).getBytes()
-  };
-  return pem.encode(msg, { maxline: maxline });
+    body: asn1.toDer(pki.privateKeyToAsn1(key)).getBytes(),
+  }
+  return pem.encode(msg, { maxline })
 };
 
 /**
@@ -53,10 +53,10 @@ export function privateKeyToPem(key: any, maxline: number) {
  */
 export function privateKeyInfoToPem(pki: any, maxline: number) {
   // convert to DER, then PEM-encode
-  var msg = {
+  const msg = {
     type: 'PRIVATE KEY',
-    body: asn1.toDer(pki).getBytes()
-  };
+    body: asn1.toDer(pki).getBytes(),
+  }
 
-  return encode(msg, { maxline: maxline });
+  return encode(msg, { maxline })
 };

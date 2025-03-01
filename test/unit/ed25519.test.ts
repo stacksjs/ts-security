@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
+import { ByteBuffer, decode64, encode64, hexToBytes } from '../../packages/wip/utils'
 import { ed25519 } from '../../src/algorithms/asymmetric/ed25519'
 import { sha256 } from '../../src/algorithms/hash/sha256'
-import { ByteBuffer, decode64, encode64, hexToBytes } from '../../packages/wip/utils'
 
 const b64PrivateKey = 'XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtjE20/RjGhpDRDhAKkHfQjKciEW7zmJamO56uXdT4rr+g=='
 const b64PublicKey = 'xNtP0YxoaQ0Q4QCpB30IynIhFu85iWpjuerl3U+K6/o='

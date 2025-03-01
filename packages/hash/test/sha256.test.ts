@@ -1,6 +1,6 @@
-import { expect, it, describe } from 'bun:test'
-import { sha256 } from '../src/sha256'
+import { describe, expect, it } from 'bun:test'
 import { ByteStringBuffer } from 'ts-security-utils'
+import { sha256 } from '../src/sha256'
 
 describe('SHA-256', () => {
   describe('API structure', () => {

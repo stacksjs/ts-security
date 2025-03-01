@@ -10,9 +10,6 @@
     "type": "git",
     "url": "git+https://github.com/stacksjs/ts-security.git"
   },
-  "dependencies": {
-    "ts-security-utils": "workspace:*"
-  },
   "bugs": {
     "url": "https://github.com/stacksjs/ts-security/issues"
   },
@@ -38,8 +35,8 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "module": "./dist/index.js",
@@ -58,6 +55,9 @@
     "dev:docs": "bun --bun vitepress dev docs",
     "build:docs": "bun --bun vitepress build docs",
     "preview:docs": "bun --bun vitepress preview docs"
+  },
+  "dependencies": {
+    "ts-security-utils": "workspace:*"
   },
   "simple-git-hooks": {
     "pre-commit": "bun lint-staged"

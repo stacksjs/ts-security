@@ -1,5 +1,5 @@
-import { ByteStringBuffer } from 'ts-security-utils'
 import type { MessageDigest, SHA1State } from './types'
+import { ByteStringBuffer } from 'ts-security-utils'
 
 /**
  * SHA-1 implementation
@@ -8,10 +8,10 @@ import type { MessageDigest, SHA1State } from './types'
 
 // SHA-1 constants
 const K = [
-  0x5a827999, // 0 <= t <= 19
-  0x6ed9eba1, // 20 <= t <= 39
-  0x8f1bbcdc, // 40 <= t <= 59
-  0xca62c1d6  // 60 <= t <= 79
+  0x5A827999, // 0 <= t <= 19
+  0x6ED9EBA1, // 20 <= t <= 39
+  0x8F1BBCDC, // 40 <= t <= 59
+  0xCA62C1D6, // 60 <= t <= 79
 ]
 
 // Initial hash state
@@ -20,7 +20,7 @@ const _initialState: SHA1State = {
   h1: 0xEFCDAB89,
   h2: 0x98BADCFE,
   h3: 0x10325476,
-  h4: 0xC3D2E1F0
+  h4: 0xC3D2E1F0,
 }
 
 /**
@@ -45,7 +45,7 @@ export const sha1 = {
     let _input = new ByteStringBuffer()
 
     // Used for word operations
-    const _w = new Array(80)
+    const _w = Array.from({ length: 80 })
 
     // Message digest object
     const md: MessageDigest = {
@@ -59,7 +59,7 @@ export const sha1 = {
       /**
        * Resets the digest to its initial state
        */
-      start: function() {
+      start() {
         state = { ..._initialState }
         _input = new ByteStringBuffer()
         this.messageLength = 0
@@ -72,11 +72,12 @@ export const sha1 = {
        * @param msg The message to update with
        * @param encoding The encoding of the message (default: 'raw')
        */
-      update: function(msg: string | ByteStringBuffer, encoding = 'raw') {
+      update(msg: string | ByteStringBuffer, encoding = 'raw') {
         if (typeof msg === 'string') {
           if (encoding === 'utf8') {
             msg = new ByteStringBuffer().putString(msg)
-          } else {
+          }
+          else {
             msg = new ByteStringBuffer().putBytes(msg)
           }
         }
@@ -104,7 +105,7 @@ export const sha1 = {
       /**
        * Produces the digest
        */
-      digest: function() {
+      digest() {
         // Create a copy of the input buffer
         const finalInput = _input.copy()
 
@@ -126,7 +127,7 @@ export const sha1 = {
         digest.putInt32(finalState.h4)
 
         return digest
-      }
+      },
     }
 
     /**
@@ -149,10 +150,10 @@ export const sha1 = {
       let i
       for (i = 0; i < 16; ++i) {
         _w[i] = (
-          (block.charCodeAt(i * 4) << 24) |
-          (block.charCodeAt(i * 4 + 1) << 16) |
-          (block.charCodeAt(i * 4 + 2) << 8) |
-          block.charCodeAt(i * 4 + 3)
+          (block.charCodeAt(i * 4) << 24)
+          | (block.charCodeAt(i * 4 + 1) << 16)
+          | (block.charCodeAt(i * 4 + 2) << 8)
+          | block.charCodeAt(i * 4 + 3)
         ) >>> 0
       }
 
@@ -175,13 +176,16 @@ export const sha1 = {
         if (i < 20) {
           f = (b & c) | ((~b) & d)
           k = K[0]
-        } else if (i < 40) {
+        }
+        else if (i < 40) {
           f = b ^ c ^ d
           k = K[1]
-        } else if (i < 60) {
+        }
+        else if (i < 60) {
           f = (b & c) | (b & d) | (c & d)
           k = K[2]
-        } else {
+        }
+        else {
           f = b ^ c ^ d
           k = K[3]
         }
@@ -228,7 +232,7 @@ export const sha1 = {
         (messageLength[0] >>> 24) & 0xFF,
         (messageLength[0] >>> 16) & 0xFF,
         (messageLength[0] >>> 8) & 0xFF,
-        messageLength[0] & 0xFF
+        messageLength[0] & 0xFF,
       ))
 
       // Process remaining blocks
@@ -239,5 +243,5 @@ export const sha1 = {
     }
 
     return md
-  }
+  },
 }

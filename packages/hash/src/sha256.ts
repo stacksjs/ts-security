@@ -15,8 +15,8 @@
  * @author Chris Breuer
  */
 
-import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
 import type { MessageDigest, SHA256, SHA256State } from './types'
+import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
 
 // Internal state
 let _initialized = false
@@ -41,7 +41,7 @@ export function createSHA256(): MessageDigest {
   let _input = createBuffer()
 
   // Used for word storage
-  const _w = new Array(64).fill(0)
+  const _w = Array.from({ length: 64 }).fill(0)
 
   // Message digest object
   const md: MessageDigest = {
@@ -200,22 +200,70 @@ function _init(): void {
 
   // Create K table for SHA-256
   _k = [
-    0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5,
-    0x3956C25B, 0x59F111F1, 0x923F82A4, 0xAB1C5ED5,
-    0xD807AA98, 0x12835B01, 0x243185BE, 0x550C7DC3,
-    0x72BE5D74, 0x80DEB1FE, 0x9BDC06A7, 0xC19BF174,
-    0xE49B69C1, 0xEFBE4786, 0x0FC19DC6, 0x240CA1CC,
-    0x2DE92C6F, 0x4A7484AA, 0x5CB0A9DC, 0x76F988DA,
-    0x983E5152, 0xA831C66D, 0xB00327C8, 0xBF597FC7,
-    0xC6E00BF3, 0xD5A79147, 0x06CA6351, 0x14292967,
-    0x27B70A85, 0x2E1B2138, 0x4D2C6DFC, 0x53380D13,
-    0x650A7354, 0x766A0ABB, 0x81C2C92E, 0x92722C85,
-    0xA2BFE8A1, 0xA81A664B, 0xC24B8B70, 0xC76C51A3,
-    0xD192E819, 0xD6990624, 0xF40E3585, 0x106AA070,
-    0x19A4C116, 0x1E376C08, 0x2748774C, 0x34B0BCB5,
-    0x391C0CB3, 0x4ED8AA4A, 0x5B9CCA4F, 0x682E6FF3,
-    0x748F82EE, 0x78A5636F, 0x84C87814, 0x8CC70208,
-    0x90BEFFFA, 0xA4506CEB, 0xBEF9A3F7, 0xC67178F2,
+    0x428A2F98,
+    0x71374491,
+    0xB5C0FBCF,
+    0xE9B5DBA5,
+    0x3956C25B,
+    0x59F111F1,
+    0x923F82A4,
+    0xAB1C5ED5,
+    0xD807AA98,
+    0x12835B01,
+    0x243185BE,
+    0x550C7DC3,
+    0x72BE5D74,
+    0x80DEB1FE,
+    0x9BDC06A7,
+    0xC19BF174,
+    0xE49B69C1,
+    0xEFBE4786,
+    0x0FC19DC6,
+    0x240CA1CC,
+    0x2DE92C6F,
+    0x4A7484AA,
+    0x5CB0A9DC,
+    0x76F988DA,
+    0x983E5152,
+    0xA831C66D,
+    0xB00327C8,
+    0xBF597FC7,
+    0xC6E00BF3,
+    0xD5A79147,
+    0x06CA6351,
+    0x14292967,
+    0x27B70A85,
+    0x2E1B2138,
+    0x4D2C6DFC,
+    0x53380D13,
+    0x650A7354,
+    0x766A0ABB,
+    0x81C2C92E,
+    0x92722C85,
+    0xA2BFE8A1,
+    0xA81A664B,
+    0xC24B8B70,
+    0xC76C51A3,
+    0xD192E819,
+    0xD6990624,
+    0xF40E3585,
+    0x106AA070,
+    0x19A4C116,
+    0x1E376C08,
+    0x2748774C,
+    0x34B0BCB5,
+    0x391C0CB3,
+    0x4ED8AA4A,
+    0x5B9CCA4F,
+    0x682E6FF3,
+    0x748F82EE,
+    0x78A5636F,
+    0x84C87814,
+    0x8CC70208,
+    0x90BEFFFA,
+    0xA4506CEB,
+    0xBEF9A3F7,
+    0xC67178F2,
   ]
 
   _initialized = true
@@ -254,15 +302,15 @@ function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
     for (let i = 16; i < 64; ++i) {
       // XOR word 2 words ago rot right 17, rot right 19, shft right 10
       t1 = w[i - 2]
-      s1 = ((t1 >>> 17) | (t1 << 15)) ^
-           ((t1 >>> 19) | (t1 << 13)) ^
-           (t1 >>> 10)
+      s1 = ((t1 >>> 17) | (t1 << 15))
+        ^ ((t1 >>> 19) | (t1 << 13))
+        ^ (t1 >>> 10)
 
       // XOR word 15 words ago rot right 7, rot right 18, shft right 3
       t2 = w[i - 15]
-      s0 = ((t2 >>> 7) | (t2 << 25)) ^
-           ((t2 >>> 18) | (t2 << 14)) ^
-           (t2 >>> 3)
+      s0 = ((t2 >>> 7) | (t2 << 25))
+        ^ ((t2 >>> 18) | (t2 << 14))
+        ^ (t2 >>> 3)
 
       // Sum(t1, word 7 ago, t2, word 16 ago) modulo 2^32
       w[i] = (s1 + w[i - 7] + s0 + w[i - 16]) | 0
@@ -271,17 +319,17 @@ function _update(s: SHA256State, w: number[], bytes: ByteStringBuffer): void {
     // Round function
     for (let i = 0; i < 64; ++i) {
       // Sum1(e)
-      s1 = ((e >>> 6) | (e << 26)) ^
-           ((e >>> 11) | (e << 21)) ^
-           ((e >>> 25) | (e << 7))
+      s1 = ((e >>> 6) | (e << 26))
+        ^ ((e >>> 11) | (e << 21))
+        ^ ((e >>> 25) | (e << 7))
 
       // Ch(e, f, g) (optimized)
       ch = g ^ (e & (f ^ g))
 
       // Sum0(a)
-      s0 = ((a >>> 2) | (a << 30)) ^
-           ((a >>> 13) | (a << 19)) ^
-           ((a >>> 22) | (a << 10))
+      s0 = ((a >>> 2) | (a << 30))
+        ^ ((a >>> 13) | (a << 19))
+        ^ ((a >>> 22) | (a << 10))
 
       // Maj(a, b, c) (optimized)
       maj = (a & b) | (c & (a ^ b))

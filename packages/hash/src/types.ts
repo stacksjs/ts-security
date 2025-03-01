@@ -1,4 +1,4 @@
-import type { ByteStringBuffer } from "ts-security-utils"
+import type { ByteStringBuffer } from 'ts-security-utils'
 
 /**
  * SHA-256 module interface.

@@ -1,11 +1,11 @@
 {
   "name": "ts-security",
-  "private": true,
   "type": "module",
+  "version": "0.0.0",
+  "private": true,
   "workspaces": [
     "packages/*"
   ],
-  "version": "0.0.0",
   "description": "A TLS/HTTPS library with automation.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",

@@ -5,8 +5,6 @@
     "moduleDetection": "force",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
     "paths": {
       "ts-security": ["./packages/ts-security/src"],
       "ts-security-utils": ["./packages/utils/src"],
@@ -16,6 +14,8 @@
       "ts-pki": ["./packages/pki/src"],
       "ts-asn1": ["./packages/asn1/src"]
     },
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "strictNullChecks": true,
     "noFallthroughCasesInSwitch": true,
