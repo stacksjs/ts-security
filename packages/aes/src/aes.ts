@@ -465,6 +465,11 @@ function initialize() {
  * @return the generated key schedule.
  */
 export function _expandKey(key: number[], decrypt: boolean): number[] {
+  // Ensure initialization happens before using the tables
+  if (!init) {
+    initialize()
+  }
+
   // copy the key's words to initialize the key schedule
   let w = key.slice(0)
 
@@ -610,6 +615,11 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
  * @param decrypt true to decrypt, false to encrypt.
  */
 export function _updateBlock(w: number[], input: number[], output: number[], decrypt: boolean): void {
+  // Ensure initialization happens before using the tables
+  if (!init) {
+    initialize()
+  }
+
   /* Mixing columns is done using matrix multiplication. The columns
    * that are to be mixed are each a single word in the current state.
    * The state has Nb columns (4 columns). Therefore each column is a

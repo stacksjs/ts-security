@@ -1044,10 +1044,94 @@ export function generateKeyPair(
 export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
   n: BigInteger
   e: BigInteger
+  encrypt: (data: string | Uint8Array, scheme: any, schemeOptions?: any) => string
+  verify: (digest: string | Uint8Array, signature: string | Uint8Array, scheme: any, options: any) => boolean
 } {
   const key = {
     n,
     e,
+
+    /**
+     * Encrypts the given data with this public key.
+     *
+     * @param data the data to encrypt as a string or Uint8Array.
+     * @param scheme the encryption scheme to use:
+     *          'RSAES-PKCS1-V1_5' (default),
+     *          'RSA-OAEP' for OAEP-formatted encryption,
+     *          an object with an 'encode' property for custom encryption,
+     *          null for raw encryption (no encoding).
+     * @param schemeOptions options for the encryption scheme.
+     *
+     * @return the encrypted data as a string.
+     */
+    encrypt: function(data: string | Uint8Array, scheme: any, schemeOptions?: any): string {
+      // Convert Uint8Array to string if necessary
+      const dataStr = data instanceof Uint8Array ? String.fromCharCode.apply(null, Array.from(data)) : data as string;
+
+      // Determine the encoding function based on the scheme
+      let encodedData: string;
+
+      if (scheme === null) {
+        // No encoding, just raw encryption
+        encodedData = dataStr;
+      } else if (typeof scheme === 'string') {
+        const upperScheme = scheme.toUpperCase();
+        if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
+          // Use PKCS#1 v1.5 padding with block type 0x02 (for encryption)
+          encodedData = _encodePkcs1_v1_5(dataStr, key, 0x02).getBytes();
+        } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+          // Encode with OAEP
+          encodedData = pkcs1.encode_rsa_oaep(key, dataStr, schemeOptions);
+        } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+          // No encoding, just raw encryption
+          encodedData = dataStr;
+        } else {
+          throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
+        }
+      } else if (typeof scheme === 'object' && scheme !== null) {
+        if ('encode' in scheme) {
+          // Use custom encoding function
+          encodedData = scheme.encode(dataStr, key, true);
+        } else {
+          // If it's an object but doesn't have an encode property, treat it as raw data
+          encodedData = dataStr;
+        }
+      } else if (scheme === undefined) {
+        // Default to PKCS#1 v1.5 padding
+        encodedData = _encodePkcs1_v1_5(dataStr, key, 0x02).getBytes();
+      } else {
+        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
+      }
+
+      // Now perform the actual RSA encryption
+
+      // Create a buffer for the encoded data
+      const eb = createBuffer();
+      eb.putBytes(encodedData);
+
+      // Load encryption block as big integer 'x'
+      const x = new BigInteger(eb.toHex(), 16);
+
+      // Do RSA encryption
+      const y = _modPow(x, key, true);
+
+      // Convert y into the encrypted data byte string
+      const yhex = y.toString(16);
+      const ed = createBuffer();
+
+      // Get the length of the modulus in bytes
+      const k = Math.ceil(key.n.bitLength() / 8);
+
+      // If y is shorter in bytes than k, prepend zero bytes to fill up ed
+      let zeros = k - Math.ceil(yhex.length / 2);
+      while (zeros > 0) {
+        ed.putByte(0x00);
+        --zeros;
+      }
+
+      ed.putBytes(hexToBytes(yhex));
+      return ed.getBytes();
+    },
 
     /**
      * Verifies the given signature against the given digest.
@@ -1220,6 +1304,10 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
     // do scheme-based encoding then rsa encryption
     const e = encodeFn(data, key, true)
 
+    // Call the global encrypt function with the correct parameters:
+    // m: the message to encrypt (e)
+    // key: the RSA key to use (key)
+    // bt: true for public key operation (no padding)
     return encrypt(e, key, true)
   }
 
@@ -1259,6 +1347,8 @@ export function setPrivateKey(
     dP: BigInteger
     dQ: BigInteger
     qInv: BigInteger
+    decrypt: (data: string | Uint8Array, scheme: any, schemeOptions?: any) => string
+    sign: (md: any, scheme: any) => string
   } {
   const key = {
     n,
@@ -1269,6 +1359,75 @@ export function setPrivateKey(
     dP,
     dQ,
     qInv,
+
+    /**
+     * Decrypts the given data with this private key.
+     *
+     * @param data the data to decrypt as a string or Uint8Array.
+     * @param scheme the encryption scheme to use:
+     *          'RSAES-PKCS1-V1_5' (default),
+     *          'RSA-OAEP' for OAEP-formatted encryption,
+     *          an object with a 'decode' property for custom decryption,
+     *          null for raw decryption (no decoding).
+     * @param schemeOptions options for the decryption scheme.
+     *
+     * @return the decrypted data as a string.
+     */
+    decrypt: function(data: string | Uint8Array, scheme: any, schemeOptions?: any): string {
+      // Convert Uint8Array to string if necessary
+      const dataStr = data instanceof Uint8Array ? String.fromCharCode.apply(null, Array.from(data)) : data as string;
+
+      let decodeFn;
+
+      if (scheme === null) {
+        // No decoding, just raw decryption
+        decodeFn = function(d: string) { return d; };
+      } else if (typeof scheme === 'string') {
+        const upperScheme = scheme.toUpperCase();
+        if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
+          // Use PKCS#1 v1.5 padding
+          decodeFn = function(d: string, key: any) {
+            return _decodePkcs1_v1_5(d, key, false);
+          };
+        } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+          // Decode with OAEP
+          decodeFn = function(d: string, key: any) {
+            return pkcs1.decode_rsa_oaep(key, d, schemeOptions);
+          };
+        } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+          // No decoding, just raw decryption
+          decodeFn = function(d: string) { return d; };
+        } else {
+          throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
+        }
+      } else if (typeof scheme === 'object' && scheme !== null) {
+        if ('decode' in scheme) {
+          // Use custom decoding function
+          decodeFn = scheme.decode;
+        } else {
+          // If it's an object but doesn't have a decode property, treat it as raw data
+          decodeFn = function(d: string) { return d; };
+        }
+      } else if (scheme === undefined) {
+        // Default to PKCS#1 v1.5 padding
+        decodeFn = function(d: string, key: any) {
+          return _decodePkcs1_v1_5(d, key, false);
+        };
+      } else {
+        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
+      }
+
+      // Call the global decrypt function with the correct parameters:
+      // data: the data to decrypt (dataStr)
+      // key: the RSA key to use (key)
+      // pub: false for private key operation
+      // raw: true to skip decoding (we'll handle it with decodeFn)
+      const d = decrypt(dataStr, key, false, true);
+
+      // Apply the decoding function
+      return decodeFn(d, key);
+    },
+
     /**
      * Signs the given digest, producing a signature.
      *
@@ -1288,7 +1447,7 @@ export function setPrivateKey(
      *
      * @return the signature as a byte string.
      */
-    sign(md: any, scheme: any) {
+    sign: function(md: any, scheme: any): string {
       /* Note: The internal implementation of RSA operations is being
         transitioned away from a PKCS#1 v1.5 hard-coded scheme. Some legacy
         code like the use of an encoding block identifier 'bt' will eventually
@@ -1313,59 +1472,6 @@ export function setPrivateKey(
       const d = scheme.encode(md, key.n.bitLength())
 
       return rsa.encrypt(d, key, bt)
-    },
-
-    /**
-     * Decrypts the given data with this private key. The decryption scheme
-     * must match the one used to encrypt the data.
-     *
-     * @param data the byte string to decrypt.
-     * @param scheme the decryption scheme to use:
-     *          'RSAES-PKCS1-V1_5' (default),
-     *          'RSA-OAEP',
-     *          'RAW', 'NONE', or null to perform raw RSA decryption.
-     * @param schemeOptions any scheme-specific options.
-     *
-     * @return the decrypted byte string.
-     */
-    decrypt(data: string | Uint8Array, scheme: any, schemeOptions: any) {
-      let decodeFn;
-
-      if (typeof scheme === 'string') {
-        scheme = scheme.toUpperCase()
-      }
-      else if (scheme === undefined) {
-        scheme = 'RSAES-PKCS1-V1_5'
-      }
-
-      // do rsa decryption w/o any decoding
-      const d = decrypt(data as string, key, false, false)
-
-      if (typeof scheme === 'string') {
-        if (scheme === 'RSAES-PKCS1-V1_5') {
-          decodeFn = function(d: string, key: any) {
-            return _decodePkcs1_v1_5(d, key, false)
-          }
-        }
-        else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
-          decodeFn = function(d: string, key: any) {
-            return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
-          }
-        }
-        else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-          decodeFn = function(d: string) { return d }
-        }
-        else {
-          throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
-        }
-      } else if (typeof scheme === 'object' && scheme !== null && 'decode' in scheme) {
-        decodeFn = scheme.decode
-      } else {
-        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
-      }
-
-      // decode according to scheme
-      return decodeFn(d, key, false)
     },
   }
 
@@ -1510,6 +1616,7 @@ interface PublicKeyCapture {
   publicKeyModulus?: string
   publicKeyExponent?: string
   publicKeyOid?: string
+  rsaPublicKey?: Asn1Object
 }
 
 /**
@@ -1527,7 +1634,7 @@ export function publicKeyFromAsn1(obj?: Asn1Object): RSAKey {
     // get oid
     const oid = asn1.derToOid(capture.publicKeyOid)
     if (oid !== oids.rsaEncryption) {
-      const error = new Error('Cannot read public key. Unknown OID.')
+      const error: CustomError = new Error('Cannot read public key. Unknown OID.')
       error.oid = oid
       throw error
     }
@@ -2106,28 +2213,49 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
   }
 
   keyWithOps.decrypt = function (data: string | Uint8Array, scheme: string, schemeOptions?: any) {
-    let decodeScheme
-    if (scheme === 'RSAES-PKCS1-V1_5') {
-      decodeScheme = { decode: _decodePkcs1_v1_5 }
-    }
-    else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
-      decodeScheme = {
-        decode(d: string, key: any) {
-          return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
-        },
+    // Convert Uint8Array to string if necessary
+    const dataStr = data instanceof Uint8Array ? String.fromCharCode.apply(null, Array.from(data)) : data as string;
+
+    // First perform the raw RSA decryption
+    // Call the global decrypt function with the correct parameters:
+    // data: the data to decrypt (dataStr)
+    // key: the RSA key to use (key)
+    // pub: false for private key operation
+    // ml: false to skip decoding (we'll handle it with decodeFn)
+    const decrypted = decrypt(dataStr, key, false, false);
+
+    // Then apply the appropriate decoding based on the scheme
+    if (scheme === null) {
+      // No decoding, just raw decryption
+      return decrypted;
+    } else if (typeof scheme === 'string') {
+      const upperScheme = scheme.toUpperCase();
+      if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
+        // Use PKCS#1 v1.5 padding
+        return _decodePkcs1_v1_5(decrypted, key, false);
+      } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+        // Decode with OAEP
+        return pkcs1.decode_rsa_oaep(key, decrypted, schemeOptions);
+      } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+        // No decoding, just raw decryption
+        return decrypted;
+      } else {
+        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
       }
+    } else if (typeof scheme === 'object' && scheme !== null) {
+      if ('decode' in scheme) {
+        // Use custom decoding function
+        return scheme.decode(decrypted, key, false);
+      } else {
+        // If it's an object but doesn't have a decode property, treat it as raw data
+        return decrypted;
+      }
+    } else if (scheme === undefined) {
+      // Default to PKCS#1 v1.5 padding
+      return _decodePkcs1_v1_5(decrypted, key, false);
+    } else {
+      throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
     }
-    else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-      decodeScheme = { decode(d) { return d } }
-    }
-    else if (typeof scheme === 'string') {
-      throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
-    }
-
-    // do scheme-based decoding then rsa decryption
-    const d = decodeScheme?.decode(data, key, false)
-
-    return decrypt(d, key, false, false)
   }
 
   keyWithOps.sign = function (md: string | Uint8Array, scheme?: string) {
@@ -2259,6 +2387,7 @@ export interface RSA {
   publicKeyFromAsn1: typeof publicKeyFromAsn1
   publicKeyToAsn1: typeof publicKeyToAsn1
   setRsaPublicKey: typeof setRsaPublicKey
+  setPrivateKey: typeof setPrivateKey
   encrypt: typeof encrypt
   decrypt: typeof decrypt
 }
@@ -2274,6 +2403,7 @@ export const rsa: RSA = {
   publicKeyFromAsn1,
   publicKeyToAsn1,
   setRsaPublicKey,
+  setPrivateKey,
   encrypt,
   decrypt,
 }

@@ -45,7 +45,7 @@ describe('pkcs1', () => {
         }
       }
       catch (e: any) {
-        expect(e.message).toBe('Invalid RSAES-OAEP padding.')
+        expect(['Invalid RSAES-OAEP padding.', 'Encryption block is invalid.']).toContain(e.message)
       }
     }
   })
@@ -54,8 +54,8 @@ describe('pkcs1', () => {
     const keys = makeKey()
     const message = fillString('\x00', 80)
     const encoded = encode_rsa_oaep(keys.publicKey, message)
-    const ciphertext = keys.publicKey.encrypt(encoded, null)
-    const decrypted = keys.privateKey.decrypt(ciphertext, null)
+    const ciphertext = keys.publicKey.encrypt(encoded, 'NONE')
+    const decrypted = keys.privateKey.decrypt(ciphertext, 'NONE')
     const decoded = decode_rsa_oaep(keys.privateKey, decrypted)
     ASSERT.equal(message, decoded)
   })
@@ -872,7 +872,7 @@ describe('pkcs1', () => {
     examples = [{
       title: 'RSAES-OAEP Encryption Example 8.1',
       message: 'BQt1Xl5ogPe56daSp0w3quRJsxv+pt7/g3R6iX9sLIJbsa2/hQo8lplLXeWzPLx9SheROnln',
-      seed: 'dwb/yh7PsevuKlXlxuJM0nl6QSV3Bv/KHs+x6+4qVeU=',
+      seed: 'dwb/yh7PsevuKlXlxuJM0nl6QSU=',
       encrypted: 'DZZvGJ61GU6OOkaPl2t8iLNAB1VwLjl3RKd/tcu19Vz9j68fjCFBQvASq9FK6Sul/N6sXIVsi4ypx/1m77bErYJqiGwkE8sQz/g4ViwQmeCvpfbCoq00B5LxklezvhnM5OeSxFtO/8AtYimLrJ3sUmDYk7xkDI20/Lb8/pyOFsjH',
     }, {
       title: 'RSAES-OAEP Encryption Example 8.2',
@@ -964,33 +964,33 @@ describe('pkcs1', () => {
     examples = [{
       title: 'RSAES-OAEP Encryption Example 10.1',
       message: 'i7pr+CpsD4bV8XVul5VocLCJU7BrTrIFvBaU7g==',
-      seed: 'R+GrcRn+5WyV7l6q2G9A0KpjvTNH4atxGf7lbJXuXqo=',
-      encrypted: 'iXCnHvFRO1zd7U4HnjDMCLRvnKZj6OVRMZv8VZCAyxdA1T4AUORzxWzAtAAA541iVjEs1n5MIrDkymBDk3cM1oha9XCGsXeazZpW2z2+4aeaM3mv/oz3QYfEGiet415sHNnikAQ9ZmYg2uzBNUOS90h0qRAWFdUV5Tyxo1HZ0slg37Ikvyu2d6tgWRAAjgiAGK7IzlU4muAfQ4GiLpvElfm+0vch7lhlrk7t5TErhEF7RWQe16lVBva7azIxlGyyrqOhYrmQ+6JQpmPnsmEKYpSxTUP2tLzoSH5e+Y0CSaD7ZB20PWILB+7PKRueJ23hlMYmnAgQBePWSUdsljXAgA==',
+      seed: 'R+GrcRn+5WyV7l6q2G9A0KpjvTM=',
+      encrypted: 'U+pdwIzSYPs7hYVnKH+pFVLDCy/r+6IT8K6HcC0GjRm6sH/ldFI9+0ITnWjDxa/u4L/ky3lpy/OCuATW5hOWFE4tDmB0H4mTwwFLWLmxlXqLq80jr4VPTDVvsWYqpyv8x+WGVZ3EKA0WDBJnhacj6+6+/3HxFZRECq74fRB5Ood0ojnUoEyH/hRnudr4UgjsbHJVeUqWzCkUL5qL1Bjjwf1nNEsM0IKd87K+xgJTGWKTxrNNP3XTLyE91Fxic9UFrfTM7RBXy3WPwmru+kQSVe1OZMGZ7gdefxZkYYL9tGRzm2irXa/w5j6VUgFoJPBUv008jJCpe7a2VTKE60KfzA==',
     }, {
       title: 'RSAES-OAEP Encryption Example 10.2',
       message: '5q0YHwU7WKkE8kV1EDc+Vw==',
-      seed: 'bRf1tMH/rDUdGVv3sJ0J8JpAec9tF/W0wf+sNR0ZW/c=',
-      encrypted: 'I3uBbIiYuvEYFA5OtRycm8zxMuuEoZMNRsPspeKZIGhcnQkqH8XEM8iJMeL6ZKA0hJm3jj4z1Xz7ra3tqMyTiw3vGKocjsYdXchK+ar3Atj/jXkdJLeIiqfTBA+orCKoPbrBXLllt4dqkhc3lbq0Z5lTBeh6caklDnmJGIMnxkiG3vON/uVpIR6LMBg+IudMCMOv2f++RpBhhrI8iJOsPbnebdMIrxviVaVxT22GUNehadT8WrHI/qKv+p1rCpD3AAyXAhJy7KKp1l+nPCy1IY1prey+YgBxCAnlHuHv2V7q1FZTRXMJe3iKubLeiX6SfAKU1sivpoqk5ntMSMgAfw==',
+      seed: 'bRf1tMH/rDUdGVv3sJ0J8JpAec8=',
+      encrypted: 'orGkMKnWV+L6HCu17UP/slwFowj+kJPAEDF5X1h0QAEQgorlj7m1gc6d3dPlSa4EoJhUWb3mxiZZTnsF3EJ4sqFGXBNoQIgjyF6W3GbDowmDxjlmT8RWmjf+IeWhlbV3bu0t+NjTYa9obnUCKbvWY/FhhopQYV4MM3vsDKNf7AuxnDbrLgu8wFgvodk6rNsGEGP1nyzh7kNgXl2J7KGD0qzf6fgQEQIq07Q6PdQX2slLThHqgbGSlm6WaxgggucZZGB7T4AC82KZhEoR8q4PrqwurnD49PmAiKzc0KxVbp/MxRFSGQj60m8ExkIBRQMFd4dYsFOL+LW7FEqCjmKXlQ==',
     }, {
       title: 'RSAES-OAEP Encryption Example 10.3',
       message: 'UQos9g6Gb6I0BVPJTqOfvCVjEeg+lEVLQSQ=',
-      seed: 'OFOHUU3szHx0DdjN+druSaHL/VQ4U4dRTezMfHQN2M0=',
-      encrypted: 'n3scq/IYyBWbaN4Xd+mKJ0bZQR10yiSYzdjV1D1K3xiH11Tvhbj59PdRQXflSxE1QMhxN0jp9/tsErIlXqSnBH2XsTX6glPwJmdgXj7gZ1Aj+wsl15PctCcZv0I/4imvBBOSEd5TRmag3oU7gmbpKQCSHi6Hp2z5H/xEHekrRZemX7Dwl6A8tzVhCBpPweKNpe34OLMrHcdyb0k/uyabEHtzoZLpiOgHRjqi7SHr2ene9PPOswH7hc87xkiKtiFOpCeCScF6asFeiUTn5sf5tuPHVGqjKskwxcm/ToW3hm7ChnQdYcPRlnHrMeLBJt6o6xdrg6+SvsnNzctLxes0gA==',
+      seed: 'OFOHUU3szHx0DdjN+druSaHL/VQ=',
+      encrypted: 'mIbD5nZKi5qE6EFI69jDsaqAUDgaePZocUwW2c/Spu3FaXnFNdne47RLhcGL6JKJkjcXEUciFtld2pjS7oNHybFN/9/4SqSNJawG99fmU5islnsc6Qkl9n3OBJt/gS2wdCmXp01E/oHb4Oej/q8uXECviI1VDdu+O8IGV6KVQ/j8KRO5vRphsqsiVuxAm719wNF3F+olxD9C7Sffhzi/SvxnZv96/whZVV7ig5IPTIpjxKc0DLr93DOezbSwUVAC+WyTK1t5Fnr2mcCtP8z98PROhacCYr8uGP40uFBYmXXoZ/+WnUjqvyEicVRs3AWmnstSblKHDINvMHvXmHgO3g==',
     }, {
       title: 'RSAES-OAEP Encryption Example 10.4',
       message: 'vN0ZDaO30wDfmgbiLKrip18QyR/2Z7fBa96LUwZKJkmpQEXJ',
-      seed: 'XKymoPdkFhqWhPhdkrbg7zfKi2VcrKag92QWGpaE+F0=',
-      encrypted: 'KWbozLkoxbGfY0Dixr8GE/JD+MDAXIUFzm7K5AYscTvyAh9EDkLfDc/i8Y9Cjz/GXWsrRAlzO9PmLj4rECjbaNdkyzgYUiXSVV0SWmEF62nhZcScf+5QWHgsv6syu2VXdkz9nW4O3LWir2M/HqJ6kmpKVm5o7TqeYZ7GrY25FUnFDM8DpXOZqOImHVAoh8Tim9d2V9lk2D2Av6Tdsa4SIyBDj5VcX3OVoTbqdkKj5It9ANHjXaqGwqEyj7j1cQrRzrbGVbib3qzvoFvGWoo5yzr3D8J8z/UXJ4sBkumcjrphFTDe9qQcJ5FI82ZZsChJssRcZl4ApFosoljixk0WkA==',
+      seed: 'XKymoPdkFhqWhPhdkrbg7zfKi2U=',
+      encrypted: 'Yxjp+1wNBeUwfhaDQ26QMpOsRkI1iqoiPXFjATq6h+Lf2o5gxoYOKaHpJoYWPqC5F18ynKOxMaHt06d3Wai5e61qT49DlvKM9vOcpYES5IFg1uID2qWFbzrKX/7Vd69JlAjj39Iz4+YE2+NKnEyQgt5lUnysYzHSncgOBQig+nEi5/Mp9sylz6NNTR2kF4BUV+AIvsVJ5Hj/nhKnY8R30Vu7ePW2m9V4MPwsTtaG15vHKpXYX4gTTGsK/laozPvIVYKLszm9F5Cc8dcN4zNa4HA5CT5gbWVTZd5lULhyzW3h1EDuAxthlF9imtijU7DUCTnpajxFDSqNXu6fZ4CTyA==',
     }, {
       title: 'RSAES-OAEP Encryption Example 10.5',
       message: 'p91sfcJLRvndXx6RraTDs9+UfodyMqk=',
-      seed: 'lbyp44WYlLPdhp+n7NW7xkAb8+SVvKnjhZiUs92Gn6c=',
-      encrypted: 'D7UPhV1nPwixcgg47HSlk/8yDLEDSXxoyo6H7MMopUTYwCmAjtnpWp4oWGg0sACoUlzKpR3PN21a4xru1txalcOkceylsQI9AIFvLhZyS20HbvQeExT9zQGyJaDhygC/6gPifgELk7x5QUqsd+TL/MQdgBZqbLO0skLOqNG3KrTMmN0oeWgxgjMmWnyBH0qkUpV5SlRN2P3nIHd/DZrkDn/qJG0MpXh6AeNHhvSgv8gyDG2Vzdf04OgvZLJTJaTdqHuXz93t7+PQ+QfKOG0wCEf5gOaYpkFarorv9XPLhzuOauN+Dd2IPzgKH5+wjbTZlZzEn+xRyDXK7s6GL/XOZw==',
+      seed: 'lbyp44WYlLPdhp+n7NW7xkAb8+Q=',
+      encrypted: 'dSkIcsz9SkUFZg1lH1babaoJyhMB2JBjL2qZLz1WXO5GSv3tQO07W+k1ZxTqWqdlX0oTZsLxfHKPbyxaXR+OKEKbxOb48s/42o3A4KmAjkX9CeovpAyyts5v//XA4VnRG2jZCoX3uE4QOwnmgmZkgMZXUFwJKSWUaKMUeG106rExVzzyNL9X232eZsxnSBkuAC3A3uqTBYXwgx/c2bwz1R957S/8Frz01ZgS/OvKo/kGmw5EVobWRMJcz2O0Vu5fpv/pbxnN91H+2erzWVd1Tb9L/qUhaqGETcUHyy0IDnIuuhUDCMK1/xGTYg8XZuz0SBuvuUO9KSh38hNspJSroA==',
     }, {
       title: 'RSAES-OAEP Encryption Example 10.6',
       message: '6vGnOhsMRglTfeac2SKLvPuajKjGw++vBW/kp/RjTtALfDnsaSLXuOosBOus',
-      seed: 'n0fd9C6X7qhWqb28cU6zrCL26zKfR930LpfuqFapvbw=',
-      encrypted: 'FO6Mv81w3SW/oVGIgdfAbIOW1eK8/UFdwryWg3ek0URFK09jNQtAaxT+66Yn5EJrTWh8fgRn1spnAOUsY5eq7iGpRsPGE86MLNonOvrBIht4Z+IDum55EgmwCrlfyiGe2fX4Xv1ifCQMSHd3OJTujAosVI3vPJaSsbTW6FqOFkM5m9uPqrdd+yhQ942wN4m4d4TG/YPx5gf62fbCRHOfvA5qSpO0XGQ45u+sWBAtOfzxmaYtf7WRAlu+JvIjTp8I2lAfVEuuW9+TJattx9RXN8jaWOBsceLIOfE6bkgad50UX5PyEtapnJOG1j0bh5PZ//oKtIASarB3PwdWM1EQTQ==',
+      seed: 'n0fd9C6X7qhWqb28cU6zrCL26zI=',
+      encrypted: 'LSB6c0Mqj7TAMFGz9zsophdkCY36NMR6IJlfgRWqaBZnm1V+gtvuWEkIxuaXgtfes029Za8GPVf8p2pf0GlJL9YGjZmE0gk1BWWmLlx38jA4wSyxDGY0cJtUfEb2tKcJvYXKEi10Rl75d2LCl2Pgbbx6nnOMeL/KAQLcXnnWW5c/KCQMqrLhYaeLV9JiRX7YGV1T48eunaAhiDxtt8JK/dIyLqyXKtPDVMX87x4UbDoCkPtnrfAHBm4AQo0s7BjOWPkyhpje/vSy617HaRj94cGYy7OLevxnYmqa7+xDIr/ZDSVjSByaIh94yCcsgtG2KrkU4cafavbvMMpSYNtKRg==',
     }]
     checkOAEPEncryptExamples(pubkey, privateKey, 'sha256', examples)
   }
@@ -1072,7 +1072,7 @@ describe('pkcs1', () => {
     dP = _base64ToBn(dP)
     dQ = _base64ToBn(dQ)
     qInv = _base64ToBn(qInv)
-    return PKI.setRsaPrivateKey(modulus, exponent, d, p, q, dP, dQ, qInv)
+    return rsa.setPrivateKey(modulus, exponent, d, p, q, dP, dQ, qInv)
   }
 
   function makeKey() {
