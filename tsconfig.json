@@ -17,7 +17,8 @@
       "ts-jsbn": ["./packages/jsbn/src"],
       "ts-pkcs": ["./packages/pkcs/src"],
       "ts-oids": ["./packages/oids.ts"],
-      "ts-aes": ["./packages/aes/src"]
+      "ts-aes": ["./packages/aes/src"],
+      "ts-prime-gen": ["./packages/prime/src"]
     },
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,

@@ -76,6 +76,7 @@ preinstall
 primality
 primeinc
 PRINTABLESTRING
+PRNG
 pssobj
 quickfix
 rootca

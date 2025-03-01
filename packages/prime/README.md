@@ -6,7 +6,7 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-prime
+# ts-prime-gen
 
 > A TypeScript implementation of probabilistic prime number generation with a focus on performance and security.
 
@@ -25,13 +25,13 @@
 
 ```bash
 # bun
-bun install ts-prime
+bun install ts-prime-gen
 
 # npm
-npm install ts-prime
+npm install ts-prime-gen
 
 # pnpm
-pnpm install ts-prime
+pnpm install ts-prime-gen
 ```
 
 ## Get Started
@@ -39,7 +39,7 @@ pnpm install ts-prime
 After installing the package, you can import and use the prime number generation functions:
 
 ```ts
-import { prime } from 'ts-prime'
+import { prime } from 'ts-prime-gen'
 
 // Generate a 1024-bit probable prime
 prime.generateProbablePrime(1024, {}, (err, num) => {
@@ -179,7 +179,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-prime` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-prime-gen` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -204,10 +204,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-prime?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-prime
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-prime-gen?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-prime-gen
 [github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-security/ci.yml?style=flat-square&branch=main
 [github-actions-href]: https://github.com/stacksjs/ts-security/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-prime/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-prime -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-prime-gen/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-prime-gen -->

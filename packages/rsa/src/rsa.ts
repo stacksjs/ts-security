@@ -5,7 +5,7 @@ import { encode_rsa_oaep, pkcs1 } from 'ts-pkcs'
 import { pki, privateKeyFromPem, privateKeyInfoToPem, privateKeyToPem } from 'ts-pki'
 import { bytesToHex, createBuffer, decode64, getBytes, hexToBytes, isServer, random } from 'ts-security-utils'
 import { BigInteger } from 'ts-jsbn'
-import { prime } from 'ts-prime'
+import { prime } from 'ts-prime-gen'
 
 /**
  * Javascript implementation of basic RSA algorithms.
@@ -1079,7 +1079,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
      *
      * @return true if the signature was verified, false if not.
      */
-    verify: (digest: string, signature: string, scheme: string, options: any) => {
+    verify: function(digest: string | Uint8Array, signature: string | Uint8Array, scheme: any, options: any) {
       if (typeof scheme === 'string')
         scheme = scheme.toUpperCase()
       else if (scheme === undefined)
@@ -1090,77 +1090,80 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
           _parseAllDigestBytes: true,
         }
       }
-
       if (!('_parseAllDigestBytes' in options))
         options._parseAllDigestBytes = true
 
+      let verifyFn;
+
       if (scheme === 'RSASSA-PKCS1-V1_5') {
-        scheme = {
-          verify(digest: string | Uint8Array, d: string) {
-            // remove padding
-            d = _decodePkcs1_v1_5(d, key, true)
-            // d is ASN.1 BER-encoded DigestInfo
-            const obj = asn1.fromDer(d, {
-              parseAllBytes: options._parseAllDigestBytes,
-            })
+        verifyFn = function(digest: string | Uint8Array, d: string) {
+          // remove padding
+          d = _decodePkcs1_v1_5(d, key, true)
+          // d is ASN.1 BER-encoded DigestInfo
+          const obj = asn1.fromDer(d, {
+            parseAllBytes: options._parseAllDigestBytes,
+          })
 
-            // validate DigestInfo
-            const capture: PrivateKeyInfoCapture = {}
-            const errors: CustomError[] = []
-            if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-              const error: CustomError = new Error(
-                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.',
+          // validate DigestInfo
+          const capture: PrivateKeyInfoCapture = {}
+          const errors: CustomError[] = []
+          if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
+            const error: CustomError = new Error(
+              'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.',
+            )
+            error.errors = errors
+            throw error
+          }
+          // check hash algorithm identifier
+          // see PKCS1-v1-5DigestAlgorithms in RFC 8017
+          // FIXME: add support to validator for strict value choices
+          const oid = asn1.derToOid(capture.algorithmIdentifier)
+          if (!(oid === oids.md2
+            || oid === oids.md5
+            || oid === oids.sha1
+            || oid === oids.sha224
+            || oid === oids.sha256
+            || oid === oids.sha384
+            || oid === oids.sha512
+            || oid === oids['sha512-224']
+            || oid === oids['sha512-256'])) {
+            const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
+            error.oid = oid
+            throw error
+          }
+
+          // special check for md2 and md5 that NULL parameters exist
+          if (oid === oids.md2 || oid === oids.md5) {
+            if (!('parameters' in capture)) {
+              throw new Error(
+                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value. '
+                + 'Missing algorithm identifier NULL parameters.',
               )
-              error.errors = errors
-              throw error
             }
-            // check hash algorithm identifier
-            // see PKCS1-v1-5DigestAlgorithms in RFC 8017
-            // FIXME: add support to validator for strict value choices
-            const oid = asn1.derToOid(capture.algorithmIdentifier)
-            if (!(oid === oids.md2
-              || oid === oids.md5
-              || oid === oids.sha1
-              || oid === oids.sha224
-              || oid === oids.sha256
-              || oid === oids.sha384
-              || oid === oids.sha512
-              || oid === oids['sha512-224']
-              || oid === oids['sha512-256'])) {
-              const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
-              error.oid = oid
-              throw error
-            }
+          }
 
-            // special check for md2 and md5 that NULL parameters exist
-            if (oid === oids.md2 || oid === oids.md5) {
-              if (!('parameters' in capture)) {
-                throw new Error(
-                  'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value. '
-                  + 'Missing algorithm identifier NULL parameters.',
-                )
-              }
-            }
-
-            // compare the given digest to the decrypted one
-            return digest === capture.digest
-          },
+          // compare the given digest to the decrypted one
+          return digest === capture.digest
         }
       }
       else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
-        scheme = {
-          verify(digest: string | Uint8Array, d: string) {
-            // remove padding
-            d = _decodePkcs1_v1_5(d, key, true)
-            return digest === d
-          },
+        verifyFn = function(digest: string | Uint8Array, d: string) {
+          // remove padding
+          d = _decodePkcs1_v1_5(d, key, true)
+          return digest === d
         }
+      }
+      else if (typeof scheme === 'object' && scheme !== null && 'verify' in scheme) {
+        verifyFn = scheme.verify
+      }
+      else {
+        throw new Error(`Unsupported verification scheme: "${scheme}"`)
       }
 
       // do rsa decryption w/o any decoding, then verify -- which does decoding
-      const d = decrypt(signature, key, true, false)
+      const d = decrypt(signature as string, key, true, false)
 
-      return scheme.verify(digest, d, key.n.bitLength())
+      return verifyFn(digest, d, key.n.bitLength())
     },
   }
 
@@ -1181,7 +1184,9 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
    *
    * @return the encrypted byte string.
    */
-  function encrypt(data: string, scheme: string, schemeOptions: any) {
+  function encrypt(data: string, scheme: any, schemeOptions: any) {
+    let encodeFn;
+
     if (typeof scheme === 'string') {
       scheme = scheme.toUpperCase()
     }
@@ -1189,29 +1194,31 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
       scheme = 'RSAES-PKCS1-V1_5'
     }
 
-    if (scheme === 'RSAES-PKCS1-V1_5') {
-      scheme = {
-        encode(m: string, key: any, pub: any) {
+    if (typeof scheme === 'string') {
+      if (scheme === 'RSAES-PKCS1-V1_5') {
+        encodeFn = function(m: string, key: any, pub: any) {
           return _encodePkcs1_v1_5(m, key, 0x02).getBytes()
-        },
+        }
       }
-    }
-    else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
-      scheme = {
-        encode(m: string, key: any) {
+      else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+        encodeFn = function(m: string, key: any) {
           return encode_rsa_oaep(key, m, schemeOptions)
-        },
+        }
       }
-    }
-    else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-      scheme = { encode(e: string) { return e } }
-    }
-    else if (typeof scheme === 'string') {
+      else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+        encodeFn = function(e: string) { return e }
+      }
+      else {
+        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
+      }
+    } else if (typeof scheme === 'object' && scheme !== null && 'encode' in scheme) {
+      encodeFn = scheme.encode
+    } else {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
     }
 
     // do scheme-based encoding then rsa encryption
-    const e = scheme.encode(data, key, true)
+    const e = encodeFn(data, key, true)
 
     return encrypt(e, key, true)
   }
@@ -1321,37 +1328,44 @@ export function setPrivateKey(
      *
      * @return the decrypted byte string.
      */
-    decrypt(data: string, scheme: string, schemeOptions: any) {
+    decrypt(data: string | Uint8Array, scheme: any, schemeOptions: any) {
+      let decodeFn;
+
       if (typeof scheme === 'string') {
         scheme = scheme.toUpperCase()
       }
-
       else if (scheme === undefined) {
         scheme = 'RSAES-PKCS1-V1_5'
       }
 
       // do rsa decryption w/o any decoding
-      const d = decrypt(data, key, false, false)
+      const d = decrypt(data as string, key, false, false)
 
-      if (scheme === 'RSAES-PKCS1-V1_5') {
-        scheme = { decode: _decodePkcs1_v1_5 }
-      }
-      else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
-        scheme = {
-          decode(d: string, key: any) {
-            return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
-          },
+      if (typeof scheme === 'string') {
+        if (scheme === 'RSAES-PKCS1-V1_5') {
+          decodeFn = function(d: string, key: any) {
+            return _decodePkcs1_v1_5(d, key, false)
+          }
         }
-      }
-      else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
-        scheme = { decode(d: string) { return d } }
-      }
-      else {
-        throw new Error(`Unsupported encryption scheme: "${scheme}".`)
+        else if (scheme === 'RSA-OAEP' || scheme === 'RSAES-OAEP') {
+          decodeFn = function(d: string, key: any) {
+            return pkcs1.decode_rsa_oaep(key, d, schemeOptions)
+          }
+        }
+        else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
+          decodeFn = function(d: string) { return d }
+        }
+        else {
+          throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
+        }
+      } else if (typeof scheme === 'object' && scheme !== null && 'decode' in scheme) {
+        decodeFn = scheme.decode
+      } else {
+        throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
       }
 
       // decode according to scheme
-      return scheme.decode(d, key, false)
+      return decodeFn(d, key, false)
     },
   }
 
@@ -2137,88 +2151,98 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     return encrypt(d, key, true)
   }
 
-  keyWithOps.verify = function (digest: string | Uint8Array, signature: string | Uint8Array, scheme: string, options: any) {
+  keyWithOps.verify = function (digest: string | Uint8Array, signature: string | Uint8Array, scheme: string | VerifyScheme | undefined, options: any) {
+    let verifyScheme: VerifyScheme;
+
     if (typeof scheme === 'string') {
-      scheme = scheme.toUpperCase()
+      scheme = scheme.toUpperCase();
+    } else if (scheme === undefined) {
+      scheme = 'RSASSA-PKCS1-V1_5';
     }
-    else if (scheme === undefined) {
-      scheme = 'RSASSA-PKCS1-V1_5'
-    }
+
     if (options === undefined) {
       options = {
         _parseAllDigestBytes: true,
-      }
+      };
     }
     if (!('_parseAllDigestBytes' in options)) {
-      options._parseAllDigestBytes = true
+      options._parseAllDigestBytes = true;
     }
 
-    if (scheme === 'RSASSA-PKCS1-V1_5') {
-      scheme = {
-        verify(digest: string | Uint8Array, d: string) {
-          // remove padding
-          d = _decodePkcs1_v1_5(d, key, true)
-          // d is ASN.1 BER-encoded DigestInfo
-          const obj = asn1.fromDer(d, {
-            parseAllBytes: options._parseAllDigestBytes,
-          })
+    // Convert string schemes to objects
+    if (typeof scheme === 'string') {
+      if (scheme === 'RSASSA-PKCS1-V1_5') {
+        verifyScheme = {
+          verify(digest: string | Uint8Array, d: string) {
+            // remove padding
+            d = _decodePkcs1_v1_5(d, key, true);
+            // d is ASN.1 BER-encoded DigestInfo
+            const obj = asn1.fromDer(d, {
+              parseAllBytes: options._parseAllDigestBytes,
+            });
 
-          // validate DigestInfo
-          const capture: PrivateKeyInfoCapture = {}
-          const errors: CustomError[] = []
-          if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
-            const error: CustomError = new Error('ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.')
-            error.errors = errors
-            throw error
-          }
-          // check hash algorithm identifier
-          // see PKCS1-v1-5DigestAlgorithms in RFC 8017
-          // FIXME: add support to vaidator for strict value choices
-          const oid = asn1.derToOid(capture.algorithmIdentifier)
-          if (!(oid === oids.md2
-            || oid === oids.md5
-            || oid === oids.sha1
-            || oid === oids.sha224
-            || oid === oids.sha256
-            || oid === oids.sha384
-            || oid === oids.sha512
-            || oid === oids['sha512-224']
-            || oid === oids['sha512-256'])) {
-            const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.')
-            error.oid = oid
-            throw error
-          }
-
-          // special check for md2 and md5 that NULL parameters exist
-          if (oid === oids.md2 || oid === oids.md5) {
-            if (!('parameters' in capture)) {
-              throw new Error(
-                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 '
-                + 'DigestInfo value. '
-                + 'Missing algorithm identifier NULL parameters.',
-              )
+            // validate DigestInfo
+            const capture: PrivateKeyInfoCapture = {};
+            const errors: CustomError[] = [];
+            if (!asn1.validate(obj, digestInfoValidator, capture, errors)) {
+              const error: CustomError = new Error(
+                'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value.',
+              );
+              error.errors = errors;
+              throw error;
             }
-          }
+            // check hash algorithm identifier
+            // see PKCS1-v1-5DigestAlgorithms in RFC 8017
+            // FIXME: add support to validator for strict value choices
+            const oid = asn1.derToOid(capture.algorithmIdentifier);
+            if (!(oid === oids.md2
+              || oid === oids.md5
+              || oid === oids.sha1
+              || oid === oids.sha224
+              || oid === oids.sha256
+              || oid === oids.sha384
+              || oid === oids.sha512
+              || oid === oids['sha512-224']
+              || oid === oids['sha512-256'])) {
+              const error: CustomError = new Error('Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.');
+              error.oid = oid;
+              throw error;
+            }
 
-          // compare the given digest to the decrypted one
-          return digest === capture.digest
-        },
+            // special check for md2 and md5 that NULL parameters exist
+            if (oid === oids.md2 || oid === oids.md5) {
+              if (!('parameters' in capture)) {
+                throw new Error(
+                  'ASN.1 object does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo value. '
+                  + 'Missing algorithm identifier NULL parameters.',
+                );
+              }
+            }
+
+            // compare the given digest to the decrypted one
+            return digest === capture.digest;
+          }
+        };
+      } else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+        verifyScheme = {
+          verify(digest: string | Uint8Array, d: string) {
+            // remove padding
+            d = _decodePkcs1_v1_5(d, key, true);
+            return digest === d;
+          }
+        };
+      } else {
+        throw new Error(`Unsupported verification scheme: "${scheme}"`);
       }
-    }
-    else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
-      scheme = {
-        verify(digest: string | Uint8Array, d: string) {
-          // remove padding
-          d = _decodePkcs1_v1_5(d, key, true)
-          return digest === d
-        },
-      }
+    } else {
+      // scheme is already a VerifyScheme object
+      verifyScheme = scheme;
     }
 
     // do rsa decryption w/o any decoding, then verify -- which does decoding
-    const d = decrypt(signature, key, true, false)
+    const d = decrypt(signature as string, key, true, false);
 
-    return scheme.verify(digest, d, key.n.bitLength())
+    return verifyScheme.verify(digest, d, key.n.bitLength());
   }
 
   return keyWithOps
