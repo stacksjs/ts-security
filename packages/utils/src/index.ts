@@ -1,5 +1,7 @@
 export * from './random'
 
+export const isServer: boolean = !!(typeof process !== 'undefined' && process.versions && (process.versions.node || process.versions.bun))
+
 // base64 characters, reverse mapping
 const _base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
 const _base64Idx = [
