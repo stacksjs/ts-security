@@ -63,9 +63,9 @@
     "preview:docs": "bun --bun vitepress preview docs"
   },
   "devDependencies": {
-    "@stacksjs/docs": "^0.69.3",
+    "@stacksjs/docs": "^0.70.21",
     "@stacksjs/eslint-config": "^4.2.1-beta.1",
-    "@types/bun": "^1.2.5",
+    "@types/bun": "^1.2.8",
     "bun-plugin-dtsx": "^0.21.9",
     "typescript": "^5.8.2"
   },
