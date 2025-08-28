@@ -1,8 +1,8 @@
 {
-  "name": "ts-asn1",
+  "name": "ts-aes",
   "type": "module",
   "version": "0.0.0",
-  "description": "A ASN.1 library.",
+  "description": "A AES library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
   "homepage": "https://github.com/stacksjs/ts-security#readme",
@@ -14,13 +14,11 @@
     "url": "https://github.com/stacksjs/ts-security/issues"
   },
   "keywords": [
-    "asn1",
-    "asn.1",
+    "aes",
     "crypto",
     "cryptography",
     "bun",
     "stacks",
-    "node-forge",
     "typescript",
     "javascript"
   ],
