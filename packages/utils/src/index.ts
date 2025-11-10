@@ -1,6 +1,7 @@
 export * from './random'
 export * from './buffer'
-import { ByteStringBuffer, createBuffer } from './buffer'
+import type { ByteStringBuffer } from './buffer'
+import { createBuffer } from './buffer'
 
 export const isServer: boolean = !!(typeof process !== 'undefined' && process.versions && (process.versions.node || process.versions.bun))
 
@@ -374,7 +375,6 @@ export interface Utils {
   bytesToHex: (bytes: string) => string
   createBuffer: (b?: string | ArrayBuffer | Uint8Array) => ByteStringBuffer
   fillString: (char: string, count: number) => string
-  ByteStringBuffer: typeof ByteStringBuffer
   hexToBytes: (hex: string) => string
   estimateCores: (options: any, callback: any) => void
 }
@@ -387,7 +387,10 @@ export const utils: Utils = {
   bytesToHex,
   createBuffer,
   fillString,
-  ByteStringBuffer,
   hexToBytes,
   estimateCores,
 }
+
+export type { ByteStringBuffer }
+
+export default utils
