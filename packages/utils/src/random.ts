@@ -128,8 +128,6 @@ declare global {
   interface Window {
     crypto: Crypto
     msCrypto?: Crypto
-    navigator: ExtendedNavigator
-    document?: any
   }
 }
 

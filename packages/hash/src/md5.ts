@@ -5,7 +5,8 @@
  * @author Chris Breuer
  */
 
-import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
 
 interface MD5State {
   h0: number
@@ -51,7 +52,7 @@ function create(): MessageDigest {
   let _input = createBuffer()
 
   // used for word storage
-  const _w: number[] = Array.from({ length: 16 }).fill(0)
+  const _w: number[] = new Array<number>(16).fill(0)
 
   // message digest object
   const md: MessageDigest = {
@@ -106,7 +107,7 @@ function create(): MessageDigest {
       }
 
       // update message length
-      const len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
+      const len = typeof msg !== 'string' ? msg.length() : msg.length
       md.messageLength += len
       const lenArray: LengthArray = [Math.floor(len / 0x100000000) >>> 0, len >>> 0]
       for (let i = md.fullMessageLength.length - 1; i >= 0; --i) {
@@ -117,7 +118,7 @@ function create(): MessageDigest {
       }
 
       // add bytes to input buffer
-      if (msg instanceof ByteStringBuffer) {
+      if (typeof msg !== 'string') {
         _input.putBytes(msg.bytes())
       }
       else {

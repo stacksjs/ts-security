@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer } from 'ts-security-utils'
 import { sha384, sha512, sha512_224, sha512_256 } from '../src/sha512'
 
 describe('SHA-512', () => {
@@ -91,7 +91,7 @@ describe('SHA-512', () => {
 
   describe('ByteStringBuffer input', () => {
     it('should hash ByteStringBuffer input', () => {
-      const buffer = new ByteStringBuffer()
+      const buffer = createBuffer()
       buffer.putBytes('abc')
 
       const md = sha512.create()

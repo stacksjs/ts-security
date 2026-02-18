@@ -9,7 +9,7 @@ const PKI = require('../../lib/pki')
 const UTIL = require('../../lib/util');
 
 (function () {
-  let _data
+  let _data: any
   describe('pkcs12', () => {
     it('should create certificate-only p12', () => {
       const p12Asn = PKCS12.toPkcs12Asn1(null, _data.certificate, null, {
@@ -40,7 +40,7 @@ const UTIL = require('../../lib/util');
       /* Note we need to mock the PRNG, since the PKCS#12 file uses encryption
         which otherwise would differ each time due to the randomized IV. */
       const oldRandomGenerate = forge.random.generate
-      forge.random.generate = function (num) {
+      forge.random.generate = function (num: any) {
         return UTIL.createBuffer().fillWithByte(0, num).getBytes()
       }
 

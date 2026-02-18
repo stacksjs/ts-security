@@ -17,7 +17,8 @@
 
 import type { Algorithm, BlockCipher } from './cipher'
 import type { CipherMode } from './cipher-modes'
-import { ByteStringBuffer, createBuffer } from 'ts-security-utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer } from 'ts-security-utils'
 import { createCipher, registerAlgorithm as registerCipherAlgorithm } from './cipher'
 import { modes } from './cipher-modes'
 
@@ -111,7 +112,7 @@ export class AESAlgorithm implements Algorithm {
 
     // convert key byte buffer into 32-bit integer array
     let keyInts: number[] = []
-    if (key && key instanceof ByteStringBuffer) {
+    if (key && typeof key === 'object' && !Array.isArray(key) && 'getInt32' in key) {
       // key lengths of 16, 24, 32 bytes allowed
       const len = key.length()
       if (len === 16 || len === 24 || len === 32) {

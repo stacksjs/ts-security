@@ -39,7 +39,7 @@ describe('pkcs1', () => {
 
       try {
         const decrypted = keys.privateKey.decrypt(out, null)
-        decode_rsa_oaep(keys.privateKey, decrypted)
+        decode_rsa_oaep(keys.privateKey, decrypted, {})
         throw {
           message: 'Expected an exception.',
         }
@@ -53,10 +53,10 @@ describe('pkcs1', () => {
   it('should detect leading zero bytes', () => {
     const keys = makeKey()
     const message = fillString('\x00', 80)
-    const encoded = encode_rsa_oaep(keys.publicKey, message)
+    const encoded = encode_rsa_oaep(keys.publicKey, message, {})
     const ciphertext = keys.publicKey.encrypt(encoded, 'NONE')
     const decrypted = keys.privateKey.decrypt(ciphertext, 'NONE')
-    const decoded = decode_rsa_oaep(keys.privateKey, decrypted)
+    const decoded = decode_rsa_oaep(keys.privateKey, decrypted, {})
     ASSERT.equal(message, decoded)
   })
 
@@ -995,7 +995,7 @@ describe('pkcs1', () => {
     checkOAEPEncryptExamples(pubkey, privateKey, 'sha256', examples)
   }
 
-  function _bytesToBigInteger(bytes) {
+  function _bytesToBigInteger(bytes: any) {
     const buffer = createBuffer(bytes)
     const hex = buffer.toHex()
     return new BigInteger(hex, 16)
@@ -1063,7 +1063,7 @@ describe('pkcs1', () => {
     return rsa.setRsaPublicKey(modulus, exponent)
   }
 
-  function decodeBase64PrivateKey(modulus, exponent, d, p, q, dP, dQ, qInv) {
+  function decodeBase64PrivateKey(modulus: any, exponent: any, d: any, p: any, q: any, dP: any, dQ: any, qInv: any) {
     modulus = _base64ToBn(modulus)
     exponent = _base64ToBn(exponent)
     d = _base64ToBn(d)

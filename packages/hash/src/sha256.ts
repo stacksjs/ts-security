@@ -16,7 +16,8 @@
  */
 
 import type { MessageDigest, SHA256, SHA256State } from './types'
-import { ByteStringBuffer, createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer, encodeUtf8, fillString } from 'ts-security-utils'
 
 // Internal state
 let _initialized = false
@@ -41,7 +42,7 @@ export function createSHA256(): MessageDigest {
   let _input = createBuffer()
 
   // Used for word storage
-  const _w = Array.from({ length: 64 }).fill(0)
+  const _w: number[] = Array.from({ length: 64 }).fill(0) as number[]
 
   // Message digest object
   const md: MessageDigest = {
@@ -102,7 +103,7 @@ export function createSHA256(): MessageDigest {
       }
 
       // Update message length
-      const len = msg instanceof ByteStringBuffer ? msg.length() : msg.length
+      const len = typeof msg !== 'string' ? msg.length() : msg.length
       md.messageLength += len
       const lenArr = [Math.floor(len / 0x100000000), len >>> 0]
 
@@ -114,7 +115,7 @@ export function createSHA256(): MessageDigest {
       }
 
       // Add bytes to input buffer
-      _input.putBytes(msg instanceof ByteStringBuffer ? msg.bytes() : msg)
+      _input.putBytes(typeof msg !== 'string' ? msg.bytes() : msg)
 
       // Process bytes
       _update(_state!, _w, _input)

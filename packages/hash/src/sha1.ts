@@ -1,5 +1,6 @@
 import type { MessageDigest, SHA1State } from './types'
-import { ByteStringBuffer } from 'ts-security-utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer } from 'ts-security-utils'
 
 /**
  * SHA-1 implementation
@@ -42,10 +43,10 @@ export const sha1 = {
     let state: SHA1State = { ..._initialState }
 
     // Input buffer
-    let _input = new ByteStringBuffer()
+    let _input = createBuffer()
 
     // Used for word operations
-    const _w = Array.from({ length: 80 })
+    const _w: number[] = new Array(80).fill(0)
 
     // Message digest object
     const md: MessageDigest = {
@@ -61,7 +62,7 @@ export const sha1 = {
        */
       start() {
         state = { ..._initialState }
-        _input = new ByteStringBuffer()
+        _input = createBuffer()
         this.messageLength = 0
         this.fullMessageLength = [0, 0]
         return this
@@ -75,10 +76,10 @@ export const sha1 = {
       update(msg: string | ByteStringBuffer, encoding = 'raw') {
         if (typeof msg === 'string') {
           if (encoding === 'utf8') {
-            msg = new ByteStringBuffer().putString(msg)
+            msg = createBuffer().putString(msg)
           }
           else {
-            msg = new ByteStringBuffer().putBytes(msg)
+            msg = createBuffer().putBytes(msg)
           }
         }
 
@@ -119,7 +120,7 @@ export const sha1 = {
         _finalizeHash(finalInput, finalState, finalMessageLength)
 
         // Create digest from state
-        const digest = new ByteStringBuffer()
+        const digest = createBuffer()
         digest.putInt32(finalState.h0)
         digest.putInt32(finalState.h1)
         digest.putInt32(finalState.h2)

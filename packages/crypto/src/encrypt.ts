@@ -68,7 +68,7 @@ export async function encrypt(
   const encrypted = await crypto.subtle.encrypt(
     {
       name: algorithm,
-      iv,
+      iv: iv as BufferSource,
     },
     key,
     encoder.encode(message),
@@ -111,7 +111,7 @@ export async function decrypt(
   const decrypted = await crypto.subtle.decrypt(
     {
       name: algorithm,
-      iv,
+      iv: iv as BufferSource,
     },
     key,
     encrypted,

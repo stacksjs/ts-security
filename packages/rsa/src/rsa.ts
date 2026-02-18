@@ -1916,6 +1916,7 @@ function _generateKeyPair(state: {
   }
 
   if ('prng' in options)
+    // @ts-expect-error - prng is dynamically set
     opts.prng = options.prng
 
   generate()
@@ -1924,6 +1925,7 @@ function _generateKeyPair(state: {
     // find p and then q (done in series to simplify)
     getPrime(state.pBits, (err: any, num: any) => {
       if (err) {
+        // @ts-expect-error - callback can accept single error arg
         return callback(err)
       }
 
@@ -1942,6 +1944,7 @@ function _generateKeyPair(state: {
 
   function finish(err: any, num: any) {
     if (err) {
+      // @ts-expect-error - callback can accept single error arg
       return callback(err)
     }
 
@@ -1993,7 +1996,9 @@ function _generateKeyPair(state: {
 
     // set keys
     const d = state.e.modInverse(state.phi)
+    // @ts-expect-error - keys is dynamically added to state
     state.keys = {
+      // @ts-expect-error - rsa is dynamically available on pki
       privateKey: pki.rsa.setPrivateKey(
         state.n,
         state.e,
@@ -2007,6 +2012,7 @@ function _generateKeyPair(state: {
       publicKey: setRsaPublicKey(state.n, state.e),
     }
 
+    // @ts-expect-error - keys is dynamically added to state
     callback(null, state.keys)
   }
 }
@@ -2096,7 +2102,9 @@ export function detectNodeCrypto(fn: string): boolean {
  * @return true if detected, false if not.
  */
 export function detectSubtleCrypto(fn: string): boolean {
+  // @ts-expect-error - util is a global reference
   return (typeof util.globalScope !== 'undefined'
+    // @ts-expect-error - util is a global reference
     && typeof util.globalScope.crypto === 'object'
     // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.crypto.subtle === 'object'
@@ -2114,6 +2122,7 @@ export function detectSubtleCrypto(fn: string): boolean {
  * @return true if detected, false if not.
  */
 export function detectSubtleMsCrypto(fn: string): boolean {
+  // @ts-expect-error - util is a global reference
   return (typeof util.globalScope !== 'undefined'
     // @ts-expect-error unsure how to type this better
     && typeof util.globalScope.msCrypto === 'object'

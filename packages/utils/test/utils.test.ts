@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { base, base2, base16, base32, base58, base64 } from '../src'
+import { base, base2, base16, base32, base58, base64 } from 'ts-base-x'
 
 describe('ts-base-x', () => {
   describe('base function configuration', () => {
@@ -107,7 +107,7 @@ describe('ts-base-x', () => {
       new Uint8Array([1, 2, 3, 4, 5]),
       new Uint8Array([0, 0, 0, 0, 1]),
       new Uint8Array([255, 255, 255]),
-      new Uint8Array(Array.from({ length: 100 }).fill(65)), // Longer input
+      new Uint8Array(new Array<number>(100).fill(65)), // Longer input
     ]
 
     for (const testCase of testCases) {

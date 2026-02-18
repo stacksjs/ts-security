@@ -9,7 +9,8 @@ import type { MessageDigest, SHA512, SHA512Algorithm } from './types'
  *
  * @author Chris Breuer
  */
-import { ByteStringBuffer, createBuffer, fillString } from 'ts-security-utils'
+import type { ByteStringBuffer } from 'ts-security-utils'
+import { createBuffer, fillString } from 'ts-security-utils'
 
 // SHA-512 state interface (each value is represented as two 32-bit integers)
 export interface SHA512State {
@@ -115,7 +116,7 @@ export function create(algorithm: SHA512Algorithm = 'sha512'): MessageDigest {
 
       // Handle UTF-8 encoding
       let bytes: string
-      if (msg instanceof ByteStringBuffer) {
+      if (typeof msg !== 'string') {
         bytes = msg.bytes()
       }
       else {

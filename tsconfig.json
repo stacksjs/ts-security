@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "target": "esnext",
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom"],
+    "types": ["bun"],
     "moduleDetection": "force",
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -34,5 +35,6 @@
     "verbatimModuleSyntax": true,
     "skipDefaultLibCheck": true,
     "skipLibCheck": true
-  }
+  },
+  "exclude": ["docs", "docs/**", "packages/wip", "packages/wip/**", "dist", "node_modules"]
 }
