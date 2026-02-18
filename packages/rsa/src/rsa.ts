@@ -997,7 +997,7 @@ export function generateKeyPair(
           modulusLength: bits,
           publicExponent: intToUint8Array(e || 0x10001),
           hash: { name: 'SHA-256' },
-        }, true, ['sign', 'verify']).then((keypair) => {
+        } as RsaHashedKeyGenParams, true, ['sign', 'verify']).then((keypair) => {
           return crypto.subtle.exportKey('pkcs8', keypair.privateKey)
         }).then((pkcs8) => {
           if (pkcs8) {
@@ -2206,7 +2206,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
         encode(m: string, key: RSAKey) {
           return encode_rsa_oaep(key, m, schemeOptions)
         },
-      }
+      } as any
     }
     else if (['RAW', 'NONE', 'NULL', null].includes(scheme)) {
       encodeScheme = { encode(e) { return e } }
@@ -2218,6 +2218,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     // do scheme-based encoding then rsa encryption
     const e = encodeScheme.encode(data, key, true)
 
+    // @ts-expect-error - data may be string or Uint8Array
     return encrypt(e, key, true)
   }
 
@@ -2254,6 +2255,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     } else if (typeof scheme === 'object' && scheme !== null) {
       if ('decode' in scheme) {
         // Use custom decoding function
+        // @ts-expect-error - scheme decode method exists at runtime
         return scheme.decode(decrypted, key, false);
       } else {
         // If it's an object but doesn't have a decode property, treat it as raw data
@@ -2273,6 +2275,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
       signScheme = { encode: emsaPkcs1v15encode }
     }
     else if (scheme === 'RSASSA-PSS') {
+      // @ts-expect-error - emsaPssEncode is defined elsewhere
       signScheme = { encode: emsaPssEncode }
     }
     else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
@@ -2310,6 +2313,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     if (typeof scheme === 'string') {
       if (scheme === 'RSASSA-PKCS1-V1_5') {
         verifyScheme = {
+          // @ts-expect-error - verify scheme type widening
           verify(digest: string | Uint8Array, d: string) {
             // remove padding
             d = _decodePkcs1_v1_5(d, key, true);
@@ -2362,6 +2366,7 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
         };
       } else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
         verifyScheme = {
+          // @ts-expect-error - verify scheme type widening
           verify(digest: string | Uint8Array, d: string) {
             // remove padding
             d = _decodePkcs1_v1_5(d, key, true);

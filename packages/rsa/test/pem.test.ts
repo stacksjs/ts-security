@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { decode, encode } from '../src/rsa'
+import { decode, encode } from 'ts-pem'
 
 const _input = '-----BEGIN PRIVACY-ENHANCED MESSAGE-----\r\n'
   + 'Proc-Type: 4,ENCRYPTED\r\n'

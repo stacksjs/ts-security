@@ -36,5 +36,5 @@
     "skipDefaultLibCheck": true,
     "skipLibCheck": true
   },
-  "exclude": ["docs", "docs/**", "packages/wip", "packages/wip/**", "dist", "node_modules"]
+  "exclude": ["docs", "docs/**", "packages/wip", "packages/wip/**", "test/unit", "test/unit/**", "pickier.config.ts", "dist", "node_modules"]
 }
