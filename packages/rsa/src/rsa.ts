@@ -1422,7 +1422,7 @@ export function setPrivateKey(
       // key: the RSA key to use (key)
       // pub: false for private key operation
       // raw: true to skip decoding (we'll handle it with decodeFn)
-      const d = decrypt(dataStr, key, false, true);
+      const d = decrypt(dataStr, key, false, false);
 
       // Apply the decoding function
       return decodeFn(d, key);

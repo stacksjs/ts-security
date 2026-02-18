@@ -45,7 +45,7 @@ export function privateKeyToPem(key: any, maxline: number): string {
   // convert to ASN.1, then DER, then PEM-encode
   const msg = {
     type: 'RSA PRIVATE KEY',
-    body: new TextEncoder().encode(asn1.toDer(rsa.privateKeyToAsn1(key)).getBytes()),
+    body: asn1.toDer(rsa.privateKeyToAsn1(key)).getBytes() as unknown as Uint8Array,
     procType: null,
     contentDomain: null,
     dekInfo: null,
@@ -67,7 +67,7 @@ export function privateKeyInfoToPem(pki: any, maxline: number): string {
   // convert to DER, then PEM-encode
   const msg = {
     type: 'PRIVATE KEY',
-    body: new TextEncoder().encode(asn1.toDer(pki).getBytes()),
+    body: asn1.toDer(pki).getBytes() as unknown as Uint8Array,
     procType: null,
     contentDomain: null,
     dekInfo: null,

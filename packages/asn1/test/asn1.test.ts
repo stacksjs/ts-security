@@ -52,7 +52,7 @@ describe('asn1', () => {
   })
 
   it('should convert INTEGER -128 to DER', () => {
-    expect(ASN1.integerToDer(-128).toHex()).toBe('ff80')
+    expect(ASN1.integerToDer(-128).toHex()).toBe('80')
   })
 
   it('should convert INTEGER -129 to DER', () => {

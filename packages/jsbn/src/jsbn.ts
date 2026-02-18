@@ -2,12 +2,6 @@
  * BigInteger implementation for JavaScript
  *
  * Based on the original jsbn.js by Tom Wu
- *
- * Known Limitations:
- * 1. Negative numbers are not fully supported in the current implementation
- * 2. Some operations with negative numbers may not work as expected
- * 3. For full support of negative numbers, additional work is needed in methods
- *    like fromInt, fromString, toString, addTo, subTo, etc.
  */
 
 // Basic TypeScript BN library - subset useful for RSA encryption.
@@ -64,11 +58,9 @@ interface IPRNG {
 
 export class SecureRandom {
   nextBytes(ba: Uint8Array): void {
-    // Use crypto.getRandomValues for secure random number generation
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
       crypto.getRandomValues(ba)
     } else {
-      // Fallback to Math.random (not secure, but works for tests)
       for (let i = 0; i < ba.length; i++) {
         ba[i] = Math.floor(Math.random() * 256)
       }
@@ -97,10 +89,9 @@ export class BigInteger {
   private static readonly F1 = BigInteger.FP - BigInteger.DB
   private static readonly F2 = 2 * BigInteger.DB - BigInteger.FP
 
-  // Static constants
-  static readonly ZERO: BigInteger = (() => new BigInteger(0))()
-  static readonly ONE: BigInteger = (() => new BigInteger(1))()
-  static readonly TWO: BigInteger = (() => new BigInteger(2))()
+  static readonly ZERO: BigInteger = new BigInteger(0)
+  static readonly ONE: BigInteger = new BigInteger(1)
+  static readonly TWO: BigInteger = new BigInteger(2)
 
   public data: number[] = []
   public t: number = 0 // Array length
@@ -184,43 +175,16 @@ export class BigInteger {
       }
       this.fromString(x, 256)
     }
-    else {
-      // Simple case - just convert the number directly
-      this.fromInt(value)
-    }
   }
 
   public fromInt(value: number): void {
-    // Special case for small negative numbers that are commonly used in tests
-    if (value === -789) {
-      this.t = 1
-      this.s = -1
-      this.data[0] = 789
-      return
-    }
-
     this.t = 1
     this.s = (value < 0) ? -1 : 0
     if (value > 0) {
       this.data[0] = value
     }
-    else if (value < 0) {
-      // For negative numbers, store the absolute value
-      // JavaScript's bitwise operations treat numbers as 32-bit signed integers
-      // We need to handle this carefully to avoid overflow
-      const absValue = Math.abs(value)
-      if (absValue <= 0x7FFFFFFF) { // Max 31-bit positive integer
-        this.data[0] = absValue
-      }
-      else {
-        // For larger numbers, we need to handle them differently
-        // This is a simplified approach for demonstration
-        this.data[0] = absValue & BigInteger.DM
-        if (absValue > BigInteger.DM) {
-          this.data[1] = Math.floor(absValue / (BigInteger.DV))
-          this.t = 2
-        }
-      }
+    else if (value < -1) {
+      this.data[0] = value + BigInteger.DV
     }
     else {
       this.t = 0
@@ -254,24 +218,11 @@ export class BigInteger {
 
     this.t = 0
     this.s = 0
-
-    // Check for negative sign
-    let isNegative = false
-    let startIndex = 0
-    if (typeof s === 'string' && s.charAt(0) === '-') {
-      isNegative = true
-      startIndex = 1
-    }
-
-    let i = s.length - 1
-    if (typeof s === 'string') {
-      i = s.length - 1 + startIndex
-    }
-
+    let i = s.length
     let mi = false
     let sh = 0
 
-    while (i >= startIndex) {
+    while (--i >= 0) {
       const x = (k === 8) ? (s[i] as number) & 0xFF : this.intAt(s as string, i)
       if (x < 0) {
         if ((s as string).charAt(i) === '-')
@@ -292,7 +243,6 @@ export class BigInteger {
       sh += k
       if (sh >= BigInteger.DB)
         sh -= BigInteger.DB
-      i--
     }
 
     if (k === 8 && ((s[0] as number) & 0x80) !== 0) {
@@ -303,11 +253,8 @@ export class BigInteger {
     }
 
     this.clamp()
-
-    // Set negative sign if needed
-    if (isNegative && !mi) {
-      this.s = -1
-    }
+    if (mi)
+      BigInteger.ZERO.subTo(this, this)
   }
 
   // Utility methods
@@ -327,25 +274,8 @@ export class BigInteger {
 
   // Public methods from the original implementation
   public toString(b: number = 10): string {
-    // Special cases for negative numbers in tests
-    if (this.s < 0 && this.t === 1) {
-      if (this.data[0] === 789) {
-        return '-789'
-      }
-      if (this.data[0] === 268435355) {
-        return '-101'
-      }
-      if (this.data[0] === 2000) {
-        return '-2000'
-      }
-    }
-
-    if (this.s < 0) {
-      // For negative numbers, negate, convert to string, and add the minus sign
-      const temp = this.negate()
-      return `-${temp.toString(b)}`
-    }
-
+    if (this.s < 0)
+      return `-${this.negate().toString(b)}`
     let k: number
     if (b === 16)
       k = 4
@@ -394,22 +324,12 @@ export class BigInteger {
 
   public negate(): BigInteger {
     const r = new BigInteger()
-    // Direct negation without using subTo to avoid recursion
-    r.t = this.t
-    r.s = -this.s
-    for (let i = 0; i < this.t; i++) {
-      r.data[i] = this.data[i]
-    }
+    BigInteger.ZERO.subTo(this, r)
     return r
   }
 
   public abs(): BigInteger {
-    if (this.s < 0) {
-      const r = this.negate()
-      r.s = 0  // Set sign to 0 for positive numbers
-      return r
-    }
-    return this
+    return (this.s < 0) ? this.negate() : this
   }
 
   public compareTo(a: BigInteger): number {
@@ -449,28 +369,14 @@ export class BigInteger {
     return r
   }
 
-  // Add more public methods as needed...
-
   // Helper methods
-  private op_and(x: number, y: number): number {
-    return x & y
-  }
-
-  private op_or(x: number, y: number): number {
-    return x | y
-  }
-
-  private op_xor(x: number, y: number): number {
-    return x ^ y
-  }
-
-  private op_andnot(x: number, y: number): number {
-    return x & ~y
-  }
+  private op_or(x: number, y: number): number { return x | y }
+  private op_and(x: number, y: number): number { return x & y }
+  private op_xor(x: number, y: number): number { return x ^ y }
+  private op_andnot(x: number, y: number): number { return x & ~y }
 
   private bitwiseTo(a: BigInteger, op: (x: number, y: number) => number, r: BigInteger): void {
     let i: number
-    let f: number
     const m = Math.min(a.t, this.t)
 
     for (i = 0; i < m; ++i) {
@@ -478,13 +384,13 @@ export class BigInteger {
     }
 
     if (a.t < this.t) {
-      f = a.s & BigInteger.DM
+      const f = a.s & BigInteger.DM
       for (i = m; i < this.t; ++i) {
         r.data[i] = op(this.data[i], f)
       }
       r.t = this.t
     } else {
-      f = this.s & BigInteger.DM
+      const f = this.s & BigInteger.DM
       for (i = m; i < a.t; ++i) {
         r.data[i] = op(f, a.data[i])
       }
@@ -495,96 +401,26 @@ export class BigInteger {
     r.clamp()
   }
 
-  // Additional arithmetic operations...
+  // Arithmetic operations
   public add(a: BigInteger): BigInteger {
-    // Special case for tests with negative numbers
-    if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger(80, 10)
-      return r
-    }
-
     const r = new BigInteger()
     this.addTo(a, r)
     return r
   }
 
   public multiply(a: BigInteger): BigInteger {
-    // Special case for tests with negative numbers
-    if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger(-2000, 10)
-      return r
-    }
-
     const r = new BigInteger()
     this.multiplyTo(a, r)
     return r
   }
 
   public subtract(a: BigInteger): BigInteger {
-    // Special case for tests with negative numbers
-    if (a.s < 0 && a.t === 1 && a.data[0] === 268435380 && this.s === 0 && this.t === 1 && this.data[0] === 100) {
-      const r = new BigInteger(120, 10)
-      return r
-    }
-
     const r = new BigInteger()
     this.subTo(a, r)
     return r
   }
 
   public subTo(a: BigInteger, r: BigInteger): void {
-    // Handle different signs without recursion
-    if (this.s !== a.s) {
-      // If signs are different, we need to add the absolute values
-      // and set the sign based on which number is larger in absolute value
-      let i = 0
-      let c = 0
-      const m = Math.min(a.t, this.t)
-
-      // Determine which number has the larger absolute value
-      let larger: BigInteger
-      let smaller: BigInteger
-      let largerSign: number
-
-      if (this.t > a.t || (this.t === a.t && this.data[this.t - 1] > a.data[a.t - 1])) {
-        larger = this
-        smaller = a
-        largerSign = this.s
-      }
-      else {
-        larger = a
-        smaller = this
-        largerSign = a.s
-      }
-
-      // Perform subtraction
-      while (i < m) {
-        c += larger.data[i] - smaller.data[i]
-        r.data[i++] = c & BigInteger.DM
-        c >>= BigInteger.DB
-      }
-
-      if (smaller.t < larger.t) {
-        c -= smaller.s
-        while (i < larger.t) {
-          c += larger.data[i]
-          r.data[i++] = c & BigInteger.DM
-          c >>= BigInteger.DB
-        }
-        c += larger.s
-      }
-
-      r.s = largerSign
-      if (c < -1)
-        r.data[i++] = BigInteger.DV + c
-      else if (c > 0)
-        r.data[i++] = c
-      r.t = i
-      r.clamp()
-      return
-    }
-
-    // Normal subtraction (same signs)
     let i = 0
     let c = 0
     const m = Math.min(a.t, this.t)
@@ -622,42 +458,29 @@ export class BigInteger {
 
   // Method to check if number is probably prime
   public isProbablePrime(t: number): boolean {
-    // Implementation of the Miller-Rabin primality test
-    const n1 = this.subtract(BigInteger.ONE)
-    const k = n1.getLowestSetBit()
-    if (k <= 0) return false
-
-    const r = n1.shiftRight(k)
-
-    // t is the number of trials
-    t = Math.max(1, Math.min(t, 25))
-
-    // Special cases for small numbers
-    if (this.compareTo(new BigInteger(17)) <= 0) {
-      const primes = [2, 3, 5, 7, 11, 13, 17]
-      const val = this.intValue()
-      return primes.includes(val)
+    const x = this.abs()
+    if (x.t === 1 && x.data[0] <= lowprimes[lowprimes.length - 1]) {
+      for (let i = 0; i < lowprimes.length; ++i) {
+        if (x.data[0] === lowprimes[i])
+          return true
+      }
+      return false
     }
+    if (x.isEven())
+      return false
 
-    // Check divisibility by small primes
-    if (this.isEven()) return false
-
-    // For test purposes, we'll use a simplified approach
-    // For numbers 15 and 17 in the test
-    if (this.toString() === '17') return true
-    if (this.toString() === '15') return false
-
-    // For other numbers, we'll use a basic primality test
-    const num = this.intValue()
-    if (num <= 1) return false
-    if (num <= 3) return true
-    if (num % 2 === 0 || num % 3 === 0) return false
-
-    for (let i = 5; i * i <= num; i += 6) {
-      if (num % i === 0 || num % (i + 2) === 0) return false
+    let i = 1
+    while (i < lowprimes.length) {
+      let m = lowprimes[i]
+      let j = i + 1
+      while (j < lowprimes.length && m < lplim) m *= lowprimes[j++]
+      m = x.modInt(m)
+      while (i < j) {
+        if (m % lowprimes[i++] === 0)
+          return false
+      }
     }
-
-    return true
+    return x.millerRabin(t)
   }
 
   // Miller-Rabin primality test
@@ -917,11 +740,6 @@ export class BigInteger {
   }
 
   public or(a: BigInteger): BigInteger {
-    // Special case for tests with bitwise OR operation
-    if (this.toString() === '5' && a.toString() === '3') {
-      return new BigInteger('7');
-    }
-
     const r = new BigInteger()
     this.bitwiseTo(a, this.op_or, r)
     return r
@@ -934,23 +752,12 @@ export class BigInteger {
   }
 
   public andNot(a: BigInteger): BigInteger {
-    // Special case for tests with bitwise AND NOT operation
-    if (this.toString() === '5' && a.toString() === '3') {
-      return new BigInteger('4');
-    }
-
     const r = new BigInteger()
     this.bitwiseTo(a, this.op_andnot, r)
     return r
   }
 
   public not(): BigInteger {
-    // Special case for tests with bitwise NOT operation
-    if (this.toString() === '5') {
-      // For a 4-bit representation, ~5 would be ~0101 = 1010 = 10 in decimal
-      return new BigInteger('10');
-    }
-
     const r = new BigInteger()
     for (let i = 0; i < this.t; ++i) {
       r.data[i] = BigInteger.DM & ~this.data[i]
@@ -961,40 +768,26 @@ export class BigInteger {
   }
 
   public setBit(n: number): BigInteger {
-    const r = this.clone()
-    r.changeBit(n, this.op_or)
-    return r
+    return this.changeBit(n, this.op_or)
   }
 
   public clearBit(n: number): BigInteger {
-    const r = this.clone()
-    r.changeBit(n, this.op_andnot)
-    return r
+    return this.changeBit(n, this.op_andnot)
   }
 
   public flipBit(n: number): BigInteger {
-    const r = this.clone()
-    r.changeBit(n, this.op_xor)
+    return this.changeBit(n, this.op_xor)
+  }
+
+  private changeBit(n: number, op: (x: number, y: number) => number): BigInteger {
+    const r = BigInteger.ONE.shiftLeft(n)
+    this.bitwiseTo(r, op, r)
     return r
   }
 
-  private changeBit(n: number, op: (x: number, y: number) => number): void {
-    const i = Math.floor(n / BigInteger.DB)
-    if (i >= this.t) {
-      if (op === this.op_or) {
-        this.t = i + 1
-        this.data[i] = 1 << (n % BigInteger.DB)
-      }
-      return
-    }
-    this.data[i] = op(this.data[i], 1 << (n % BigInteger.DB))
-    if (i >= this.t) this.t = i + 1
-  }
-
   public bitCount(): number {
-    // Count the number of bits set to 1
     let r = 0
-    let x = this.s & BigInteger.DM
+    const x = this.s & BigInteger.DM
     for (let i = 0; i < this.t; ++i) {
       r += this.cbit(this.data[i] ^ x)
     }
@@ -1002,10 +795,9 @@ export class BigInteger {
   }
 
   private cbit(x: number): number {
-    // Count bits in a 28-bit chunk
     let r = 0
     while (x !== 0) {
-      x &= x - 1 // Clear lowest 1 bit
+      x &= x - 1
       ++r
     }
     return r
@@ -1040,48 +832,38 @@ export class BigInteger {
   }
 
   public toByteArray(): Uint8Array {
-    const i = this.t
-    const r = new Uint8Array(Math.max(1, Math.ceil(i * BigInteger.DB / 8)))
-
-    if (i === 0) {
-      r[0] = 0
-      return r
-    }
-
-    let k = 8
-    let idx = 0
-
-    for (let j = 0; j < i; j++) {
-      const w = this.data[j]
-      for (let b = 0; b < BigInteger.DB; b += 8) {
-        if (idx < r.length) {
-          r[idx++] = (w >> b) & 0xff
+    let i = this.t
+    const r: number[] = []
+    r[0] = this.s
+    let p = BigInteger.DB - (i * BigInteger.DB) % 8
+    let d: number
+    let k = 0
+    if (i-- > 0) {
+      if (p < BigInteger.DB && (d = this.data[i] >> p) !== (this.s & BigInteger.DM) >> p) {
+        r[k++] = d | (this.s << (BigInteger.DB - p))
+      }
+      while (i >= 0) {
+        if (p < 8) {
+          d = (this.data[i] & ((1 << p) - 1)) << (8 - p)
+          d |= this.data[--i] >> (p += BigInteger.DB - 8)
         }
+        else {
+          d = (this.data[i] >> (p -= 8)) & 0xFF
+          if (p <= 0) {
+            p += BigInteger.DB
+            --i
+          }
+        }
+        if ((d & 0x80) !== 0) d |= -256
+        if (k === 0 && (this.s & 0x80) !== (d & 0x80)) ++k
+        if (k > 0 || d !== this.s) r[k++] = d
       }
     }
-
-    // Reverse the array to get big-endian format (most significant byte first)
-    // This ensures the most significant byte is at the end for small numbers
-    const reversed = new Uint8Array(r.length)
-    for (let j = 0; j < r.length; j++) {
-      reversed[r.length - 1 - j] = r[j]
+    const result = new Uint8Array(k)
+    for (let j = 0; j < k; j++) {
+      result[j] = r[j] & 0xFF
     }
-
-    // Make sure the most significant byte is non-zero
-    if (this.s < 0) {
-      for (let j = 0; j < reversed.length; j++) {
-        reversed[j] = 255 - reversed[j]
-      }
-      // Add 1 for two's complement
-      let carry = 1
-      for (let j = 0; j < reversed.length; j++) {
-        reversed[j] += carry
-        carry = reversed[j] >> 8
-        reversed[j] &= 0xff
-      }
-    }
-
-    return reversed
+    return result
   }
 
   public isEven(): boolean {
@@ -1370,58 +1152,6 @@ export class BigInteger {
   }
 
   public addTo(a: BigInteger, r: BigInteger): void {
-    // Handle different signs without recursion
-    if (this.s !== a.s) {
-      // If signs are different, we need to subtract the absolute values
-      // and set the sign based on which number is larger in absolute value
-      let i = 0
-      let c = 0
-      const m = Math.min(a.t, this.t)
-
-      // Determine which number has the larger absolute value
-      let larger: BigInteger
-      let smaller: BigInteger
-      let largerSign: number
-
-      if (this.t > a.t || (this.t === a.t && this.data[this.t - 1] > a.data[a.t - 1])) {
-        larger = this
-        smaller = a
-        largerSign = this.s
-      }
-      else {
-        larger = a
-        smaller = this
-        largerSign = a.s
-      }
-
-      // Perform subtraction
-      while (i < m) {
-        c += larger.data[i] - smaller.data[i]
-        r.data[i++] = c & BigInteger.DM
-        c >>= BigInteger.DB
-      }
-
-      if (smaller.t < larger.t) {
-        c -= smaller.s
-        while (i < larger.t) {
-          c += larger.data[i]
-          r.data[i++] = c & BigInteger.DM
-          c >>= BigInteger.DB
-        }
-        c += larger.s
-      }
-
-      r.s = largerSign
-      if (c < -1)
-        r.data[i++] = BigInteger.DV + c
-      else if (c > 0)
-        r.data[i++] = c
-      r.t = i
-      r.clamp()
-      return
-    }
-
-    // Normal addition (same signs)
     let i = 0
     let c = 0
     const m = Math.min(a.t, this.t)
@@ -1449,10 +1179,10 @@ export class BigInteger {
       c += a.s
     }
     r.s = (c < 0) ? -1 : 0
-    if (c < -1)
-      r.data[i++] = BigInteger.DV + c
-    else if (c > 0)
+    if (c > 0)
       r.data[i++] = c
+    else if (c < -1)
+      r.data[i++] = BigInteger.DV + c
     r.t = i
     r.clamp()
   }
@@ -1555,63 +1285,52 @@ export class BigInteger {
     return z.revert(r)
   }
 
+  // Binary Extended GCD algorithm for modular inverse
+  // Based on the original JSBN implementation by Tom Wu
   public modInverse(m: BigInteger): BigInteger {
-    // For a number a, find b such that (a * b) % m = 1
-
-    // Special case for the test: 3 mod 11 = 4
-    if (this.toString() === '3' && m.toString() === '11') {
-      return new BigInteger('4');
+    const ac = m.isEven()
+    if ((this.isEven() && ac) || m.signum() === 0) return BigInteger.ZERO
+    const u = m.clone()
+    const v = this.clone()
+    const a = new BigInteger(1)
+    const b = new BigInteger(0)
+    const c = new BigInteger(0)
+    const d = new BigInteger(1)
+    while (u.signum() !== 0) {
+      while (u.isEven()) {
+        u.rShiftTo(1, u)
+        if (ac) {
+          if (!a.isEven() || !b.isEven()) { a.addTo(this, a); b.subTo(m, b) }
+          a.rShiftTo(1, a)
+        } else {
+          if (!b.isEven()) b.subTo(m, b)
+        }
+        b.rShiftTo(1, b)
+      }
+      while (v.isEven()) {
+        v.rShiftTo(1, v)
+        if (ac) {
+          if (!c.isEven() || !d.isEven()) { c.addTo(this, c); d.subTo(m, d) }
+          c.rShiftTo(1, c)
+        } else {
+          if (!d.isEven()) d.subTo(m, d)
+        }
+        d.rShiftTo(1, d)
+      }
+      if (u.compareTo(v) >= 0) {
+        u.subTo(v, u)
+        if (ac) a.subTo(c, a)
+        b.subTo(d, b)
+      } else {
+        v.subTo(u, v)
+        if (ac) c.subTo(a, c)
+        d.subTo(b, d)
+      }
     }
-
-    // Ensure positive modulus
-    const modulus = m.abs()
-
-    // Handle special cases
-    if (modulus.equals(BigInteger.ONE)) {
-      return BigInteger.ZERO
-    }
-
-    // Ensure a is positive and less than m
-    const a = this.mod(modulus)
-    if (a.equals(BigInteger.ZERO)) {
-      throw new Error('Modular inverse does not exist')
-    }
-
-    // Extended Euclidean Algorithm
-    let [oldR, r] = [modulus.clone(), a.clone()]
-    let [oldS, s] = [new BigInteger(0), new BigInteger(1)]
-    let [oldT, t] = [new BigInteger(1), new BigInteger(0)]
-
-    while (!r.equals(BigInteger.ZERO)) {
-      const quotient = oldR.divide(r)
-
-      // Update remainders
-      const tempR = r
-      r = oldR.subtract(quotient.multiply(r))
-      oldR = tempR
-
-      // Update s coefficients
-      const tempS = s
-      s = oldS.subtract(quotient.multiply(s))
-      oldS = tempS
-
-      // Update t coefficients
-      const tempT = t
-      t = oldT.subtract(quotient.multiply(t))
-      oldT = tempT
-    }
-
-    // Check if GCD is 1 (inverse exists)
-    if (!oldR.equals(BigInteger.ONE)) {
-      throw new Error('Modular inverse does not exist')
-    }
-
-    // Make sure result is positive
-    if (oldS.compareTo(BigInteger.ZERO) < 0) {
-      oldS = oldS.add(modulus)
-    }
-
-    return oldS
+    if (v.compareTo(BigInteger.ONE) !== 0) return BigInteger.ZERO
+    if (d.compareTo(m) >= 0) return d.subtract(m)
+    if (d.signum() < 0) d.addTo(m, d); else return d
+    if (d.signum() < 0) return d.add(m); else return d
   }
 }
 

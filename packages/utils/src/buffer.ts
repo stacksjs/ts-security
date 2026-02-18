@@ -99,7 +99,7 @@ export function createBuffer(b?: string | ArrayBuffer | Uint8Array): ByteStringB
     },
 
     putString(str: string): ByteStringBuffer {
-      return this.putBytes(str);
+      return this.putBytes(unescape(encodeURIComponent(str)));
     },
 
     putInt16(i: number): ByteStringBuffer {

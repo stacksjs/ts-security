@@ -136,12 +136,11 @@ describe('BigInteger', () => {
       console.log('Running: should negate a BigInteger')
       const a = new BigInteger('123')
       const result = a.negate()
-      // The implementation returns a new BigInteger with opposite sign
-      expect(result.s).toBe(-a.s)
+      expect(result.toString()).toBe('-123')
 
       const b = new BigInteger('-456')
       const result2 = b.negate()
-      expect(result2.s).toBe(-b.s)
+      expect(result2.toString()).toBe('456')
     })
 
     it('should get the absolute value of a BigInteger', () => {
@@ -272,9 +271,8 @@ describe('BigInteger', () => {
 
     it('should perform bitwise NOT operation', () => {
       const a = new BigInteger('5') // 101 in binary
-      // NOT operation is typically implemented as a complement within a certain bit width
-      // For a 4-bit representation, ~5 would be ~0101 = 1010 = 10 in decimal
-      expect(a.not().toString()).toBe('10')
+      // In two's complement, ~5 = -6
+      expect(a.not().toString()).toBe('-6')
     })
 
     it('should set, clear, and flip bits', () => {
