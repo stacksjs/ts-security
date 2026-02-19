@@ -44,7 +44,7 @@
  */
 
 import type { ByteStringBuffer } from 'ts-security-utils'
-import { sha1 } from 'ts-hash'
+import { sha1 } from '@stacksjs/ts-hash'
 
 // Extended Error interface for PKCS1 specific errors
 interface PKCS1Error extends Error {

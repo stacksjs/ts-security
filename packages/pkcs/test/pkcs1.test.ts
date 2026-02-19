@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { sha1, sha256 } from 'ts-hash'
+import { sha1, sha256 } from '@stacksjs/ts-hash'
 import { BigInteger } from 'ts-jsbn'
 import { rsa } from 'ts-rsa'
 import { createBuffer, decode64, encode64, fillString } from 'ts-security-utils'

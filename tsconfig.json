@@ -10,7 +10,7 @@
       "ts-security": ["./packages/core/src"],
       "ts-security-utils": ["./packages/utils/src"],
       "ts-base-x": ["./packages/base-x/src"],
-      "ts-hash": ["./packages/hash/src"],
+      "@stacksjs/ts-hash": ["./packages/hash/src"],
       "ts-pem": ["./packages/pem/src"],
       "ts-pki": ["./packages/pki/src"],
       "ts-asn1": ["./packages/asn1/src"],

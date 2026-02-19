@@ -1,5 +1,5 @@
 {
-  "name": "ts-hash",
+  "name": "@stacksjs/ts-hash",
   "type": "module",
   "version": "0.0.0",
   "description": "A SHA-1, SHA-256, SHA-384, SHA-512 hashing library.",

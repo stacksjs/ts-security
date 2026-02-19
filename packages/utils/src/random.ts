@@ -28,7 +28,7 @@
  */
 
 import type { ByteStringBuffer } from '.'
-import { sha256 } from 'ts-hash'
+import { sha256 } from '@stacksjs/ts-hash'
 import { _expandKey, _updateBlock } from 'ts-aes'
 
 // Local implementation of ByteStringBuffer to avoid circular dependencies
