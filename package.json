@@ -1,7 +1,7 @@
 {
   "name": "ts-security",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -47,7 +47,10 @@
   "bin": {
     "ts-security": "./dist/bin/cli.js"
   },
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "fresh": "bunx rimraf node_modules/ bun.lock && bun i",

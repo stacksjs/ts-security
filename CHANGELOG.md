@@ -1,5 +1,176 @@
 # Changelog
+### 🐛 Bug Fixes
 
+- update wrong package naming for aes ([96d4b94](https://github.com/stacksjs/ts-security/commit/96d4b94)) _(by Adelino Ngomacha <adelinob335@gmail.com>)_
+
+### 🧹 Chores
+
+- wip ([bdfb62c](https://github.com/stacksjs/ts-security/commit/bdfb62c)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([9449195](https://github.com/stacksjs/ts-security/commit/9449195)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([a2e0253](https://github.com/stacksjs/ts-security/commit/a2e0253)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([641b4ac](https://github.com/stacksjs/ts-security/commit/641b4ac)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([2636a9b](https://github.com/stacksjs/ts-security/commit/2636a9b)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([7a04028](https://github.com/stacksjs/ts-security/commit/7a04028)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([2f3e8d7](https://github.com/stacksjs/ts-security/commit/2f3e8d7)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- **deps**: update all non-major dependencies (#5) ([85a386b](https://github.com/stacksjs/ts-security/commit/85a386b)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#5](https://github.com/stacksjs/ts-security/issues/5), [#5](https://github.com/stacksjs/ts-security/issues/5))
+- **deps**: update actions/checkout action to v6 (#19) ([aa925be](https://github.com/stacksjs/ts-security/commit/aa925be)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#19](https://github.com/stacksjs/ts-security/issues/19), [#19](https://github.com/stacksjs/ts-security/issues/19))
+- wip ([4884b78](https://github.com/stacksjs/ts-security/commit/4884b78)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([d1331b6](https://github.com/stacksjs/ts-security/commit/d1331b6)) _(by Chris <chrisbreuer93@gmail.com>)_
+- add clarity ([08dafea](https://github.com/stacksjs/ts-security/commit/08dafea)) _(by cab-mikee <mike.cabz32@gmail.com>)_
+- update tooling ([273579b](https://github.com/stacksjs/ts-security/commit/273579b)) _(by Adelino Ngomacha <adelinob335@gmail.com>)_
+- add stargazers and sponsors ([51a56a4](https://github.com/stacksjs/ts-security/commit/51a56a4)) _(by Test User <test@example.com>)_
+- **deps**: update all non-major dependencies (#4) ([95392c2](https://github.com/stacksjs/ts-security/commit/95392c2)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#4](https://github.com/stacksjs/ts-security/issues/4), [#4](https://github.com/stacksjs/ts-security/issues/4))
+- **deps**: update all non-major dependencies (#3) ([e43401e](https://github.com/stacksjs/ts-security/commit/e43401e)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#3](https://github.com/stacksjs/ts-security/issues/3), [#3](https://github.com/stacksjs/ts-security/issues/3))
+- wip ([2c02f1e](https://github.com/stacksjs/ts-security/commit/2c02f1e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([93e8e03](https://github.com/stacksjs/ts-security/commit/93e8e03)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2c66e75](https://github.com/stacksjs/ts-security/commit/2c66e75)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([22e648a](https://github.com/stacksjs/ts-security/commit/22e648a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([87c3104](https://github.com/stacksjs/ts-security/commit/87c3104)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f32e050](https://github.com/stacksjs/ts-security/commit/f32e050)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3465b5b](https://github.com/stacksjs/ts-security/commit/3465b5b)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9a31193](https://github.com/stacksjs/ts-security/commit/9a31193)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2fd4d57](https://github.com/stacksjs/ts-security/commit/2fd4d57)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([56a8ccb](https://github.com/stacksjs/ts-security/commit/56a8ccb)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3eedb1c](https://github.com/stacksjs/ts-security/commit/3eedb1c)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6f71a22](https://github.com/stacksjs/ts-security/commit/6f71a22)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([daa910c](https://github.com/stacksjs/ts-security/commit/daa910c)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0404490](https://github.com/stacksjs/ts-security/commit/0404490)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9365a68](https://github.com/stacksjs/ts-security/commit/9365a68)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([4927baa](https://github.com/stacksjs/ts-security/commit/4927baa)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([09e4348](https://github.com/stacksjs/ts-security/commit/09e4348)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0d2377a](https://github.com/stacksjs/ts-security/commit/0d2377a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([5ece82a](https://github.com/stacksjs/ts-security/commit/5ece82a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([1dd0a3a](https://github.com/stacksjs/ts-security/commit/1dd0a3a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([28b2a54](https://github.com/stacksjs/ts-security/commit/28b2a54)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2ee8f1f](https://github.com/stacksjs/ts-security/commit/2ee8f1f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([1e75e0b](https://github.com/stacksjs/ts-security/commit/1e75e0b)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c89d6db](https://github.com/stacksjs/ts-security/commit/c89d6db)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f9f9a1a](https://github.com/stacksjs/ts-security/commit/f9f9a1a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([09a9e9e](https://github.com/stacksjs/ts-security/commit/09a9e9e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0ba8d48](https://github.com/stacksjs/ts-security/commit/0ba8d48)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([e39935e](https://github.com/stacksjs/ts-security/commit/e39935e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([84f1dd6](https://github.com/stacksjs/ts-security/commit/84f1dd6)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9d74eea](https://github.com/stacksjs/ts-security/commit/9d74eea)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([31e50ce](https://github.com/stacksjs/ts-security/commit/31e50ce)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6ca2ffc](https://github.com/stacksjs/ts-security/commit/6ca2ffc)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([4d5b9f6](https://github.com/stacksjs/ts-security/commit/4d5b9f6)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c57aba4](https://github.com/stacksjs/ts-security/commit/c57aba4)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([378cf5a](https://github.com/stacksjs/ts-security/commit/378cf5a)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9d155dd](https://github.com/stacksjs/ts-security/commit/9d155dd)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([604eb28](https://github.com/stacksjs/ts-security/commit/604eb28)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3d42fd1](https://github.com/stacksjs/ts-security/commit/3d42fd1)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0afda05](https://github.com/stacksjs/ts-security/commit/0afda05)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2b109ad](https://github.com/stacksjs/ts-security/commit/2b109ad)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([77764d3](https://github.com/stacksjs/ts-security/commit/77764d3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([35b9644](https://github.com/stacksjs/ts-security/commit/35b9644)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([635d3ce](https://github.com/stacksjs/ts-security/commit/635d3ce)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([422f1ea](https://github.com/stacksjs/ts-security/commit/422f1ea)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([53abfc9](https://github.com/stacksjs/ts-security/commit/53abfc9)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b75c2bc](https://github.com/stacksjs/ts-security/commit/b75c2bc)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([dade46f](https://github.com/stacksjs/ts-security/commit/dade46f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([4504c00](https://github.com/stacksjs/ts-security/commit/4504c00)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0ca38e3](https://github.com/stacksjs/ts-security/commit/0ca38e3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c2dfbaa](https://github.com/stacksjs/ts-security/commit/c2dfbaa)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b065666](https://github.com/stacksjs/ts-security/commit/b065666)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([ea8bb4c](https://github.com/stacksjs/ts-security/commit/ea8bb4c)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([60f2f87](https://github.com/stacksjs/ts-security/commit/60f2f87)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([d8013f5](https://github.com/stacksjs/ts-security/commit/d8013f5)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f29adc7](https://github.com/stacksjs/ts-security/commit/f29adc7)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([8b88abe](https://github.com/stacksjs/ts-security/commit/8b88abe)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b4aef71](https://github.com/stacksjs/ts-security/commit/b4aef71)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([06e39a8](https://github.com/stacksjs/ts-security/commit/06e39a8)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([692c627](https://github.com/stacksjs/ts-security/commit/692c627)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([dee84ab](https://github.com/stacksjs/ts-security/commit/dee84ab)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([7876821](https://github.com/stacksjs/ts-security/commit/7876821)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0841530](https://github.com/stacksjs/ts-security/commit/0841530)) _(by Chris <chrisbreuer93@gmail.com>)_
+- **deps**: update dependency @types/bun to ^1.2.3 (#2) ([5896882](https://github.com/stacksjs/ts-security/commit/5896882)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#2](https://github.com/stacksjs/ts-security/issues/2), [#2](https://github.com/stacksjs/ts-security/issues/2))
+- wip ([a86def3](https://github.com/stacksjs/ts-security/commit/a86def3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3d01a97](https://github.com/stacksjs/ts-security/commit/3d01a97)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c7b14b6](https://github.com/stacksjs/ts-security/commit/c7b14b6)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6d7ac70](https://github.com/stacksjs/ts-security/commit/6d7ac70)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([1fa2150](https://github.com/stacksjs/ts-security/commit/1fa2150)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2f1853b](https://github.com/stacksjs/ts-security/commit/2f1853b)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([bf145e2](https://github.com/stacksjs/ts-security/commit/bf145e2)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9c40059](https://github.com/stacksjs/ts-security/commit/9c40059)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c172469](https://github.com/stacksjs/ts-security/commit/c172469)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([71aa386](https://github.com/stacksjs/ts-security/commit/71aa386)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([ccd566c](https://github.com/stacksjs/ts-security/commit/ccd566c)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([05261b1](https://github.com/stacksjs/ts-security/commit/05261b1)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([905f29b](https://github.com/stacksjs/ts-security/commit/905f29b)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6a6f5be](https://github.com/stacksjs/ts-security/commit/6a6f5be)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3df21d0](https://github.com/stacksjs/ts-security/commit/3df21d0)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f1cccb0](https://github.com/stacksjs/ts-security/commit/f1cccb0)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([19cfffb](https://github.com/stacksjs/ts-security/commit/19cfffb)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3d293fc](https://github.com/stacksjs/ts-security/commit/3d293fc)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([5abc825](https://github.com/stacksjs/ts-security/commit/5abc825)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([30ac7f0](https://github.com/stacksjs/ts-security/commit/30ac7f0)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b200387](https://github.com/stacksjs/ts-security/commit/b200387)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6f284fa](https://github.com/stacksjs/ts-security/commit/6f284fa)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([47e402f](https://github.com/stacksjs/ts-security/commit/47e402f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([01542cd](https://github.com/stacksjs/ts-security/commit/01542cd)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([ebf7074](https://github.com/stacksjs/ts-security/commit/ebf7074)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([3c9d7dc](https://github.com/stacksjs/ts-security/commit/3c9d7dc)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c72deb9](https://github.com/stacksjs/ts-security/commit/c72deb9)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c39ac32](https://github.com/stacksjs/ts-security/commit/c39ac32)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0bc543e](https://github.com/stacksjs/ts-security/commit/0bc543e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([376a282](https://github.com/stacksjs/ts-security/commit/376a282)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([94a2919](https://github.com/stacksjs/ts-security/commit/94a2919)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([a83c75d](https://github.com/stacksjs/ts-security/commit/a83c75d)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b87a703](https://github.com/stacksjs/ts-security/commit/b87a703)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([d044876](https://github.com/stacksjs/ts-security/commit/d044876)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([bc00efc](https://github.com/stacksjs/ts-security/commit/bc00efc)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([7322a0f](https://github.com/stacksjs/ts-security/commit/7322a0f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([efd614e](https://github.com/stacksjs/ts-security/commit/efd614e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([83e19d9](https://github.com/stacksjs/ts-security/commit/83e19d9)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f289d4e](https://github.com/stacksjs/ts-security/commit/f289d4e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9b8fec5](https://github.com/stacksjs/ts-security/commit/9b8fec5)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([33b1cd5](https://github.com/stacksjs/ts-security/commit/33b1cd5)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([4c6984f](https://github.com/stacksjs/ts-security/commit/4c6984f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([a6b60ef](https://github.com/stacksjs/ts-security/commit/a6b60ef)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([8995169](https://github.com/stacksjs/ts-security/commit/8995169)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([44d1da3](https://github.com/stacksjs/ts-security/commit/44d1da3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([5440920](https://github.com/stacksjs/ts-security/commit/5440920)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([4d0613d](https://github.com/stacksjs/ts-security/commit/4d0613d)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([d729d00](https://github.com/stacksjs/ts-security/commit/d729d00)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([1d56581](https://github.com/stacksjs/ts-security/commit/1d56581)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([647e0f5](https://github.com/stacksjs/ts-security/commit/647e0f5)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([87a4c0c](https://github.com/stacksjs/ts-security/commit/87a4c0c)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([55e5233](https://github.com/stacksjs/ts-security/commit/55e5233)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([6541fe3](https://github.com/stacksjs/ts-security/commit/6541fe3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b94fcc9](https://github.com/stacksjs/ts-security/commit/b94fcc9)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([dbac52f](https://github.com/stacksjs/ts-security/commit/dbac52f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([7ab9ae4](https://github.com/stacksjs/ts-security/commit/7ab9ae4)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([b917d08](https://github.com/stacksjs/ts-security/commit/b917d08)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0056f30](https://github.com/stacksjs/ts-security/commit/0056f30)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([35a9b44](https://github.com/stacksjs/ts-security/commit/35a9b44)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([f3f6faa](https://github.com/stacksjs/ts-security/commit/f3f6faa)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([bbaa490](https://github.com/stacksjs/ts-security/commit/bbaa490)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([9ef436e](https://github.com/stacksjs/ts-security/commit/9ef436e)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c7d3092](https://github.com/stacksjs/ts-security/commit/c7d3092)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([7c4b044](https://github.com/stacksjs/ts-security/commit/7c4b044)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([7d79302](https://github.com/stacksjs/ts-security/commit/7d79302)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([63c836b](https://github.com/stacksjs/ts-security/commit/63c836b)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([79ea377](https://github.com/stacksjs/ts-security/commit/79ea377)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([56ab9c1](https://github.com/stacksjs/ts-security/commit/56ab9c1)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([0364a07](https://github.com/stacksjs/ts-security/commit/0364a07)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([fbc5ab3](https://github.com/stacksjs/ts-security/commit/fbc5ab3)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([2169ad2](https://github.com/stacksjs/ts-security/commit/2169ad2)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([839ff99](https://github.com/stacksjs/ts-security/commit/839ff99)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([a0c741f](https://github.com/stacksjs/ts-security/commit/a0c741f)) _(by Chris <chrisbreuer93@gmail.com>)_
+- wip ([c98f286](https://github.com/stacksjs/ts-security/commit/c98f286)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 📄 Miscellaneous
+
+- Merge pull request #21 from stacksjs/renovate/actions-cache-5.x ([2da73ae](https://github.com/stacksjs/ts-security/commit/2da73ae)) _(by [renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot]))_ ([#21](https://github.com/stacksjs/ts-security/issues/21), [#21](https://github.com/stacksjs/ts-security/issues/21))
+
+### Contributors
+
+- _Adelino Ngomacha <adelinob335@gmail.com>_
+- _Chris <chrisbreuer93@gmail.com>_
+- _Test User <test@example.com>_
+- _[renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>](https://github.com/renovate[bot])_
+- _cab-mikee <mike.cabz32@gmail.com>_
+- _glennmichael123 <gtorregosa@gmail.com>_
 
 ## v0.9.0...main
 
@@ -608,7 +779,6 @@
 
 ## ...main
 
-
 ### 🏡 Chore
 
 - Wip ([b032de5](https://github.com/stacksjs/tlsx/commit/b032de5))
@@ -622,4 +792,3 @@
 ### ❤️ Contributors
 
 - Chris <chrisbreuer93@gmail.com>
-

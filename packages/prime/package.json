@@ -1,7 +1,7 @@
 {
   "name": "ts-prime-gen",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A prime number library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
@@ -31,7 +31,10 @@
   },
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["README.md", "dist"],
+  "files": [
+    "README.md",
+    "dist"
+  ],
   "scripts": {
     "build": "bun build.ts",
     "lint": "bunx --bun pickier lint . --config pickier.config.ts --max-warnings 9999",
