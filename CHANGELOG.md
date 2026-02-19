@@ -1,4 +1,27 @@
 # Changelog
+[Compare changes](https://github.com/stacksjs/ts-security/compare/v0.0.1...v0.0.2)
+
+### 🧹 Chores
+
+- release v0.0.2 ([f371eb2](https://github.com/stacksjs/ts-security/commit/f371eb2)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([05d4458](https://github.com/stacksjs/ts-security/commit/05d4458)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([cbe4921](https://github.com/stacksjs/ts-security/commit/cbe4921)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+
+### Contributors
+
+- _glennmichael123 <gtorregosa@gmail.com>_
+
+[Compare changes](https://github.com/stacksjs/ts-security/compare/v0.0.1...HEAD)
+
+### 🧹 Chores
+
+- wip ([05d4458](https://github.com/stacksjs/ts-security/commit/05d4458)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+- wip ([cbe4921](https://github.com/stacksjs/ts-security/commit/cbe4921)) _(by glennmichael123 <gtorregosa@gmail.com>)_
+
+### Contributors
+
+- _glennmichael123 <gtorregosa@gmail.com>_
+
 ### 🐛 Bug Fixes
 
 - update wrong package naming for aes ([96d4b94](https://github.com/stacksjs/ts-security/commit/96d4b94)) _(by Adelino Ngomacha <adelinob335@gmail.com>)_

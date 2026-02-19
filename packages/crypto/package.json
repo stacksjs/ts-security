@@ -1,7 +1,7 @@
 {
   "name": "ts-security-crypto",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Cryptographic utilities using Bun native features",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "license": "MIT",

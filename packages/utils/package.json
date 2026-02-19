@@ -1,7 +1,7 @@
 {
   "name": "ts-security-utils",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A collection of utility functions for the ts-security package.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",

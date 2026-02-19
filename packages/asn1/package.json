@@ -1,7 +1,7 @@
 {
   "name": "ts-asn1",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A ASN.1 library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
   "license": "MIT",
