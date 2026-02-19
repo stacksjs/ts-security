@@ -24,13 +24,13 @@
 
 ```bash
 # bun
-bun install ts-asn1
+bun install ts-aes
 
 # npm
-npm install ts-asn1
+npm install ts-aes
 
 # pnpm
-pnpm install ts-asn1
+pnpm install ts-aes
 ```
 
 ## Get Started
@@ -38,7 +38,7 @@ pnpm install ts-asn1
 After installing the package, you can import and use the ASN.1 encoding and decoding functions:
 
 ```ts
-import { asn1 } from 'ts-asn1'
+import { asn1 } from 'ts-aes'
 import { utils } from 'ts-security-utils'
 
 // Create an ASN.1 INTEGER
@@ -182,7 +182,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-asn1` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-aes` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -207,10 +207,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-asn1?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-asn1
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-aes?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-aes
 [github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-security/ci.yml?style=flat-square&branch=main
 [github-actions-href]: https://github.com/stacksjs/ts-security/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-asn1/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-asn1 -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-aes/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-aes -->

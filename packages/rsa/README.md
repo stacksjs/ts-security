@@ -6,7 +6,7 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-pem
+# ts-rsa
 
 > A TypeScript implementation of PEM (Privacy Enhanced Mail) encoding and decoding with a focus on type safety and standards compliance.
 
@@ -24,13 +24,13 @@
 
 ```bash
 # bun
-bun install ts-pem
+bun install ts-rsa
 
 # npm
-npm install ts-pem
+npm install ts-rsa
 
 # pnpm
-pnpm install ts-pem
+pnpm install ts-rsa
 ```
 
 ## Get Started
@@ -38,7 +38,7 @@ pnpm install ts-pem
 After installing the package, you can import and use the PEM encoding and decoding functions:
 
 ```ts
-import { decode, encode } from 'ts-pem'
+import { decode, encode } from 'ts-rsa'
 
 // Decode a PEM-formatted string
 const pemString = `-----BEGIN CERTIFICATE-----
@@ -115,7 +115,7 @@ bun test
 
 ## Changelog
 
-Please see our [releases](https://github.com/stacksjs/ts-pem/releases) page for more information on what has changed recently.
+Please see our [releases](https://github.com/stacksjs/ts-rsa/releases) page for more information on what has changed recently.
 
 ## Contributing
 
@@ -133,7 +133,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-pem` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-rsa` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -158,10 +158,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-pem?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-pem
-[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-pem/ci.yml?style=flat-square&branch=main
-[github-actions-href]: https://github.com/stacksjs/ts-pem/actions?query=workflow%3Aci
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-rsa?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-rsa
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-rsa/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/ts-rsa/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-pem/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-pem -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-rsa/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/ts-rsa -->

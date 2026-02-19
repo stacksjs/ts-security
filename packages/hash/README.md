@@ -6,7 +6,7 @@
 <!-- [![npm downloads][npm-downloads-src]][npm-downloads-href] -->
 <!-- [![Codecov][codecov-src]][codecov-href] -->
 
-# ts-hash
+# @stacksjs/ts-hash
 
 > A TypeScript implementation of the SHA family of cryptographic hash functions with a focus on type safety, security, and performance.
 
@@ -37,13 +37,13 @@
 
 ```bash
 # bun
-bun install ts-hash
+bun install @stacksjs/ts-hash
 
 # npm
-npm install ts-hash
+npm install @stacksjs/ts-hash
 
 # pnpm
-pnpm install ts-hash
+pnpm install @stacksjs/ts-hash
 ```
 
 ## Get Started
@@ -51,7 +51,7 @@ pnpm install ts-hash
 After installing the package, you can import and use the various hash functions:
 
 ```ts
-import { sha1, sha256, sha384, sha512, sha512_224, sha512_256 } from 'ts-hash'
+import { sha1, sha256, sha384, sha512, sha512_224, sha512_256 } from '@stacksjs/ts-hash'
 
 // SHA-1 Hashing (legacy, not recommended for security-critical applications)
 const md1 = sha1.create()
@@ -177,7 +177,7 @@ bun test
 
 ## Changelog
 
-Please see our [releases](https://github.com/stacksjs/ts-hash/releases) page for more information on what has changed recently.
+Please see our [releases](https://github.com/stacksjs/@stacksjs/ts-hash/releases) page for more information on what has changed recently.
 
 ## Contributing
 
@@ -195,7 +195,7 @@ For casual chit-chat with others using this package:
 
 ## Postcardware
 
-"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `ts-hash` is being used! We showcase them on our website too.
+"Software that is free, but hopes for a postcard." We love receiving postcards from around the world showing where `@stacksjs/ts-hash` is being used! We showcase them on our website too.
 
 Our address: Stacks.js, 12665 Village Ln #2306, Playa Vista, CA 90094, United States 🌎
 
@@ -220,10 +220,10 @@ The MIT License (MIT). Please see [LICENSE](https://github.com/stacksjs/stacks/t
 Made with 💙
 
 <!-- Badges -->
-[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/ts-hash?style=flat-square
-[npm-version-href]: https://npmjs.com/package/@stacksjs/ts-hash
-[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/ts-hash/ci.yml?style=flat-square&branch=main
-[github-actions-href]: https://github.com/stacksjs/ts-hash/actions?query=workflow%3Aci
+[npm-version-src]: https://img.shields.io/npm/v/@stacksjs/@stacksjs/ts-hash?style=flat-square
+[npm-version-href]: https://npmjs.com/package/@stacksjs/@stacksjs/ts-hash
+[github-actions-src]: https://img.shields.io/github/actions/workflow/status/stacksjs/@stacksjs/ts-hash/ci.yml?style=flat-square&branch=main
+[github-actions-href]: https://github.com/stacksjs/@stacksjs/ts-hash/actions?query=workflow%3Aci
 
-<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/ts-hash/main?style=flat-square
-[codecov-href]: https://codecov.io/gh/stacksjs/ts-hash -->
+<!-- [codecov-src]: https://img.shields.io/codecov/c/gh/stacksjs/@stacksjs/ts-hash/main?style=flat-square
+[codecov-href]: https://codecov.io/gh/stacksjs/@stacksjs/ts-hash -->
