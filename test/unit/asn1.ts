@@ -417,7 +417,7 @@ const UTIL = require('../../lib/util');
         // bytes for round-trip comparison
         const bytes = b.copy().bytes()
         // copy for non-strict test
-        const bns = b.copy()
+        const _bns = b.copy()
         // create strict and non-strict asn1
         const asn1assert = throws ? ASSERT.throws : function (f) { f() }
         let asn1

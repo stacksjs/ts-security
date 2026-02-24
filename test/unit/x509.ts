@@ -355,7 +355,7 @@ const UTIL = require('../../lib/util');
       // verify certificate chain
       const caStore = PKI.createCaStore()
       caStore.addCertificate(cert)
-      PKI.verifyCertificateChain(caStore, [cert], (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, [cert], (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, true)
         ASSERT.ok(cert.verifySubjectKeyIdentifier())
         return true
@@ -420,7 +420,7 @@ const UTIL = require('../../lib/util');
       // verify certificate chain
       const caStore = PKI.createCaStore()
       caStore.addCertificate(cert)
-      PKI.verifyCertificateChain(caStore, [cert], (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, [cert], (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, true)
         ASSERT.ok(cert.verifySubjectKeyIdentifier())
         return true
@@ -478,7 +478,7 @@ const UTIL = require('../../lib/util');
       // verify certificate chain
       const caStore = PKI.createCaStore()
       caStore.addCertificate(cert)
-      PKI.verifyCertificateChain(caStore, [cert], (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, [cert], (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, true)
         ASSERT.ok(cert.verifySubjectKeyIdentifier())
         return true
@@ -749,7 +749,7 @@ const UTIL = require('../../lib/util');
       // verify certificate chain
       const caStore = PKI.createCaStore()
       caStore.addCertificate(cert)
-      PKI.verifyCertificateChain(caStore, [cert], (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, [cert], (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, true)
         ASSERT.ok(cert.verifySubjectKeyIdentifier())
         return true
@@ -837,7 +837,7 @@ const UTIL = require('../../lib/util');
 
       // verify certificate chain
       const caStore = PKI.createCaStore()
-      PKI.verifyCertificateChain(caStore, [cert], (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, [cert], (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, PKI.certificateError.unknown_ca)
         return true
       })
@@ -928,7 +928,7 @@ const UTIL = require('../../lib/util');
       const caStore = PKI.createCaStore()
       caStore.addCertificate(intermediateCert)
       const chain = [entityCert, intermediateCert]
-      PKI.verifyCertificateChain(caStore, chain, (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, chain, (vfd, _depth, _chain) => {
         ASSERT.equal(vfd, true)
         return true
       })
@@ -1019,7 +1019,7 @@ const UTIL = require('../../lib/util');
       const caStore = PKI.createCaStore()
       caStore.addCertificate(intermediateCert)
       const chain = [entityCert, intermediateCert]
-      PKI.verifyCertificateChain(caStore, chain, (vfd, depth, chain) => {
+      PKI.verifyCertificateChain(caStore, chain, (vfd, depth, _chain) => {
         if (depth === 0) {
           ASSERT.equal(vfd, true)
         }

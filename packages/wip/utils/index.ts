@@ -902,9 +902,9 @@ export default util
 // Add proper type declarations for global objects
 declare global {
   // @ts-expect-error unsure how to better handle this
-  var self: WorkerGlobalScope
+  var _self: WorkerGlobalScope
   // @ts-expect-error unsure how to better handle this
-  var window: Window
+  var _window: Window
 
   interface Window {
     // @ts-expect-error unsure how to better handle this

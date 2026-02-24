@@ -78,7 +78,7 @@ export function createBuffer(b?: string | ArrayBuffer | Uint8Array): ByteStringB
     fillWithByte(b: number, n: number): ByteStringBuffer {
       b &= 0xFF;
       const c = String.fromCharCode(b);
-      let added = n;
+      const added = n;
       while (n > 0) {
         if (n & 1) {
           this.data += c;

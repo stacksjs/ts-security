@@ -300,7 +300,7 @@ export function estimateCores(options: any, callback: any): void {
   // create worker concurrency estimation code as blob
   const blobUrl = URL.createObjectURL(new Blob(['(', function () {
     // @ts-ignore
-    self.addEventListener('message', (e: any) => {
+    self.addEventListener('message', (_e: any) => {
       // run worker for 4 ms
       const st = Date.now()
       const et = st + 4
@@ -321,7 +321,7 @@ export function estimateCores(options: any, callback: any): void {
       return callback(null, util.cores)
     }
 
-    map(numWorkers, (err: Error | null, results: any[]) => {
+    map(numWorkers, (_err: Error | null, results: any[]) => {
       max.push(reduce(numWorkers, results))
       sample(max, samples - 1, numWorkers)
     })

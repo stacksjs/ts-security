@@ -38,8 +38,8 @@ export function pbkdf2(
   s: Buffer | string,
   c: number,
   dkLen: number,
-  md?: MessageDigest | string | ((err: Error | null, key?: string) => void),
-  callback?: (err: Error | null, key?: string) => void,
+  md?: MessageDigest | string | ((_err: Error | null, _key?: string) => void),
+  callback?: (_err: Error | null, _key?: string) => void,
 ): string | void {
   if (typeof md === 'function') {
     callback = md

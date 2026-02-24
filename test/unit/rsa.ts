@@ -205,6 +205,7 @@ const UTIL = require('../../lib/util');
       _pairCmp(pair1, pair2)
     })
 
+    // eslint-disable-next-line no-unused-vars
     it('should generate same 512 bit key pair (prng+sync,prng+sync+purejs)', function () {
       if (!isDeterministic(true, false, false)
         || !isDeterministic(true, false, true)) {
@@ -238,6 +239,7 @@ const UTIL = require('../../lib/util');
       _pairCmp(pair1, pair2)
     })
 
+    // eslint-disable-next-line no-unused-vars
     it('should generate same 512 bit key pair (prng+sync,prng+async)', function (done) {
       if (!isDeterministic(true, false, false)
         || !isDeterministic(true, true, false)) {
@@ -250,6 +252,7 @@ const UTIL = require('../../lib/util');
       })
     })
 
+    // eslint-disable-next-line no-unused-vars
     it('should generate same 512 bit key pair (prng+async,prng+sync)', function (done) {
       if (!isDeterministic(true, true, false)
         || !isDeterministic(true, false, false)) {
@@ -262,6 +265,7 @@ const UTIL = require('../../lib/util');
       })
     })
 
+    // eslint-disable-next-line no-unused-vars
     it('should generate same 512 bit key pair (prng+async,prng+async)', function (done) {
       if (!isDeterministic(true, true, false)
         || !isDeterministic(true, true, false)) {
@@ -582,6 +586,7 @@ const UTIL = require('../../lib/util');
        *   -pubin -inkey rsa_1025_public.pem -pkeyopt digest:sha1 \
        *   -pkeyopt rsa_padding_mode:pss -pkeyopt rsa_pss_saltlen:20
        */
+      // eslint-disable-next-line no-unused-vars
       function createTests(params) {
         const keySize = params.keySize
 

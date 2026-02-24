@@ -27,7 +27,7 @@ import { privateKeyFromAsn1, privateKeyToAsn1, wrapRsaPrivateKey } from '../algo
 import { sha1 } from '../algorithms/hash/sha1'
 import { sha512 } from '../algorithms/hash/sha512'
 import { aes } from '../algorithms/symmetric/aes'
-import { createCipher, createCipher as createCipherOriginal } from '../algorithms/symmetric/cipher'
+import { createCipher } from '../algorithms/symmetric/cipher'
 import { des } from '../algorithms/symmetric/des'
 import { rc2 } from '../algorithms/symmetric/rc2'
 import { asn1 } from '../encoding/asn1'

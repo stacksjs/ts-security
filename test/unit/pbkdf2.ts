@@ -148,7 +148,7 @@ const UTIL = require('../../lib/util');
       // Note: might be too slow on old browsers
       const salt = '4bcda0d1c689fe465c5b8a817f0ddf3d'
       const md = MD.sha512.create()
-      PBKDF2('password', salt, 1000, 48, md, (err, dk) => {
+      PBKDF2('password', salt, 1000, 48, md, (_err, dk) => {
         const dkHex = UTIL.bytesToHex(dk)
         ASSERT.equal(dkHex, '975725960aa736f721182962677291a9085c75421c38636098d904f5a96f11a485f767082b710a69f8a46bcf9eba29f3')
         done()
@@ -158,7 +158,7 @@ const UTIL = require('../../lib/util');
     it('should asynchronously derive a password with hmac-sha-512 (passed as an algorithm identifier) c=1000', (done) => {
       // Note: might be too slow on old browsers
       const salt = '4bcda0d1c689fe465c5b8a817f0ddf3d'
-      PBKDF2('password', salt, 1000, 48, 'sha512', (err, dk) => {
+      PBKDF2('password', salt, 1000, 48, 'sha512', (_err, dk) => {
         const dkHex = UTIL.bytesToHex(dk)
         ASSERT.equal(dkHex, '975725960aa736f721182962677291a9085c75421c38636098d904f5a96f11a485f767082b710a69f8a46bcf9eba29f3')
         done()

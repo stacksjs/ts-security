@@ -1280,7 +1280,7 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
 
     if (typeof scheme === 'string') {
       if (scheme === 'RSAES-PKCS1-V1_5') {
-        encodeFn = function(m: string, key: any, pub: any) {
+        encodeFn = function(m: string, key: any, _pub: any) {
           return _encodePkcs1_v1_5(m, key, 0x02).getBytes()
         }
       }

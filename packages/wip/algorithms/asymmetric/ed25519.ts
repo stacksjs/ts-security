@@ -444,7 +444,7 @@ const I = gf([
   0x2B83,
 ])
 
-function sha512(msg: Buffer | Uint8Array, msgLen: number): Buffer | Uint8Array {
+function sha512(msg: Buffer | Uint8Array, _msgLen: number): Buffer | Uint8Array {
   const md = sha.create()
   const buffer = new ByteBuffer()
   const msgStr = Buffer.from(msg).toString('binary')

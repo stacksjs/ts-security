@@ -615,7 +615,7 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
  * @param output an array of block-size 32-bit words.
  * @param decrypt true to decrypt, false to encrypt.
  */
-export function _updateBlock(w: number[], input: number[], output: number[], decrypt: boolean): void {
+export function _updateBlock(_w: number[], _input: number[], _output: number[], _decrypt: boolean): void {
   // Ensure initialization happens before using the tables
   if (!init) {
     initialize()

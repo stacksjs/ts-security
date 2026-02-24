@@ -68,7 +68,7 @@ export interface RNGInterface {
  */
 export function generateProbablePrime(bits: number, options: PrimeOptions, callback: (err: Error | null, num?: BigInteger) => void): void {
   if (typeof options === 'function') {
-    callback = options as (err: Error | null, num?: BigInteger) => void
+    callback = options as (_err: Error | null, _num?: BigInteger) => void
     options = {}
   }
   options = options || {}

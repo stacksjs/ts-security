@@ -450,7 +450,7 @@ export class RC2Algorithm implements Algorithm {
  *
  * @return the cipher.
  */
-function createCipher(key: string | ByteStringBuffer, bits: number, encrypt: boolean): BlockCipher {
+function createCipher(key: string | ByteStringBuffer, _bits: number, encrypt: boolean): BlockCipher {
   const algorithm = new RC2Algorithm()
   const cipher = new BlockCipher({
     algorithm,
@@ -474,7 +474,7 @@ function createCipher(key: string | ByteStringBuffer, bits: number, encrypt: boo
  *
  * @return the cipher.
  */
-export function startEncrypting(key: string, iv: string, output: ByteStringBuffer): BlockCipher {
+export function startEncrypting(key: string, iv: string, _output: ByteStringBuffer): BlockCipher {
   const cipher = createEncryptionCipher(key, 128)
   cipher.start({ iv } as RC2Options)
   return cipher
@@ -511,7 +511,7 @@ export function createEncryptionCipher(key: string, bits: number): BlockCipher {
  *
  * @return the cipher.
  */
-export function startDecrypting(key: string, iv: string, output: ByteStringBuffer): BlockCipher {
+export function startDecrypting(key: string, iv: string, _output: ByteStringBuffer): BlockCipher {
   const cipher = createDecryptionCipher(key, 128)
   cipher.start({ iv } as RC2Options)
   return cipher

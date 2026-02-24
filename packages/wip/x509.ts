@@ -931,7 +931,7 @@ export function verifySignature(options: {
  *
  * @return the certificate.
  */
-export function certificateFromPem(pemString: string, computeHash?: boolean, strict?: boolean): Certificate {
+export function certificateFromPem(pemString: string, computeHash?: boolean, _strict?: boolean): Certificate {
   const msg = pem.decode(pemString)[0]
 
   if (msg.type !== 'CERTIFICATE' && msg.type !== 'X509 CERTIFICATE'
@@ -1092,7 +1092,7 @@ export function getPublicKeyFingerprint(
 export function certificationRequestFromPem(
   pemString: string,
   computeHash: boolean,
-  strict: boolean,
+  _strict: boolean,
 ): CertificationRequest {
   const msg = pem.decode(pemString)[0]
 

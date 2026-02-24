@@ -240,10 +240,10 @@ export function createSocket(options: SocketOptions & { flashId: string }): Sock
   const socket: Socket = {
     id,
     // set handlers
-    connected: options.connected || function (e: SocketEvent) {},
-    closed: options.closed || function (e: SocketEvent) {},
-    data: options.data || function (e: SocketEvent) {},
-    error: options.error || function (e: SocketEvent) {},
+    connected: options.connected || function (_e: SocketEvent) {},
+    closed: options.closed || function (_e: SocketEvent) {},
+    data: options.data || function (_e: SocketEvent) {},
+    error: options.error || function (_e: SocketEvent) {},
     destroy() {
       api.destroy(id)
       delete sp.sockets[id]

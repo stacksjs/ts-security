@@ -39,10 +39,10 @@ export function wrapSocket(options: SocketOptions): Socket {
   const tlsSocket = {
     id: socket.id,
     // set handlers
-    connected: socket.connected || function (e) {},
-    closed: socket.closed || function (e) {},
-    data: socket.data || function (e) {},
-    error: socket.error || function (e) {},
+    connected: socket.connected || function (_e) {},
+    closed: socket.closed || function (_e) {},
+    data: socket.data || function (_e) {},
+    error: socket.error || function (_e) {},
   }
 
   // create TLS connection
@@ -99,12 +99,12 @@ export function wrapSocket(options: SocketOptions): Socket {
   })
 
   // handle doing handshake after connecting
-  socket.connected = function (e) {
+  socket.connected = function (_e) {
     c.handshake(options.sessionId)
   }
 
   // handle closing TLS connection
-  socket.closed = function (e) {
+  socket.closed = function (_e) {
     if (c.open && c.handshaking) {
       // error
       tlsSocket.error({

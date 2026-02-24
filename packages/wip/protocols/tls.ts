@@ -358,7 +358,7 @@ function prf_TLS1(secret: string, label: string, seed: string, length: number) {
  *
  * @return the pseudo random bytes in a byte buffer.
  */
-function prf_sha256(secret: string, label: string, seed: string, length: number) {
+function prf_sha256(_secret: string, _label: string, _seed: string, _length: number) {
   // FIXME: implement me for TLS 1.2
 }
 
@@ -414,7 +414,7 @@ function hmac_sha1(key: Buffer, seqNum: number[], record: Record) {
  *
  * @return true on success, false on failure.
  */
-function deflate(c: any, record: Record, s: any) {
+function deflate(c: any, record: Record, _s: any) {
   let rval = false
 
   try {
@@ -440,7 +440,7 @@ function deflate(c: any, record: Record, s: any) {
  *
  * @return true on success, false on failure.
  */
-function inflate(c, record, s) {
+function inflate(c, record, _s) {
   let rval = false
 
   try {
@@ -771,7 +771,7 @@ function handleUnexpected(c: any, record: any) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-function handleHelloRequest(c: any, record: any, length: number) {
+function handleHelloRequest(c: any, _record: any, _length: number) {
   // ignore renegotiation requests from the server during a handshake, but
   // if handshaking, send a warning alert that renegotation is denied
   if (!c.handshaking && c.handshakes > 0) {
@@ -1364,7 +1364,7 @@ function handleCertificate(c: any, record: any, length: number) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-function handleServerKeyExchange(c: any, record: any, length: number) {
+function handleServerKeyExchange(c: any, _record: any, length: number) {
   // this implementation only supports RSA, no Diffie-Hellman support
   // so any length > 0 is invalid
   if (length > 0) {
@@ -1542,7 +1542,7 @@ function handleCertificateRequest(c: any, record: any, length: number) {
  * @param record the record.
  * @param length the length of the handshake message.
  */
-function handleCertificateVerify(c: any, record: any, length: number) {
+function handleCertificateVerify(_c: any, _record: any, _length: number) {
   if (length < 2) {
     return c.error(c, {
       message: 'Invalid CertificateVerify. Message too short.',
@@ -2028,7 +2028,7 @@ function handleAlert(c: any, record: any) {
  * @param c the connection.
  * @param record the record.
  */
-function handleHandshake(c: any, record: any) {
+function handleHandshake(_c: any, _record: any) {
   // get the handshake type and message length
   const b = record.fragment
   const type = b.getByte()
@@ -2217,23 +2217,23 @@ function handleHeartbeat(c: any, record: any) {
  */
 // client expect states (indicate which records are expected to be received)
 const SHE = 0 // rcv server hello
-var SCE = 1 // rcv server certificate
-var SKE = 2 // rcv server key exchange
-var SCR = 3 // rcv certificate request
-var SHD = 4 // rcv server hello done
-var SCC = 5 // rcv change cipher spec
-var SFI = 6 // rcv finished
-var SAD = 7 // rcv application data
-var SER = 8 // not expecting any messages at this point
+const SCE = 1 // rcv server certificate
+const SKE = 2 // rcv server key exchange
+const SCR = 3 // rcv certificate request
+const SHD = 4 // rcv server hello done
+const SCC = 5 // rcv change cipher spec
+const SFI = 6 // rcv finished
+const SAD = 7 // rcv application data
+const SER = 8 // not expecting any messages at this point
 
 // server expect states
 const CHE = 0 // rcv client hello
-var CCE = 1 // rcv client certificate
-var CKE = 2 // rcv client key exchange
-var CCV = 3 // rcv certificate verify
-var CCC = 4 // rcv change cipher spec
-var CFI = 5 // rcv finished
-var CAD = 6 // rcv application data
+const CCE = 1 // rcv client certificate
+const CKE = 2 // rcv client key exchange
+const CCV = 3 // rcv certificate verify
+const CCC = 4 // rcv change cipher spec
+const CFI = 5 // rcv finished
+const CAD = 6 // rcv application data
 const CER = 7 // not expecting any messages at this point
 
 // map client current expect state and content type to function
@@ -2278,7 +2278,7 @@ const H3 = handleServerKeyExchange
 const H4 = handleCertificateRequest
 const H5 = handleServerHelloDone
 const H6 = handleFinished
-let hsTable: any = []
+const hsTable: any = []
 hsTable[tls.ConnectionEnd.client] = [
 //      HR,01,SH,03,04,05,06,07,08,09,10,SC,SK,CR,HD,15,CK,17,18,19,FI
 /* SHE */[__, __, H1, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __],
@@ -3086,7 +3086,7 @@ tls.createClientKeyExchange = function (c) {
  *
  * @return the ServerKeyExchange byte buffer.
  */
-tls.createServerKeyExchange = function (c) {
+tls.createServerKeyExchange = function (_c) {
   // this implementation only supports RSA, no Diffie-Hellman support,
   // so this record is empty
 
@@ -3219,7 +3219,7 @@ tls.getClientSignature = function (c, callback) {
  *
  * @return the CertificateVerify byte buffer.
  */
-tls.createCertificateVerify = function (c, signature) {
+tls.createCertificateVerify = function (_c, signature) {
   /* Note: The signature will be stored in a "digitally-signed" opaque
     vector that has the length prefixed using 2 bytes, so include those
     2 bytes in the handshake message length. This is done as a minor
@@ -3285,7 +3285,7 @@ tls.createCertificateRequest = function (c) {
  *
  * @return the ServerHelloDone byte buffer.
  */
-function createServerHelloDone(c: any) {
+function createServerHelloDone(_c: any) {
   // build record fragment
   const rval = createBuffer()
   rval.putByte(tls.HandshakeType.server_hello_done)
@@ -3587,7 +3587,7 @@ export function verifyCertificateChain(c: any, chain: any): any {
 
     options.verify = function (vfd, depth, chain) {
       // convert pki.certificateError to tls alert description
-      const desc = _certErrorToAlertDesc(vfd)
+      const _desc = _certErrorToAlertDesc(vfd)
 
       // call application callback
       let ret = c.verify(c, vfd, depth, chain)
@@ -3719,7 +3719,7 @@ tls.createSessionCache = function (cache, capacity) {
         delete rval.cache[key]
       }
       // add session to cache
-      var key = util.bytesToHex(sessionId)
+      const key = util.bytesToHex(sessionId)
       rval.order.push(key)
       rval.cache[key] = session
     }
@@ -3737,7 +3737,7 @@ tls.createSessionCache = function (cache, capacity) {
  *
  * @return the new TLS connection.
  */
-export function createConnection(options: any): any {
+export function createConnection(_options: any): any {
   let caStore = null
   if (options.caStore) {
     // if CA store is an array, convert it to a CA store object
@@ -3783,7 +3783,7 @@ export function createConnection(options: any): any {
     connected: options.connected,
     virtualHost: options.virtualHost || null,
     verifyClient: options.verifyClient || false,
-    verify: options.verify || function (cn, vfd, dpth, cts) { return vfd },
+    verify: options.verify || function (_cn, vfd, _dpth, _cts) { return vfd },
     verifyOptions: options.verifyOptions || {},
     getCertificate: options.getCertificate || null,
     getPrivateKey: options.getPrivateKey || null,

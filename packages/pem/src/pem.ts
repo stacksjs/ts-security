@@ -203,7 +203,8 @@ function foldHeader(header: PEMHeader): string {
 
   // ensure values with CRLF are folded
   const values: string[] = []
-  const insertSpace = (match: string, $1: string): string => {
+  // eslint-disable-next-line no-unused-vars
+  const insertSpace = (_match: string, $1: string): string => {
     return ` ${$1}`
   }
 
