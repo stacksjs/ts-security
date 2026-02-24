@@ -220,7 +220,8 @@ export const Type = {
  *
  * @return the asn1 object.
  */
-export function createAsn1Object(_tagClass: number, _type: number, _constructed: boolean, _value: any, _options?: CreateOptions): Asn1Object {
+// eslint-disable-next-line pickier/no-unused-vars
+export function createAsn1Object(tagClass: number, type: number, constructed: boolean, value: any, options?: CreateOptions): Asn1Object {
   /* An asn1 object has a tagClass, a type, a constructed flag, and a
     value. The value's type depends on the constructed flag. If
     constructed, it will contain a list of other asn1 objects. If not,
