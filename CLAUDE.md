@@ -2,7 +2,7 @@
 
 ## About
 
-A TLS/HTTPS security library with automation.
+ts-security is a comprehensive TypeScript cryptographic library providing AES encryption (128/192/256-bit with ECB, CBC, CFB, OFB, CTR, GCM modes), SHA-2 hashing (SHA-256/384/512), HMAC, RSA encryption/signing, and Ed25519 digital signatures. It also includes X.509 certificate management (PEM encoding, CSR creation, chain validation), a Fortuna CSPRNG implementation, TLS/SSL protocol support, and utilities for Base-N encoding, ASN.1, and BigInteger arithmetic. The library works in both browser and Bun/Node.js environments.
 
 ## Linting
 
