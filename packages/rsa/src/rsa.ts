@@ -768,7 +768,8 @@ export const createKeyPairGenerationState: (bits: number, e?: number, options?: 
  *   // step key-generation, run algorithm for 100 ms, repeat
  *   if(!pki.rsa.stepKeyPairGenerationState(state, 100)) {
  *     setTimeout(step, 1);
- *   } else {
+ *   }
+else {
  *     // key-generation complete
  *     // TODO: turn off progress indicator here
  *     // TODO: use the generated key-pair in "state.keys"
@@ -1074,32 +1075,40 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
       if (scheme === null) {
         // No encoding, just raw encryption
         encodedData = dataStr;
-      } else if (typeof scheme === 'string') {
+      }
+else if (typeof scheme === 'string') {
         const upperScheme = scheme.toUpperCase();
         if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
           // Use PKCS#1 v1.5 padding with block type 0x02 (for encryption)
           encodedData = _encodePkcs1_v1_5(dataStr, key, 0x02).getBytes();
-        } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+        }
+else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
           // Encode with OAEP
           encodedData = pkcs1.encode_rsa_oaep(key, dataStr, schemeOptions);
-        } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+        }
+else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
           // No encoding, just raw encryption
           encodedData = dataStr;
-        } else {
+        }
+else {
           throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
         }
-      } else if (typeof scheme === 'object' && scheme !== null) {
+      }
+else if (typeof scheme === 'object' && scheme !== null) {
         if ('encode' in scheme) {
           // Use custom encoding function
           encodedData = scheme.encode(dataStr, key, true);
-        } else {
+        }
+else {
           // If it's an object but doesn't have an encode property, treat it as raw data
           encodedData = dataStr;
         }
-      } else if (scheme === undefined) {
+      }
+else if (scheme === undefined) {
         // Default to PKCS#1 v1.5 padding
         encodedData = _encodePkcs1_v1_5(dataStr, key, 0x02).getBytes();
-      } else {
+      }
+else {
         throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
       }
 
@@ -1295,9 +1304,11 @@ export function setRsaPublicKey(n: BigInteger, e: BigInteger): {
       else {
         throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
       }
-    } else if (typeof scheme === 'object' && scheme !== null && 'encode' in scheme) {
+    }
+else if (typeof scheme === 'object' && scheme !== null && 'encode' in scheme) {
       encodeFn = scheme.encode
-    } else {
+    }
+else {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`)
     }
 
@@ -1382,38 +1393,46 @@ export function setPrivateKey(
       if (scheme === null) {
         // No decoding, just raw decryption
         decodeFn = function(d: string) { return d; };
-      } else if (typeof scheme === 'string') {
+      }
+else if (typeof scheme === 'string') {
         const upperScheme = scheme.toUpperCase();
         if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
           // Use PKCS#1 v1.5 padding
           decodeFn = function(d: string, key: any) {
             return _decodePkcs1_v1_5(d, key, false);
           };
-        } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+        }
+else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
           // Decode with OAEP
           decodeFn = function(d: string, key: any) {
             return pkcs1.decode_rsa_oaep(key, d, schemeOptions);
           };
-        } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+        }
+else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
           // No decoding, just raw decryption
           decodeFn = function(d: string) { return d; };
-        } else {
+        }
+else {
           throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
         }
-      } else if (typeof scheme === 'object' && scheme !== null) {
+      }
+else if (typeof scheme === 'object' && scheme !== null) {
         if ('decode' in scheme) {
           // Use custom decoding function
           decodeFn = scheme.decode;
-        } else {
+        }
+else {
           // If it's an object but doesn't have a decode property, treat it as raw data
           decodeFn = function(d: string) { return d; };
         }
-      } else if (scheme === undefined) {
+      }
+else if (scheme === undefined) {
         // Default to PKCS#1 v1.5 padding
         decodeFn = function(d: string, key: any) {
           return _decodePkcs1_v1_5(d, key, false);
         };
-      } else {
+      }
+else {
         throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
       }
 
@@ -2238,33 +2257,41 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
     if (scheme === null) {
       // No decoding, just raw decryption
       return decrypted;
-    } else if (typeof scheme === 'string') {
+    }
+else if (typeof scheme === 'string') {
       const upperScheme = scheme.toUpperCase();
       if (upperScheme === 'RSAES-PKCS1-V1_5' || scheme === undefined) {
         // Use PKCS#1 v1.5 padding
         return _decodePkcs1_v1_5(decrypted, key, false);
-      } else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
+      }
+else if (upperScheme === 'RSA-OAEP' || upperScheme === 'RSAES-OAEP') {
         // Decode with OAEP
         return pkcs1.decode_rsa_oaep(key, decrypted, schemeOptions);
-      } else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
+      }
+else if (upperScheme === 'RAW' || upperScheme === 'NONE' || upperScheme === 'NULL') {
         // No decoding, just raw decryption
         return decrypted;
-      } else {
+      }
+else {
         throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
       }
-    } else if (typeof scheme === 'object' && scheme !== null) {
+    }
+else if (typeof scheme === 'object' && scheme !== null) {
       if ('decode' in scheme) {
         // Use custom decoding function
         // @ts-expect-error - scheme decode method exists at runtime
         return scheme.decode(decrypted, key, false);
-      } else {
+      }
+else {
         // If it's an object but doesn't have a decode property, treat it as raw data
         return decrypted;
       }
-    } else if (scheme === undefined) {
+    }
+else if (scheme === undefined) {
       // Default to PKCS#1 v1.5 padding
       return _decodePkcs1_v1_5(decrypted, key, false);
-    } else {
+    }
+else {
       throw new TypeError(`Unsupported encryption scheme: "${scheme}".`);
     }
   }
@@ -2296,7 +2323,8 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
 
     if (typeof scheme === 'string') {
       scheme = scheme.toUpperCase();
-    } else if (scheme === undefined) {
+    }
+else if (scheme === undefined) {
       scheme = 'RSASSA-PKCS1-V1_5';
     }
 
@@ -2364,7 +2392,8 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
             return digest === capture.digest;
           }
         };
-      } else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
+      }
+else if (scheme === 'NONE' || scheme === 'NULL' || scheme === null) {
         verifyScheme = {
           // @ts-expect-error - verify scheme type widening
           verify(digest: string | Uint8Array, d: string) {
@@ -2373,10 +2402,12 @@ export function addRSAKeyOps(key: RSAKey): RSAKeyWithOps {
             return digest === d;
           }
         };
-      } else {
+      }
+else {
         throw new Error(`Unsupported verification scheme: "${scheme}"`);
       }
-    } else {
+    }
+else {
       // scheme is already a VerifyScheme object
       verifyScheme = scheme;
     }

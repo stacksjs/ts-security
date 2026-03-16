@@ -769,7 +769,8 @@ export const createKeyPairGenerationState: (bits: number, e?: number, options?: 
  *   // step key-generation, run algorithm for 100 ms, repeat
  *   if(!pki.rsa.stepKeyPairGenerationState(state, 100)) {
  *     setTimeout(step, 1);
- *   } else {
+ *   }
+else {
  *     // key-generation complete
  *     // TODO: turn off progress indicator here
  *     // TODO: use the generated key-pair in "state.keys"

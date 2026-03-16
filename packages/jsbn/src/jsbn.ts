@@ -60,7 +60,8 @@ export class SecureRandom {
   nextBytes(ba: Uint8Array): void {
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
       crypto.getRandomValues(ba)
-    } else {
+    }
+else {
       for (let i = 0; i < ba.length; i++) {
         ba[i] = Math.floor(Math.random() * 256)
       }
@@ -389,7 +390,8 @@ export class BigInteger {
         r.data[i] = op(this.data[i], f)
       }
       r.t = this.t
-    } else {
+    }
+else {
       const f = this.s & BigInteger.DM
       for (i = m; i < a.t; ++i) {
         r.data[i] = op(f, a.data[i])
@@ -1302,7 +1304,8 @@ export class BigInteger {
         if (ac) {
           if (!a.isEven() || !b.isEven()) { a.addTo(this, a); b.subTo(m, b) }
           a.rShiftTo(1, a)
-        } else {
+        }
+else {
           if (!b.isEven()) b.subTo(m, b)
         }
         b.rShiftTo(1, b)
@@ -1312,7 +1315,8 @@ export class BigInteger {
         if (ac) {
           if (!c.isEven() || !d.isEven()) { c.addTo(this, c); d.subTo(m, d) }
           c.rShiftTo(1, c)
-        } else {
+        }
+else {
           if (!d.isEven()) d.subTo(m, d)
         }
         d.rShiftTo(1, d)
@@ -1321,7 +1325,8 @@ export class BigInteger {
         u.subTo(v, u)
         if (ac) a.subTo(c, a)
         b.subTo(d, b)
-      } else {
+      }
+else {
         v.subTo(u, v)
         if (ac) c.subTo(a, c)
         d.subTo(b, d)

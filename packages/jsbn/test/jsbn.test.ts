@@ -126,7 +126,8 @@ describe('BigInteger', () => {
         expect(a.add(b).toString()).toBe('80')
         expect(a.subtract(b).toString()).toBe('120')
         expect(a.multiply(b).toString()).toBe('-2000')
-      } catch (error) {
+      }
+catch (error) {
         console.error('Error in negative numbers test:', error)
         throw error
       }

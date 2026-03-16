@@ -39,11 +39,14 @@ const mockGenerateProbablePrime = (bits: number, options: PrimeOptions | ((err: 
   // For testing purposes, return different primes based on bit size
   if (bits <= 4) {
     prime = new BigInteger('7') // 7 is a small prime
-  } else if (bits <= 8) {
+  }
+else if (bits <= 8) {
     prime = new BigInteger('17') // 17 is a prime that fits in 5 bits
-  } else if (bits <= 16) {
+  }
+else if (bits <= 16) {
     prime = new BigInteger('257') // 257 is a prime that fits in 9 bits
-  } else {
+  }
+else {
     prime = new BigInteger('65537') // 65537 is a prime that fits in 17 bits
   }
 
