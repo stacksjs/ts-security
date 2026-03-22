@@ -14,3 +14,5 @@ docs/.vitepress/dist
 docs/.vitepress/cache
 storage
 rp
+.zed
+.cursor
