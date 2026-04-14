@@ -2,38 +2,6 @@
 title: Getting Started with ts-security
 description: Learn how to implement security features in your application using ts-security
 ---
-  tls,
-} from 'ts-security'
-```
-
-### AES Encryption
-
-Encrypt and decrypt data using AES with various modes:
-
-```typescript
-import { aes } from 'ts-security'
-
-// Generate a random key (256-bit for AES-256)
-const key = crypto.getRandomValues(new Uint8Array(32))
-
-// Generate a random IV (initialization vector)
-const iv = crypto.getRandomValues(new Uint8Array(16))
-
-// Create cipher in GCM mode (recommended for authenticated encryption)
-const cipher = aes.createCipher('AES-GCM', key)
-cipher.start({ iv })
-cipher.update('Hello, World!')
-cipher.finish()
-
-const encrypted = cipher.output
-const tag = cipher.mode.tag // Authentication tag for GCM
-
-// Decrypt
-const decipher = aes.createDecipher('AES-GCM', key)
-decipher.start({ iv, tag })
-decipher.update(encrypted)
-decipher.finish()
-
 const decrypted = decipher.output.toString()
 console.log(decrypted) // "Hello, World!"
 ```

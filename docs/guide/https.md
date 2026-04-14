@@ -2,37 +2,6 @@
 title: HTTPS Setup
 description: Complete guide to setting up HTTPS with ts-security
 ---
-
-  const attrs = [
-    { shortName: 'CN', value: 'localhost' },
-    { shortName: 'O', value: 'Development' },
-  ]
-
-  cert.setSubject(attrs)
-  cert.setIssuer(attrs)
-
-  cert.setExtensions([
-    { name: 'basicConstraints', cA: false },
-    {
-      name: 'keyUsage',
-      digitalSignature: true,
-      keyEncipherment: true,
-    },
-    {
-      name: 'extKeyUsage',
-      serverAuth: true,
-    },
-    {
-      name: 'subjectAltName',
-      altNames: [
-        { type: 2, value: 'localhost' },
-        { type: 2, value: '*.localhost' },
-        { type: 7, ip: '127.0.0.1' },
-        { type: 7, ip: '::1' },
-      ],
-    },
-  ])
-
   cert.sign(keys.privateKey)
 
   return {

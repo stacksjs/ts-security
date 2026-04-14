@@ -2,38 +2,6 @@
 title: Certificate Management
 description: Comprehensive guide to managing SSL/TLS certificates with ts-security
 ---
-  cert.validity.notAfter.setFullYear(
-    cert.validity.notBefore.getFullYear() + 1
-  )
-
-  // Set subject attributes
-  const attrs = [
-    { shortName: 'CN', value: 'localhost' },
-    { shortName: 'O', value: 'My Organization' },
-    { shortName: 'OU', value: 'Development' },
-    { shortName: 'C', value: 'US' },
-    { shortName: 'ST', value: 'California' },
-    { shortName: 'L', value: 'San Francisco' },
-  ]
-
-  cert.setSubject(attrs)
-  cert.setIssuer(attrs) // Same as subject for self-signed
-
-  // Add extensions
-  cert.setExtensions([
-    {
-      name: 'basicConstraints',
-      cA: false,
-    },
-    {
-      name: 'keyUsage',
-      digitalSignature: true,
-      keyEncipherment: true,
-    },
-    {
-      name: 'extKeyUsage',
-      serverAuth: true,
-      clientAuth: true,
     },
     {
       name: 'subjectAltName',
