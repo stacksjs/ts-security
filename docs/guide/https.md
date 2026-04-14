@@ -2,21 +2,6 @@
 title: HTTPS Setup
 description: Complete guide to setting up HTTPS with ts-security
 ---
-  cert.sign(keys.privateKey)
-
-  return {
-    cert: pki.certificateToPem(cert),
-    key: pki.privateKeyToPem(keys.privateKey),
-  }
-}
-```
-
-### Using with Bun Server
-
-```typescript
-import { createLocalhostCertificate } from './certificates'
-
-const { cert, key } = createLocalhostCertificate()
 
 Bun.serve({
   port: 3000,

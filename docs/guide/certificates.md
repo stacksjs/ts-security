@@ -2,21 +2,6 @@
 title: Certificate Management
 description: Comprehensive guide to managing SSL/TLS certificates with ts-security
 ---
-    },
-    {
-      name: 'subjectAltName',
-      altNames: [
-        { type: 2, value: 'localhost' },
-        { type: 2, value: '*.localhost' },
-        { type: 7, ip: '127.0.0.1' },
-        { type: 7, ip: '::1' },
-      ],
-    },
-  ])
-
-  // Self-sign the certificate
-  cert.sign(keys.privateKey, sha256.create())
-
   return {
     certificate: pki.certificateToPem(cert),
     privateKey: pki.privateKeyToPem(keys.privateKey),

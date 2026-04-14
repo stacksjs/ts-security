@@ -2,23 +2,6 @@
 title: Getting Started with ts-security
 description: Learn how to implement security features in your application using ts-security
 ---
-const decrypted = decipher.output.toString()
-console.log(decrypted) // "Hello, World!"
-```
-
-### SHA-256 Hashing
-
-```typescript
-import { sha256 } from 'ts-security'
-
-// Create a message digest
-const md = sha256.create()
-md.update('Hello, World!')
-const hash = md.digest()
-
-console.log(hash.toHex())
-// "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
-```
 
 ### HMAC Message Authentication
 
