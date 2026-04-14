@@ -3,41 +3,6 @@ title: HTTPS Setup
 description: Complete guide to setting up HTTPS with ts-security
 ---
 
-# HTTPS Setup
-
-This guide covers setting up HTTPS for your applications using ts-security, including local development and production configurations.
-
-## Overview
-
-HTTPS (HTTP Secure) encrypts communication between clients and servers using TLS/SSL. ts-security provides:
-
-- Certificate generation for development
-- TLS connection handling
-- Certificate validation
-- Cipher suite configuration
-
-## Local Development Setup
-
-### Quick Start for localhost
-
-```typescript
-import { pki, rsa, tls } from 'ts-security'
-
-// Generate self-signed certificate for localhost
-function createLocalhostCertificate() {
-  const keys = rsa.generateKeyPair({ bits: 2048 })
-  const cert = pki.createCertificate()
-
-  cert.publicKey = keys.publicKey
-  cert.serialNumber = Date.now().toString(16)
-
-  // 1 year validity
-  cert.validity.notBefore = new Date()
-  cert.validity.notAfter = new Date()
-  cert.validity.notAfter.setFullYear(
-    cert.validity.notBefore.getFullYear() + 1
-  )
-
   const attrs = [
     { shortName: 'CN', value: 'localhost' },
     { shortName: 'O', value: 'Development' },
@@ -95,7 +60,7 @@ Bun.serve({
   },
 })
 
-console.log('Server running at https://localhost:3000')
+console.log('Server running at <https://localhost:300>0')
 ```
 
 ### Using with Node.js
@@ -112,7 +77,7 @@ const server = https.createServer({ cert, key }, (req, res) => {
 })
 
 server.listen(3000, () => {
-  console.log('Server running at https://localhost:3000')
+  console.log('Server running at <https://localhost:300>0')
 })
 ```
 
@@ -270,14 +235,14 @@ import { tls } from 'ts-security'
 // Recommended cipher suites for modern security
 const modernCipherSuites = [
   // TLS 1.3 (preferred)
-  'TLS_AES_256_GCM_SHA384',
-  'TLS_AES_128_GCM_SHA256',
-  'TLS_CHACHA20_POLY1305_SHA256',
+  'TLS*AES*256*GCM*SHA384',
+  'TLS*AES*128*GCM*SHA256',
+  'TLS*CHACHA20*POLY1305*SHA256',
 
   // TLS 1.2 fallback (still secure)
-  'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384',
-  'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256',
-  'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256',
+  'TLS*ECDHE*RSA*WITH*AES*256*GCM*SHA384',
+  'TLS*ECDHE*RSA*WITH*AES*128*GCM*SHA256',
+  'TLS*ECDHE*RSA*WITH*CHACHA20*POLY1305*SHA256',
 ]
 
 const tlsOptions = {
@@ -300,8 +265,8 @@ function createSecureServer(cert: string, key: string) {
 
       // Cipher suite configuration
       ciphers: [
-        'TLS_AES_256_GCM_SHA384',
-        'TLS_AES_128_GCM_SHA256',
+        'TLS*AES*256*GCM*SHA384',
+        'TLS*AES*128*GCM_SHA256',
         'ECDHE-RSA-AES256-GCM-SHA384',
         'ECDHE-RSA-AES128-GCM-SHA256',
       ].join(':'),
@@ -352,6 +317,7 @@ async function secureRequest(url: string, options?: {
 
       connected: (conn) => {
         const request = `GET ${urlObj.pathname} HTTP/1.1\r\n`
+
           + `Host: ${urlObj.hostname}\r\n`
           + `Connection: close\r\n`
           + `\r\n`
@@ -558,6 +524,6 @@ function debugCertificateChain(certPem: string, caCertPem?: string) {
 
 ## Next Steps
 
-- Learn about [X.509 Operations](/guide/x509)
-- Review [Certificate Management](/guide/certificates)
-- Explore the [TLS API Reference](/api/tls)
++ Learn about [X.509 Operations](/guide/x509)
++ Review [Certificate Management](/guide/certificates)
++ Explore the [TLS API Reference](/api/tls)

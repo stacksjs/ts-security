@@ -2,40 +2,6 @@
 title: Getting Started with ts-security
 description: Learn how to implement security features in your application using ts-security
 ---
-
-# Getting Started
-
-This guide will walk you through setting up security features in your application using ts-security.
-
-## Installation
-
-Install ts-security using your preferred package manager:
-
-```bash
-# Using bun
-bun add ts-security
-
-# Using npm
-npm install ts-security
-
-# Using pnpm
-pnpm add ts-security
-```
-
-## Quick Start
-
-### Import the Library
-
-```typescript
-import {
-  aes,
-  sha256,
-  sha512,
-  hmac,
-  rsa,
-  ed25519,
-  pki,
-  random,
   tls,
 } from 'ts-security'
 ```

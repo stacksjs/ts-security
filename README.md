@@ -109,7 +109,7 @@ cert.sign(keypair.privateKey)
 const connection = tls.connect({
   server: host,
   port: 443,
-  caStore: [/* trusted certificates */]
+  caStore: [/_ trusted certificates _/]
 })
 ```
 

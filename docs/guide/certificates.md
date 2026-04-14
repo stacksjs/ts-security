@@ -2,42 +2,6 @@
 title: Certificate Management
 description: Comprehensive guide to managing SSL/TLS certificates with ts-security
 ---
-
-# Certificate Management
-
-This guide covers creating, managing, and working with SSL/TLS certificates using ts-security.
-
-## Overview
-
-Certificates are essential for:
-
-- HTTPS/TLS connections
-- Code signing
-- Email encryption (S/MIME)
-- Client authentication
-- API security
-
-## Creating Self-Signed Certificates
-
-### Basic Self-Signed Certificate
-
-```typescript
-import { pki, rsa } from 'ts-security'
-
-async function createSelfSignedCert() {
-  // Generate RSA key pair
-  const keys = rsa.generateKeyPair({ bits: 2048 })
-
-  // Create certificate
-  const cert = pki.createCertificate()
-  cert.publicKey = keys.publicKey
-
-  // Set serial number (should be unique)
-  cert.serialNumber = Date.now().toString(16)
-
-  // Set validity period
-  cert.validity.notBefore = new Date()
-  cert.validity.notAfter = new Date()
   cert.validity.notAfter.setFullYear(
     cert.validity.notBefore.getFullYear() + 1
   )

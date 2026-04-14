@@ -36,5 +36,3 @@ features:
     icon: "💎"
     details: Full TypeScript support with comprehensive type definitions.
 ---
-
-<Home />
