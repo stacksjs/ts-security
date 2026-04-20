@@ -2,7 +2,7 @@
 
 [Compare changes](https://github.com/stacksjs/ts-security/compare/v0.0.1...v0.0.2)
 
-### 🧹 Chores
+## 🧹 Chores
 
 - release v0.0.2 ([f371eb2](https://github.com/stacksjs/ts-security/commit/f371eb2)) _(by glennmichael123 <gtorregosa@gmail.com>)_
 - wip ([05d4458](https://github.com/stacksjs/ts-security/commit/05d4458)) _(by glennmichael123 <gtorregosa@gmail.com>)_
