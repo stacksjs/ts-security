@@ -2,6 +2,119 @@
 title: Getting Started with ts-security
 description: Learn how to implement security features in your application using ts-security
 ---
+  tls,
+} from 'ts-security'
+```
+
+### AES Encryption
+
+Encrypt and decrypt data using AES with various modes:
+
+```typescript
+import { aes } from 'ts-security'
+
+// Generate a random key (256-bit for AES-256)
+const key = crypto.getRandomValues(new Uint8Array(32))
+
+// Generate a random IV (initialization vector)
+const iv = crypto.getRandomValues(new Uint8Array(16))
+
+// Create cipher in GCM mode (recommended for authenticated encryption)
+const cipher = aes.createCipher('AES-GCM', key)
+cipher.start({ iv })
+cipher.update('Hello, World!')
+cipher.finish()
+
+const encrypted = cipher.output
+const tag = cipher.mode.tag // Authentication tag for GCM
+
+// Decrypt
+const decipher = aes.createDecipher('AES-GCM', key)
+decipher.start({ iv, tag })
+decipher.update(encrypted)
+decipher.finish()
+
+const decrypted = decipher.output.toString()
+console.log(decrypted) // "Hello, World!"
+```
+
+### SHA-256 Hashing
+
+```typescript
+import { sha256 } from 'ts-security'
+
+// Create a message digest
+const md = sha256.create()
+md.update('Hello, World!')
+const hash = md.digest()
+
+console.log(hash.toHex())
+// "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+```
+
+### HMAC Message Authentication
+
+```typescript
+import { hmac } from 'ts-security'
+
+const key = 'secret-key'
+const message = 'Hello, World!'
+
+// Create HMAC with SHA-256
+const mac = hmac.create()
+mac.start('sha256', key)
+mac.update(message)
+const result = mac.digest()
+
+console.log(result.toHex())
+```
+
+### RSA Key Generation and Encryption
+
+```typescript
+import { rsa, pki } from 'ts-security'
+
+// Generate RSA key pair
+const keypair = rsa.generateKeyPair({
+  bits: 2048,
+  workers: -1, // Use all available cores
+})
+
+// Encrypt with public key
+const encrypted = keypair.publicKey.encrypt('Secret message', 'RSA-OAEP', {
+  md: sha256.create(),
+})
+
+// Decrypt with private key
+const decrypted = keypair.privateKey.decrypt(encrypted, 'RSA-OAEP', {
+  md: sha256.create(),
+})
+
+console.log(decrypted) // "Secret message"
+```
+
+### Digital Signatures with Ed25519
+
+```typescript
+import { ed25519 } from 'ts-security'
+
+// Generate key pair
+const keypair = ed25519.generateKeyPair()
+
+// Sign a message
+const message = new TextEncoder().encode('Hello, World!')
+const signature = ed25519.sign(message, keypair.privateKey)
+
+// Verify the signature
+const isValid = ed25519.verify(signature, message, keypair.publicKey)
+console.log(isValid) // true
+```
+
+### Secure Random Numbers
+
+```typescript
+import { random } from 'ts-security'
+
 // Generate random bytes synchronously
 const bytes = random.getBytesSync(32)
 

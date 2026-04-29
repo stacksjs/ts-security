@@ -2,6 +2,117 @@
 title: Certificate Management
 description: Comprehensive guide to managing SSL/TLS certificates with ts-security
 ---
+  cert.validity.notAfter.setFullYear(
+    cert.validity.notBefore.getFullYear() + 1
+  )
+
+  // Set subject attributes
+  const attrs = [
+    { shortName: 'CN', value: 'localhost' },
+    { shortName: 'O', value: 'My Organization' },
+    { shortName: 'OU', value: 'Development' },
+    { shortName: 'C', value: 'US' },
+    { shortName: 'ST', value: 'California' },
+    { shortName: 'L', value: 'San Francisco' },
+  ]
+
+  cert.setSubject(attrs)
+  cert.setIssuer(attrs) // Same as subject for self-signed
+
+  // Add extensions
+  cert.setExtensions([
+    {
+      name: 'basicConstraints',
+      cA: false,
+    },
+    {
+      name: 'keyUsage',
+      digitalSignature: true,
+      keyEncipherment: true,
+    },
+    {
+      name: 'extKeyUsage',
+      serverAuth: true,
+      clientAuth: true,
+    },
+    {
+      name: 'subjectAltName',
+      altNames: [
+        { type: 2, value: 'localhost' },
+        { type: 2, value: '*.localhost' },
+        { type: 7, ip: '127.0.0.1' },
+        { type: 7, ip: '::1' },
+      ],
+    },
+  ])
+
+  // Self-sign the certificate
+  cert.sign(keys.privateKey, sha256.create())
+
+  return {
+    certificate: pki.certificateToPem(cert),
+    privateKey: pki.privateKeyToPem(keys.privateKey),
+    publicKey: pki.publicKeyToPem(keys.publicKey),
+  }
+}
+```
+
+### Certificate with Multiple Domains (SAN)
+
+```typescript
+import { pki, rsa } from 'ts-security'
+
+function createMultiDomainCert(domains: string[]) {
+  const keys = rsa.generateKeyPair({ bits: 2048 })
+  const cert = pki.createCertificate()
+
+  cert.publicKey = keys.publicKey
+  cert.serialNumber = Date.now().toString(16)
+
+  cert.validity.notBefore = new Date()
+  cert.validity.notAfter = new Date()
+  cert.validity.notAfter.setFullYear(
+    cert.validity.notBefore.getFullYear() + 1
+  )
+
+  // Use first domain as CN
+  cert.setSubject([{ shortName: 'CN', value: domains[0] }])
+  cert.setIssuer([{ shortName: 'CN', value: domains[0] }])
+
+  // Add all domains to SAN
+  const altNames = domains.map(domain => ({
+    type: 2, // DNS
+    value: domain,
+  }))
+
+  cert.setExtensions([
+    { name: 'basicConstraints', cA: false },
+    {
+      name: 'keyUsage',
+      digitalSignature: true,
+      keyEncipherment: true,
+    },
+    {
+      name: 'extKeyUsage',
+      serverAuth: true,
+    },
+    {
+      name: 'subjectAltName',
+      altNames,
+    },
+  ])
+
+  cert.sign(keys.privateKey, sha256.create())
+
+  return {
+    certificate: pki.certificateToPem(cert),
+    privateKey: pki.privateKeyToPem(keys.privateKey),
+  }
+}
+
+// Usage
+const { certificate, privateKey } = createMultiDomainCert([
+  'example.com',
   'www.example.com',
   'api.example.com',
 ])

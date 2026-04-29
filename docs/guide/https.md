@@ -2,6 +2,122 @@
 title: HTTPS Setup
 description: Complete guide to setting up HTTPS with ts-security
 ---
+
+  const attrs = [
+    { shortName: 'CN', value: 'localhost' },
+    { shortName: 'O', value: 'Development' },
+  ]
+
+  cert.setSubject(attrs)
+  cert.setIssuer(attrs)
+
+  cert.setExtensions([
+    { name: 'basicConstraints', cA: false },
+    {
+      name: 'keyUsage',
+      digitalSignature: true,
+      keyEncipherment: true,
+    },
+    {
+      name: 'extKeyUsage',
+      serverAuth: true,
+    },
+    {
+      name: 'subjectAltName',
+      altNames: [
+        { type: 2, value: 'localhost' },
+        { type: 2, value: '*.localhost' },
+        { type: 7, ip: '127.0.0.1' },
+        { type: 7, ip: '::1' },
+      ],
+    },
+  ])
+
+  cert.sign(keys.privateKey)
+
+  return {
+    cert: pki.certificateToPem(cert),
+    key: pki.privateKeyToPem(keys.privateKey),
+  }
+}
+```
+
+### Using with Bun Server
+
+```typescript
+import { createLocalhostCertificate } from './certificates'
+
+const { cert, key } = createLocalhostCertificate()
+
+Bun.serve({
+  port: 3000,
+  tls: {
+    cert,
+    key,
+  },
+  fetch(req) {
+    return new Response('Hello, HTTPS!')
+  },
+})
+
+console.log('Server running at <https://localhost:300>0')
+```
+
+### Using with Node.js
+
+```typescript
+import https from 'node:https'
+import { createLocalhostCertificate } from './certificates'
+
+const { cert, key } = createLocalhostCertificate()
+
+const server = https.createServer({ cert, key }, (req, res) => {
+  res.writeHead(200)
+  res.end('Hello, HTTPS!')
+})
+
+server.listen(3000, () => {
+  console.log('Server running at <https://localhost:300>0')
+})
+```
+
+## Custom Development Domains
+
+### Setup Local CA
+
+For custom domains like `*.dev.local`:
+
+```typescript
+import { pki, rsa } from 'ts-security'
+import fs from 'node:fs'
+
+class LocalCA {
+  private caKey: any
+  private caCert: any
+
+  constructor() {
+    this.initCA()
+  }
+
+  private initCA() {
+    const caKeyPath = './.certs/ca-key.pem'
+    const caCertPath = './.certs/ca-cert.pem'
+
+    // Check if CA already exists
+    if (fs.existsSync(caKeyPath) && fs.existsSync(caCertPath)) {
+      this.caKey = pki.privateKeyFromPem(
+        fs.readFileSync(caKeyPath, 'utf-8')
+      )
+      this.caCert = pki.certificateFromPem(
+        fs.readFileSync(caCertPath, 'utf-8')
+      )
+      return
+    }
+
+    // Create new CA
+    const keys = rsa.generateKeyPair({ bits: 4096 })
+    const cert = pki.createCertificate()
+
     cert.publicKey = keys.publicKey
     cert.serialNumber = '01'
 
