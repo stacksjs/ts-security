@@ -488,7 +488,7 @@ function _modPow(x: any, key: any, pub: boolean) {
     s2 = p^-1 mod q
 
     So y = (x1r1s1 + x2r2s2) mod n
-         = ((x^d mod p)q(q^-1 mod p) + (x^d mod q)p(p^-1 mod q)) mod n
+        = ((x^d mod p)q(q^-1 mod p) + (x^d mod q)p(p^-1 mod q)) mod n
 
     According to Fermat's Little Theorem, if the modulus P is prime,
     for any integer A not evenly divisible by P, A^(P-1) ~= 1 mod P.

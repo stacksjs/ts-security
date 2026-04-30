@@ -216,11 +216,11 @@ function destroySocketPool(options: any) {
  *
  * @param options:
  *          flashId: the dom ID for the flash object element.
- *          connected: function(event) called when the socket connects.
- *          closed: function(event) called when the socket closes.
- *          data: function(event) called when socket data has arrived,
+ *          connected: function(_event) called when the socket connects.
+ *          closed: function(_event) called when the socket closes.
+ *          data: function(_event) called when socket data has arrived,
  *            it can be read from the socket using receive().
- *          error: function(event) called when a socket error occurs.
+ *          error: function(_event) called when a socket error occurs.
  *
  * @return the created socket.
  */

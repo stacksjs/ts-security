@@ -4338,7 +4338,7 @@ export const tls: TLS = {
  *   sessionCache: a session cache to use.
  *   cipherSuites: an optional array of cipher suites to use,
  *     see tls.CipherSuites.
- *   connected: function(conn) called when the first handshake completes.
+ *   connected: function(_conn) called when the first handshake completes.
  *   virtualHost: the virtual server name to use in a TLS SNI extension.
  *   verifyClient: true to require a client certificate in server mode,
  *     'optional' to request one, false not to (default: false).
@@ -4351,17 +4351,17 @@ export const tls: TLS = {
  *     a chain of certificates (as an array).
  *   getPrivateKey: an optional callback used to get a private key.
  *   getSignature: an optional callback used to get a signature.
- *   tlsDataReady: function(conn) called when TLS protocol data has been
+ *   tlsDataReady: function(_conn) called when TLS protocol data has been
  *     prepared and is ready to be used (typically sent over a socket
  *     connection to its destination), read from conn.tlsData buffer.
- *   dataReady: function(conn) called when application data has
+ *   dataReady: function(_conn) called when application data has
  *     been parsed from a TLS record and should be consumed by the
  *     application, read from conn.data buffer.
- *   closed: function(conn) called when the connection has been closed.
- *   error: function(conn, error) called when there was an error.
- *   deflate: function(inBytes) if provided, will deflate TLS records using
+ *   closed: function(_conn) called when the connection has been closed.
+ *   error: function(_conn, _error) called when there was an error.
+ *   deflate: function(_inBytes) if provided, will deflate TLS records using
  *     the deflate algorithm if the server supports it.
- *   inflate: function(inBytes) if provided, will inflate TLS records using
+ *   inflate: function(_inBytes) if provided, will inflate TLS records using
  *     the deflate algorithm if the server supports it.
  *
  * @return the new TLS connection.

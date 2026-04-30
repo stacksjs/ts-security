@@ -512,51 +512,51 @@ export function _expandKey(key: number[], decrypt: boolean): number[] {
   }
 
   /* When we are updating a cipher block we always use the code path for
-     encryption whether we are decrypting or not (to shorten code and
-     simplify the generation of look up tables). However, because there
-     are differences in the decryption algorithm, other than just swapping
-     in different look up tables, we must transform our key schedule to
-     account for these changes:
+    encryption whether we are decrypting or not (to shorten code and
+    simplify the generation of look up tables). However, because there
+    are differences in the decryption algorithm, other than just swapping
+    in different look up tables, we must transform our key schedule to
+    account for these changes:
 
-     1. The decryption algorithm gets its key rounds in reverse order.
-     2. The decryption algorithm adds the round key before mixing columns
-       instead of afterwards.
+    1. The decryption algorithm gets its key rounds in reverse order.
+    2. The decryption algorithm adds the round key before mixing columns
+      instead of afterwards.
 
-     We don't need to modify our key schedule to handle the first case,
-     we can just traverse the key schedule in reverse order when decrypting.
+    We don't need to modify our key schedule to handle the first case,
+    we can just traverse the key schedule in reverse order when decrypting.
 
-     The second case requires a little work.
+    The second case requires a little work.
 
-     The tables we built for performing rounds will take an input and then
-     perform SubBytes() and MixColumns() or, for the decrypt version,
-     InvSubBytes() and InvMixColumns(). But the decrypt algorithm requires
-     us to AddRoundKey() before InvMixColumns(). This means we'll need to
-     apply some transformations to the round key to inverse-mix its columns
-     so they'll be correct for moving AddRoundKey() to after the state has
-     had its columns inverse-mixed.
+    The tables we built for performing rounds will take an input and then
+    perform SubBytes() and MixColumns() or, for the decrypt version,
+    InvSubBytes() and InvMixColumns(). But the decrypt algorithm requires
+    us to AddRoundKey() before InvMixColumns(). This means we'll need to
+    apply some transformations to the round key to inverse-mix its columns
+    so they'll be correct for moving AddRoundKey() to after the state has
+    had its columns inverse-mixed.
 
-     To inverse-mix the columns of the state when we're decrypting we use a
-     lookup table that will apply InvSubBytes() and InvMixColumns() at the
-     same time. However, the round key's bytes are not inverse-substituted
-     in the decryption algorithm. To get around this problem, we can first
-     substitute the bytes in the round key so that when we apply the
-     transformation via the InvSubBytes()+InvMixColumns() table, it will
-     undo our substitution leaving us with the original value that we
-     want -- and then inverse-mix that value.
+    To inverse-mix the columns of the state when we're decrypting we use a
+    lookup table that will apply InvSubBytes() and InvMixColumns() at the
+    same time. However, the round key's bytes are not inverse-substituted
+    in the decryption algorithm. To get around this problem, we can first
+    substitute the bytes in the round key so that when we apply the
+    transformation via the InvSubBytes()+InvMixColumns() table, it will
+    undo our substitution leaving us with the original value that we
+    want -- and then inverse-mix that value.
 
-     This change will correctly alter our key schedule so that we can XOR
-     each round key with our already transformed decryption state. This
-     allows us to use the same code path as the encryption algorithm.
+    This change will correctly alter our key schedule so that we can XOR
+    each round key with our already transformed decryption state. This
+    allows us to use the same code path as the encryption algorithm.
 
-     We make one more change to the decryption key. Since the decryption
-     algorithm runs in reverse from the encryption algorithm, we reverse
-     the order of the round keys to avoid having to iterate over the key
-     schedule backwards when running the encryption algorithm later in
-     decryption mode. In addition to reversing the order of the round keys,
-     we also swap each round key's 2nd and 4th rows. See the comments
-     section where rounds are performed for more details about why this is
-     done. These changes are done inline with the other substitution
-     described above.
+    We make one more change to the decryption key. Since the decryption
+    algorithm runs in reverse from the encryption algorithm, we reverse
+    the order of the round keys to avoid having to iterate over the key
+    schedule backwards when running the encryption algorithm later in
+    decryption mode. In addition to reversing the order of the round keys,
+    we also swap each round key's 2nd and 4th rows. See the comments
+    section where rounds are performed for more details about why this is
+    done. These changes are done inline with the other substitution
+    described above.
   */
   if (decrypt) {
     let tmp

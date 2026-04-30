@@ -22,9 +22,9 @@
  *   getCertificate: an optional callback used to get a certificate.
  *   getPrivateKey: an optional callback used to get a private key.
  *   getSignature: an optional callback used to get a signature.
- *   deflate: function(inBytes) if provided, will deflate TLS records using
+ *   deflate: function(_inBytes) if provided, will deflate TLS records using
  *     the deflate algorithm if the server supports it.
- *   inflate: function(inBytes) if provided, will inflate TLS records using
+ *   inflate: function(_inBytes) if provided, will inflate TLS records using
  *     the deflate algorithm if the server supports it.
  *
  * @return the TLS-wrapped socket.
