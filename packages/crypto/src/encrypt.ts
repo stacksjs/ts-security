@@ -3,8 +3,17 @@
  */
 
 export interface EncryptOptions {
-  algorithm?: 'AES-GCM' | 'AES-CBC'
+  /**
+   * Only authenticated AES-GCM is supported. Unauthenticated modes such as
+   * raw AES-CBC are intentionally not offered because they are vulnerable to
+   * tampering and padding-oracle attacks.
+   */
+  algorithm?: 'AES-GCM'
   keyLength?: 128 | 192 | 256
+  /**
+   * Optional 12-byte GCM nonce. Must be unique per key. If omitted a fresh
+   * CSPRNG nonce is generated, which is the recommended usage.
+   */
   iv?: Uint8Array
 }
 
@@ -13,6 +22,11 @@ export interface EncryptResult {
   iv: string
   algorithm: string
 }
+
+/** AES-GCM standard nonce length in bytes. */
+const GCM_IV_LENGTH = 12
+/** PBKDF2 salt length in bytes. */
+const SALT_LENGTH = 16
 
 /**
  * Generate a cryptographic key from a passphrase using PBKDF2
@@ -53,12 +67,17 @@ export async function encrypt(
   passphrase: string,
   options?: EncryptOptions,
 ): Promise<EncryptResult> {
-  const algorithm = options?.algorithm || 'AES-GCM'
+  const algorithm = 'AES-GCM'
   const keyLength = options?.keyLength || 256
-  const iv = options?.iv || crypto.getRandomValues(new Uint8Array(12))
+  const iv = options?.iv || crypto.getRandomValues(new Uint8Array(GCM_IV_LENGTH))
+
+  // GCM nonces must be exactly 12 bytes so that decrypt() can locate the
+  // ciphertext boundary in the serialized salt||iv||ciphertext blob.
+  if (iv.length !== GCM_IV_LENGTH)
+    throw new Error(`AES-GCM IV must be exactly ${GCM_IV_LENGTH} bytes`)
 
   // Generate salt for key derivation
-  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH))
 
   // Derive key from passphrase
   const key = await deriveKey(passphrase, salt, keyLength)
@@ -94,23 +113,29 @@ export async function encrypt(
 export async function decrypt(
   encryptedData: string,
   passphrase: string,
-  algorithm: string = 'AES-GCM',
 ): Promise<string> {
   // Decode from base64
   const combined = Buffer.from(encryptedData, 'base64')
 
+  // The blob must contain salt + IV + at least the 16-byte GCM auth tag.
+  const minLength = SALT_LENGTH + GCM_IV_LENGTH + 16
+  if (combined.length < minLength)
+    throw new Error('Invalid ciphertext: too short')
+
   // Extract salt, IV, and encrypted data
-  const salt = combined.slice(0, 16)
-  const iv = combined.slice(16, 28) // 12 bytes for GCM
-  const encrypted = combined.slice(28)
+  const salt = combined.slice(0, SALT_LENGTH)
+  const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + GCM_IV_LENGTH)
+  const encrypted = combined.slice(SALT_LENGTH + GCM_IV_LENGTH)
 
   // Derive key from passphrase
   const key = await deriveKey(passphrase, salt)
 
-  // Decrypt the message
+  // Always decrypt with authenticated AES-GCM. The algorithm is fixed (never
+  // caller-supplied) so a malicious ciphertext cannot downgrade the mode, and
+  // GCM verifies the auth tag, rejecting any tampered ciphertext.
   const decrypted = await crypto.subtle.decrypt(
     {
-      name: algorithm,
+      name: 'AES-GCM',
       iv: iv as BufferSource,
     },
     key,
