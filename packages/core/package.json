@@ -1,6 +1,7 @@
 {
   "name": "ts-security",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A library of security utilities. Written in TypeScript. Optimized for Node/Bun/Browser environments.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

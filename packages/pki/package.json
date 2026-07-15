@@ -1,6 +1,7 @@
 {
   "name": "ts-pki",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A PKI library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

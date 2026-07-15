@@ -1,6 +1,7 @@
 {
   "name": "ts-jsbn",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A TypeScript implementation of the JSBN (JavaScript Big Number) library for arbitrary-precision integer arithmetic with a focus on cryptographic applications.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

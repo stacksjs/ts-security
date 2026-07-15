@@ -1,6 +1,7 @@
 {
   "name": "ts-aes",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A AES library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

@@ -1,6 +1,7 @@
 {
   "name": "ts-asn1",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A ASN.1 library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",

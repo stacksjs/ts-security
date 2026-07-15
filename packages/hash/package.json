@@ -1,6 +1,7 @@
 {
   "name": "@stacksjs/ts-hash",
   "type": "module",
+  "sideEffects": false,
   "version": "0.0.2",
   "description": "A SHA-1, SHA-256, SHA-384, SHA-512 hashing library.",
   "author": "Chris Breuer <chris@stacksjs.org> (https://github.com/chrisbbreuer)",
