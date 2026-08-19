@@ -1,12 +1,19 @@
-import type { BunpressConfig } from 'bunpress'
+import type { BunPressConfig } from '@stacksjs/bunpress'
 
-const config: BunpressConfig = {
-  name: 'ts-security',
+const config: BunPressConfig = {
+  title: 'ts-security',
   description: 'A comprehensive TypeScript security library providing cryptographic primitives, TLS/HTTPS support, and X.509 certificate management.',
   url: 'https://ts-security.stacksjs.org',
 
-  theme: {
-    primaryColor: '#2563EB',
+  themeConfig: {
+    socialLinks: [
+      { icon: 'github', link: 'https://github.com/stacksjs/ts-security' },
+      { icon: 'discord', link: 'https://discord.gg/stacksjs' },
+      { icon: 'twitter', link: 'https://twitter.com/stacksjs' },
+    ],
+    colors: {
+      primary: '#2563EB',
+    },
   },
 
   nav: [
@@ -74,11 +81,6 @@ const config: BunpressConfig = {
     ['meta', { name: 'keywords', content: 'typescript, security, cryptography, tls, https, certificates, x509, aes, rsa, encryption' }],
   ],
 
-  socialLinks: [
-    { icon: 'github', link: 'https://github.com/stacksjs/ts-security' },
-    { icon: 'discord', link: 'https://discord.gg/stacksjs' },
-    { icon: 'twitter', link: 'https://twitter.com/stacksjs' },
-  ],
 }
 
 export default config
